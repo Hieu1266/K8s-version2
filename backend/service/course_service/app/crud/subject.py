@@ -76,7 +76,11 @@ class CRUDSubject(CRUDBase[Subject, SubjectCreate, SubjectUpdate, UUID]):
             )
 
         return db.exec(statement).all()
-    
-
+    def get_owner(self, db: Session, subject_id: UUID) -> Optional[UUID]:
+        statement = (
+            select(Syllabus.instructor_id)
+            .where(Syllabus.subject_id == subject_id)
+        )
+        return db.exec(statement).first()
 
 crud_subject = CRUDSubject(Subject)

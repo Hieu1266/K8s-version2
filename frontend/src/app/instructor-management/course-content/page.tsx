@@ -113,10 +113,6 @@ export default function CourseContentPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2 bg-blue-50 text-blue-700 px-3.5 py-2 rounded-lg text-xs font-medium border border-blue-100">
-            <Info size={16} className="shrink-0 text-blue-600" />
-            <span>Chỉ hiển thị môn học do Quản trị viên/Bộ môn phân công.</span>
-          </div>
         </div>
 
         {/* Khối Thống kê */}

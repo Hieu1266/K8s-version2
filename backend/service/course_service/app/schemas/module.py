@@ -7,8 +7,10 @@ class ModuleBase(BaseModel):
     title: str
     order_index: int = 1
 
-class ModuleCreate(ModuleBase):
+class ModuleCreate(BaseModel):
+    title: str
     subject_id: UUID
+    order_index: Optional[int] = None
 
 class ModuleUpdate(BaseModel):
     title: Optional[str] = None
@@ -25,3 +27,9 @@ class ModuleLearningStructure(BaseModel):
     title: str
     module_id: UUID
     lessons: List[LessonLearningStructure]
+
+class ModuleData(BaseModel):
+    module_id: UUID
+    title: str
+    total_lessons: int
+    order_index: int

@@ -1,4 +1,5 @@
-from pydantic import BaseModel
+import os
+from pydantic import BaseModel, computed_field
 from uuid import UUID
 from typing import Optional
 from app.schemas.enums import SyllabusStatus
@@ -22,6 +23,12 @@ class SyllabusUpdate(BaseModel):
 
 class SyllabusRead(SyllabusBase):
     syllabus_id: UUID
+
+    # Tự động trích xuất tên file từ đường dẫn để hiển thị lên UI
+    @computed_field
+    @property
+    def file_name(self) -> str:
+        return os.path.basename(self.syllabus_file_path) if self.syllabus_file_path else ""
 
     class Config:
         from_attributes = True

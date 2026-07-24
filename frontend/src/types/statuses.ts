@@ -32,3 +32,10 @@ export enum ReviewStatus {
     COMPLETED = 'COMPLETED', // Đã chấm xong
     SKIPPED = 'SKIPPED',     // Bị bỏ qua (hết hạn hoặc lý do đặc biệt)
 }
+
+export enum SyllabusStatus {
+    SYLLABUS_DRAFT = "SYLLABUS_DRAFT",
+    SYLLABUS_REVIEWING = "SYLLABUS_REVIEWING",
+    SYLLABUS_APPROVED = "SYLLABUS_APPROVED",
+    SYLLABUS_REJECTED = "SYLLABUS_REJECTED"
+}

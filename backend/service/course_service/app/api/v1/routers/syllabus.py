@@ -4,6 +4,7 @@ from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status, UploadFile, File
+from fastapi.responses import FileResponse  # 🟢 Bổ sung import để trả về file stream
 
 from app.api.v1.deps import SessionDep
 from app.core.security import RoleChecker
@@ -47,6 +48,7 @@ async def upload_syllabus_file(file: UploadFile = File(...)):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Lỗi khi lưu file: {str(e)}")
+
 
 # 🔵 2. API: Lấy thông tin đề cương theo ID Môn học
 @router.get("/subject/{subject_id}", response_model=SyllabusRead, status_code=status.HTTP_200_OK)
@@ -93,7 +95,7 @@ def update_syllabus(
     db: SessionDep,
     current_user: dict = Depends(RoleChecker(["Admin", "Instructor", "Manager"]))
 ):
-    db_obj = crud_syllabus.get(db=db, id=syllabus_id)
+    db_obj = crud_syllabus.get_by_id(db=db, id=syllabus_id)
     if not db_obj:
         raise HTTPException(status_code=404, detail="Không tìm thấy đề cương yêu cầu.")
     return crud_syllabus.update(db=db, db_obj=db_obj, obj_in=payload)
@@ -107,3 +109,29 @@ def is_subject_instructor(
 ):
     query = CheckSyllabusInstructor(subject_id=subject_id, instructor_id=instructor_id)
     return crud_syllabus.is_subject_instructor(db, query)
+
+
+
+@router.get("/download/{syllabus_id}")
+def download_syllabus_file(
+    syllabus_id: UUID,
+    db: SessionDep,
+    current_user: dict = Depends(RoleChecker(["Admin", "Instructor", "Student", "Manager"]))
+):
+    syllabus = crud_syllabus.get_by_id(db=db, id=syllabus_id)
+    if not syllabus or not syllabus.syllabus_file_path:
+        raise HTTPException(status_code=404, detail="Không tìm thấy tập tin đề cương.")
+
+    # Tìm đường dẫn tuyệt đối trên đĩa
+    base_dir = "/var/www/lumer_media/uploads" if os.path.exists("/var/www/lumer_media/uploads") else ""
+    full_path = os.path.join(base_dir, syllabus.syllabus_file_path)
+
+    if not os.path.exists(full_path):
+        raise HTTPException(status_code=404, detail="Tập tin không tồn tại trên máy chủ.")
+
+    file_name = os.path.basename(full_path)
+    return FileResponse(
+        path=full_path,
+        filename=file_name,
+        media_type="application/pdf"
+    )

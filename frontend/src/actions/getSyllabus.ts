@@ -1,4 +1,5 @@
 'use server'
+import { SyllabusUpdatePayload, SyllabusData, UploadSyllabusResponse } from '@/types/syllabus';
 
 import { cookies } from 'next/headers'
 
@@ -20,18 +21,11 @@ export interface Course {
   title: string;
   description?: string;
   status_id?: string;
-  instructor_id?: string | null;       
-  curriculum_id: string;               
-  curriculum_file_path?: string | null; 
-  subjects: Subject[];                 
+  instructor_id?: string | null;
+  curriculum_id: string;
+  curriculum_file_path?: string | null;
+  subjects: Subject[];
 }
-
-// export interface InstructorUser {
-//   user_id: string;
-//   username: string;
-//   email: string;
-//   role_id: number;
-// }
 
 // --- HELPER: LẤY TOKEN TỪ COOKIES ---
 async function getTokenFromCookie(): Promise<string> {
@@ -55,15 +49,23 @@ async function getUserIdFromToken(): Promise<string | null> {
   }
 }
 
+async function getAuthHeaders(additionalHeaders: Record<string, string> = {}) {
+  const token = await getTokenFromCookie();
+  return {
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...additionalHeaders,
+  };
+}
+
 // 1. Khóa học
 export async function getCoursesAction(): Promise<Course[]> {
   try {
     const token = await getTokenFromCookie();
     const response = await fetch(`${userBackendUrl}/courses/`, {
       method: "GET",
-      headers: { 
-        "Authorization": `Bearer ${token}`, 
-        "Accept": "application/json" 
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Accept": "application/json"
       },
     });
 
@@ -83,9 +85,9 @@ export async function getSubjectsByCourseAction(courseId: string): Promise<Subje
     const token = await getTokenFromCookie();
     const response = await fetch(`${userBackendUrl}/subjects/course/${courseId}`, {
       method: "GET",
-      headers: { 
-        "Authorization": `Bearer ${token}`, 
-        "Accept": "application/json" 
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Accept": "application/json"
       },
     });
 
@@ -103,9 +105,9 @@ export async function getSubjectsAction(): Promise<Subject[]> {
     const token = await getTokenFromCookie();
     const response = await fetch(`${userBackendUrl}/subjects/`, {
       method: "GET",
-      headers: { 
-        "Authorization": `Bearer ${token}`, 
-        "Accept": "application/json" 
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Accept": "application/json"
       },
     });
 
@@ -172,7 +174,7 @@ export async function createSyllabusAction(payload: {
   subject_id: string;
   description: string;
   syllabus_file_path?: string | null;
-  instructor_id?: string | null; // 👈 Nhận Giảng viên được chọn từ UI Form!
+  instructor_id?: string | null;
   status_id?: string;
 }) {
   try {
@@ -180,13 +182,13 @@ export async function createSyllabusAction(payload: {
     const url = `${baseUrl.replace(/\/$/, "")}/syllabus/`;
 
     const token = await getTokenFromCookie();
-    const currentUserId = await getUserIdFromToken(); // Người thực hiện phân công (Assigner)
+    const currentUserId = await getUserIdFromToken();
 
     const finalPayload = {
       subject_id: payload.subject_id,
       description: payload.description || "Chưa có mô tả",
-      instructor_id: payload.instructor_id || null, // 👈 Giảng viên đứng lớp (role_id = 4)
-      assigner_id: currentUserId,                    // 👈 Người phân công (Admin/Quản lý)
+      instructor_id: payload.instructor_id || null,
+      assigner_id: currentUserId,
       syllabus_file_path: payload.syllabus_file_path || "documents/syllabi/placeholder.pdf",
       status_id: payload.status_id || "SYLLABUS_DRAFT"
     };
@@ -210,62 +212,6 @@ export async function createSyllabusAction(payload: {
     throw new Error(error.message || "Lỗi kết nối đến máy chủ.");
   }
 }
-
-// 🟢 7. LẤY DANH SÁCH GIẢNG VIÊN (ROLE_ID = 4) ĐỂ HIỂN THỊ LÊN FORM CHỌN
-export interface InstructorUser {
-  user_id: string | number;
-  username: string;
-  email: string;
-  role?: string;
-}
-
-
-
-
-// export async function getInstructorsAction(): Promise<InstructorUser[]> {
-//   try {
-//     // ⚠️ Đảm bảo URL API backend đúng (ví dụ API lấy danh sách user có role INSTRUCTOR/TEACHER)
-//     const response = await fetch(`${process.env.BACKEND_URL}/api/users/instructors`, {
-//       method: "GET",
-//       headers: {
-//         "Content-Type": "application/json",
-//         // Bổ sung Token/Header Authorization nếu API yêu cầu đăng nhập:
-//         // "Authorization": `Bearer ${token}` 
-//       },
-//       cache: "no-store", // Đảm bảo lấy dữ liệu mới nhất
-//     });
-
-//     if (!response.ok) {
-//       console.error("Lỗi HTTP khi lấy giảng viên:", response.status);
-//       return [];
-//     }
-
-//     const resData = await response.json();
-
-//     // ⚠️ QUAN TRỌNG: Kiểm tra cấu trúc JSON trả về từ Backend!
-//     // Trường hợp Backend trả về mảng trực tiếp: [ { user_id, username, ... } ]
-//     if (Array.isArray(resData)) {
-//       return resData;
-//     }
-
-//     // Trường hợp Backend bọc data trong object: { data: [ ... ] } hoặc { users: [ ... ] }
-//     if (resData && Array.isArray(resData.data)) {
-//       return resData.data;
-//     }
-//     if (resData && Array.isArray(resData.users)) {
-//       return resData.users;
-//     }
-
-//     return [];
-//   } catch (error) {
-//     console.error("Lỗi catch khi getInstructorsAction:", error);
-//     return [];
-//   }
-// }
-
-
-
-
 
 // 8. Upload File
 export async function uploadFileAction(formData: FormData) {
@@ -291,9 +237,6 @@ export async function uploadFileAction(formData: FormData) {
   return data;
 }
 
-
-
-
 export interface InstructorUser {
   user_id: string | number;
   username: string;
@@ -303,19 +246,14 @@ export interface InstructorUser {
 
 export async function getInstructorsAction(): Promise<InstructorUser[]> {
   try {
-    // 1. Phải dùng biến môi trường của hệ thống USER (không phải Course)
     const userBackendUrl = process.env.NEXT_PUBLIC_USER_BACKEND_URL;
-    const token = await getTokenFromCookie(); // Hàm này đã có sẵn ở đầu file getSyllabus.ts
+    const token = await getTokenFromCookie();
 
-    // 2. Thiết lập tham số giống hệt hàm getrInstructorList của bạn
     const skip = 0;
-    const limit = 100; // Lấy tối đa 100 giảng viên
-    const roleId = 4;  // Role Giảng viên
-    
-    // Đảm bảo statusId đúng với Database của bạn (ví dụ: 'ACTIVE' hoặc '1')
-    const statusId = "ACTIVE"; 
+    const limit = 100;
+    const roleId = 4;
+    const statusId = "ACTIVE";
 
-    // 3. Gọi đúng endpoint lấy giảng viên của bên User backend
     const url = `${userBackendUrl}/get-instructor-list?skip=${skip}&limit=${limit}&status_id=${statusId}&role_id=${roleId}`;
 
     const response = await fetch(url, {
@@ -334,17 +272,15 @@ export async function getInstructorsAction(): Promise<InstructorUser[]> {
 
     const resData = await response.json();
 
-    // 4. Bóc tách dữ liệu đúng cấu trúc
     let rawList = [];
     if (Array.isArray(resData)) {
       rawList = resData;
     } else if (resData && Array.isArray(resData.data)) {
       rawList = resData.data;
     } else if (resData && Array.isArray(resData.list)) {
-      rawList = resData.list; // Đón đầu cấu trúc ActionResponseList của bạn
+      rawList = resData.list;
     }
 
-    // 5. Chuẩn hóa dữ liệu map vào UI Form
     return rawList.map((user: any) => ({
       user_id: user.user_id,
       username: user.username || "Chưa có tên",
@@ -358,3 +294,77 @@ export async function getInstructorsAction(): Promise<InstructorUser[]> {
   }
 }
 
+/**
+ * 9. Cập nhật Đề cương (Syllabus) theo ID
+ */
+export async function updateSyllabusAction(
+  syllabusId: string,
+  payload: SyllabusUpdatePayload
+) {
+  try {
+    const baseUrl = userBackendUrl || "";
+    const url = `${baseUrl.replace(/\/$/, "")}/syllabus/${syllabusId}`;
+
+    const token = await getTokenFromCookie();
+
+    const res = await fetch(url, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { "Authorization": `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify(payload)
+    });
+
+    // 🟢 An toàn hơn: Bắt lỗi chuỗi / HTML khi Server bị crash 500
+    if (!res.ok) {
+      const errorText = await res.text();
+      let errorMessage = `Lỗi máy chủ (${res.status})`;
+      try {
+        const errorJson = JSON.parse(errorText);
+        errorMessage = errorJson.detail || errorMessage;
+      } catch {
+        // Nếu response là plain text "Internal Server Error"
+        errorMessage = errorText || errorMessage;
+      }
+      throw new Error(errorMessage);
+    }
+
+    return await res.json();
+  } catch (error: any) {
+    throw new Error(error.message || "Lỗi cập nhật đề cương");
+  }
+}
+
+/**
+ * 10. Tải file Đề cương (Syllabus) về máy dưới dạng dữ liệu Base64
+ */
+export async function downloadSyllabusFileAction(
+  syllabusId: string
+): Promise<{ base64Data: string; contentType: string }> {
+  try {
+    const baseUrl = userBackendUrl || "";
+    const url = `${baseUrl.replace(/\/$/, "")}/syllabus/download/${syllabusId}`;
+
+    const token = await getTokenFromCookie();
+
+    const res = await fetch(url, {
+      method: "GET",
+      headers: {
+        ...(token ? { "Authorization": `Bearer ${token}` } : {})
+      }
+    });
+
+    if (!res.ok) {
+      throw new Error("Không thể tải tập tin đề cương về máy.");
+    }
+
+    const arrayBuffer = await res.arrayBuffer();
+    const base64Data = Buffer.from(arrayBuffer).toString("base64");
+    const contentType = res.headers.get("content-type") || "application/octet-stream";
+
+    return { base64Data, contentType };
+  } catch (error: any) {
+    throw new Error(error.message || "Lỗi khi tải file đề cương");
+  }
+}
