@@ -6,12 +6,8 @@ import Link from "next/link";
 export default function Navbar() {
   const router = useRouter();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [showExploreMenu, setShowExploreMenu] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
-
-  const exploreRef = useRef<HTMLDivElement>(null);
   const userRef = useRef<HTMLDivElement>(null);
-
   const [role, setRole] = useState("");
 
   useEffect(() => {
@@ -20,9 +16,6 @@ export default function Navbar() {
     setRole(savedRole);
 
     const handleClickOutside = (event: MouseEvent) => {
-      if (exploreRef.current && !exploreRef.current.contains(event.target as Node)) {
-        setShowExploreMenu(false);
-      }
       if (userRef.current && !userRef.current.contains(event.target as Node)) {
         setShowUserMenu(false);
       }
@@ -48,7 +41,6 @@ export default function Navbar() {
     }
   };
 
-
   const handleLogout = () => {
     localStorage.clear();
     alert("Đã đăng xuất tài khoản!");
@@ -73,7 +65,6 @@ export default function Navbar() {
     <header className="bg-white border-b border-gray-200 sticky top-0 z-50 px-6 py-3.5 flex justify-between items-center font-sans">
       {/* KHU VỰC BÊN TRÁI */}
       <div className="flex items-center space-x-6">
-
         {/* LOGO: LUÔN VỀ /home NẾU ĐÃ ĐĂNG NHẬP (BẤT KỂ ROLE NÀO) */}
         <Link
           href={isLoggedIn ? "/home" : "/"}
@@ -81,68 +72,57 @@ export default function Navbar() {
         >
           LUMER <span className="text-blue-400 font-medium text-xs">elearning</span>
         </Link>
-      </div >
+      </div>
 
       {/* KHU VỰC BÊN PHẢI */}
-      < div className="flex items-center space-x-4" >
-        {
-          isLoggedIn ? (
-            <div className="relative" ref={userRef} >
-              <button
-                type="button"
-                onClick={() => setShowUserMenu(!showUserMenu)}
-                className="w-8 h-8 bg-[#0b1b35] hover:bg-slate-800 text-white font-black text-xs rounded-full flex items-center justify-center cursor-pointer border border-slate-200 transition uppercase"
-              >
-                {getAvatarText()}
-              </button>
+      <div className="flex items-center space-x-4">
+        {isLoggedIn ? (
+          <div className="relative" ref={userRef}>
+            <button
+              type="button"
+              onClick={() => setShowUserMenu(!showUserMenu)}
+              className="w-8 h-8 bg-[#0b1b35] hover:bg-slate-800 text-white font-black text-xs rounded-full flex items-center justify-center cursor-pointer border border-slate-200 transition uppercase"
+            >
+              {getAvatarText()}
+            </button>
 
-              {/* MENU AVATAR */}
-              {showUserMenu && (
-                <div className="absolute right-0 mt-2 w-52 bg-white border border-gray-200 rounded-xl shadow-lg py-1.5 z-50 divide-y divide-gray-100">
-                  <div className="py-1">
-                    {/* Nút vào trang làm việc tương ứng với Role */}
-                    <Link
-                      href={menuConfig.path}
-                      onClick={() => setShowUserMenu(false)}
-                      className="block px-4 py-2 text-xs font-bold text-gray-700 hover:bg-slate-50 hover:text-[#0066FF] transition no-underline"
-                    >
-                      {menuConfig.label}
-                    </Link>
-
-                    {/* Nút quay lại trang chủ /home cho nhanh */}
-                    <Link
-                      href="/home"
-                      onClick={() => setShowUserMenu(false)}
-                      className="block px-4 py-2 text-xs font-medium text-gray-600 hover:bg-slate-50 hover:text-[#0066FF] transition no-underline"
-                    >
-                      Trang chủ khóa học
-                    </Link>
-                  </div>
-
-                  <div className="py-1">
-                    <button
-                      type="button"
-                      onClick={handleLogout}
-                      className="w-full text-left px-4 py-2 text-xs font-bold text-red-600 hover:bg-red-50 transition cursor-pointer border-none bg-transparent"
-                    >
-                      Đăng xuất
-                    </button>
-                  </div>
+            {/* MENU AVATAR */}
+            {showUserMenu && (
+              <div className="absolute right-0 mt-2 w-52 bg-white border border-gray-200 rounded-xl shadow-lg py-1.5 z-50 divide-y divide-gray-100">
+                <div className="py-1">
+                  {/* Nút vào trang làm việc tương ứng với Role */}
+                  <Link
+                    href={menuConfig.path}
+                    onClick={() => setShowUserMenu(false)}
+                    className="block px-4 py-2 text-xs font-bold text-gray-700 hover:bg-slate-50 hover:text-[#0066FF] transition no-underline"
+                  >
+                    {menuConfig.label}
+                  </Link>
                 </div>
-              )
-              }
-            </div >
-          ) : (
-            <>
-              <Link href="/login?mode=login" className="text-xs font-bold text-gray-700 hover:text-blue-600 transition no-underline">
-                Đăng nhập
-              </Link>
-              <Link href="/login?mode=register" className="bg-blue-50 hover:bg-blue-100 text-[#0066FF] border border-blue-100 text-xs font-bold px-4 py-2 rounded-xl transition no-underline">
-                Đăng ký tài khoản
-              </Link>
-            </>
-          )}
-      </ >
-    </header >
+
+                <div className="py-1">
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="w-full text-left px-4 py-2 text-xs font-bold text-red-600 hover:bg-red-50 transition cursor-pointer border-none bg-transparent"
+                  >
+                    Đăng xuất
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <>
+            <Link href="/login?mode=login" className="text-xs font-bold text-gray-700 hover:text-blue-600 transition no-underline">
+              Đăng nhập
+            </Link>
+            <Link href="/login?mode=register" className="bg-blue-50 hover:bg-blue-100 text-[#0066FF] border border-blue-100 text-xs font-bold px-4 py-2 rounded-xl transition no-underline">
+              Đăng ký tài khoản
+            </Link>
+          </>
+        )}
+      </div>
+    </header>
   );
 }
