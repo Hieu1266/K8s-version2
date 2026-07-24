@@ -48,13 +48,6 @@ export default function Navbar() {
     }
   };
 
-<<<<<<< HEAD
-  const handleCategoryClick = (categoryName: string) => {
-    setShowExploreMenu(false);
-    router.push(`/home?category=${encodeURIComponent(categoryName)}`);
-  };
-=======
->>>>>>> f8c8135 (Update nav bar)
 
   const handleLogout = () => {
     localStorage.clear();
