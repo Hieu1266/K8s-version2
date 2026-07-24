@@ -48,9 +48,15 @@ export default function Navbar() {
     }
   };
 
+  // Xử lý khi bấm vào danh mục trong Menu Khám phá
   const handleCategoryClick = (categoryName: string) => {
     setShowExploreMenu(false);
-    router.push(`/home?category=${encodeURIComponent(categoryName)}`);
+
+    // Đường dẫn gốc được tính toán động dựa vào quyền tài khoản hiện tại
+    const basePath = getBasePathByRole();
+
+    // Đẩy kèm tham số danh mục lọc ra URL của trang đó
+    router.push(`${basePath}?category=${encodeURIComponent(categoryName)}`);
   };
 
   const handleLogout = () => {
@@ -77,7 +83,7 @@ export default function Navbar() {
     <header className="bg-white border-b border-gray-200 sticky top-0 z-50 px-6 py-3.5 flex justify-between items-center font-sans">
       {/* KHU VỰC BÊN TRÁI */}
       <div className="flex items-center space-x-6">
-        
+
         {/* LOGO: LUÔN VỀ /home NẾU ĐÃ ĐĂNG NHẬP (BẤT KỂ ROLE NÀO) */}
         <Link
           href={isLoggedIn ? "/home" : "/"}
@@ -86,52 +92,54 @@ export default function Navbar() {
           LUMER <span className="text-blue-400 font-medium text-xs">elearning</span>
         </Link>
 
-        {/* NÚT KHÁM PHÁ (Hiện cho tất cả mọi người ở /home) */}
-        <div className="relative" ref={exploreRef}>
-          <button
-            type="button"
-            onClick={() => setShowExploreMenu(!showExploreMenu)}
-            className="bg-[#0066FF] hover:bg-blue-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 cursor-pointer transition select-none border-none"
-          >
-            Khám phá ▾
-          </button>
-          {showExploreMenu && (
-            <div className="absolute left-0 mt-2 w-[550px] bg-white border border-gray-200 rounded-2xl shadow-xl p-5 grid grid-cols-2 gap-6 z-50">
-              <div className="space-y-2">
-                <h4 className="text-[11px] font-black uppercase text-[#0066FF] tracking-wider">
-                  Khám phá danh mục
-                </h4>
-                <div className="flex flex-col space-y-2 text-xs font-bold text-gray-600">
-                  {["Khoa học Máy tính", "An ninh mạng", "Phát triển Web", "Khoa học Dữ liệu & AI", "Thiết kế Đồ họa"].map((cat) => (
-                    <span
-                      key={cat}
-                      onClick={() => handleCategoryClick(cat)}
-                      className="hover:text-[#0066FF] cursor-pointer transition"
-                    >
-                      {cat}
-                    </span>
-                  ))}
+        {/* NÚT KHÁM PHÁ THẢ XUỐNG - Sẽ ẨN nếu là Giảng viên hoặc Admin */}
+        {!isFacultyOrAdmin && (
+          <div className="relative" ref={exploreRef}>
+            <button
+              type="button"
+              onClick={() => setShowExploreMenu(!showExploreMenu)}
+              className="bg-[#0066FF] hover:bg-blue-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 cursor-pointer transition select-none border-none"
+            >
+              Khám phá ▾
+            </button>
+            {showExploreMenu && (
+              <div className="absolute left-0 mt-2 w-[550px] bg-white border border-gray-200 rounded-2xl shadow-xl p-5 grid grid-cols-2 gap-6 z-50">
+                <div className="space-y-2">
+                  <h4 className="text-[11px] font-black uppercase text-[#0066FF] tracking-wider">
+                    Khám phá danh mục
+                  </h4>
+                  <div className="flex flex-col space-y-2 text-xs font-bold text-gray-600">
+                    {["Khoa học Máy tính", "An ninh mạng", "Phát triển Web", "Khoa học Dữ liệu & AI", "Thiết kế Đồ họa"].map((cat) => (
+                      <span
+                        key={cat}
+                        onClick={() => handleCategoryClick(cat)}
+                        className="hover:text-[#0066FF] cursor-pointer transition"
+                      >
+                        {cat}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <h4 className="text-[11px] font-black uppercase text-gray-400 tracking-wider">
+                    Chứng chỉ chuyên môn
+                  </h4>
+                  <div className="flex flex-col space-y-2 text-xs font-medium text-gray-500">
+                    {["Google Career Certificates", "Infosec", "Princeton University"].map((cert) => (
+                      <span
+                        key={cert}
+                        onClick={() => handleCategoryClick(cert)}
+                        className="hover:text-gray-800 cursor-pointer transition"
+                      >
+                        {cert === "Google Career Certificates" ? "Chứng chỉ Google Career" : cert === "Infosec" ? "Hệ thống bảo mật Infosec" : "Princeton Academic Program"}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               </div>
-              <div className="space-y-2">
-                <h4 className="text-[11px] font-black uppercase text-gray-400 tracking-wider">
-                  Chứng chỉ chuyên môn
-                </h4>
-                <div className="flex flex-col space-y-2 text-xs font-medium text-gray-500">
-                  {["Google Career Certificates", "Infosec", "Princeton University"].map((cert) => (
-                    <span
-                      key={cert}
-                      onClick={() => handleCategoryClick(cert)}
-                      className="hover:text-gray-800 cursor-pointer transition"
-                    >
-                      {cert === "Google Career Certificates" ? "Chứng chỉ Google Career" : cert === "Infosec" ? "Hệ thống bảo mật Infosec" : "Princeton Academic Program"}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
 
         <input
           type="text"
