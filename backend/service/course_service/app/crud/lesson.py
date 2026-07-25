@@ -1,68 +1,214 @@
+from typing import Optional, Union, Dict, Any
+from uuid import UUID
+from sqlmodel import Session, select, func
 from app.crud.base import CRUDBase
 from app.models.lesson import Lesson
 from app.models.module import Module
 from app.models.subject import Subject
 from app.models.course import Course
 from app.schemas.lesson import LessonCreate, LessonUpdate
-from uuid import UUID
-from sqlmodel import Session, select
+
 
 class CRUDLesson(CRUDBase[Lesson, LessonCreate, LessonUpdate, UUID]):
-    
+
     def create(self, db: Session, obj_in: LessonCreate) -> Lesson:
-        
         db_obj = self.model.model_validate(obj_in)
-        
-        # 1. Logic nghiệp vụ: Nếu là bài thi/kiểm tra thì bắt buộc không được tự chọn
+
+        # 1. Logic nghiệp vụ Quiz
         if db_obj.is_quiz:
             db_obj.is_optional = False
 
-        db.add(db_obj)
-        db.flush()  # Đẩy dữ liệu xuống DB tạm thời để lấy ID nếu cần, chưa commit
+        # 2. Xử lý order_index khi thêm mới
+        max_order = db.scalar(
+            select(func.max(Lesson.order_index))
+            .where(Lesson.module_id == db_obj.module_id)
+        ) or 0
 
-        # 2. Tìm course_id thông qua module_id của lesson mới tạo
+        # Nếu không chọn vị trí hoặc vị trí truyền vào lớn hơn max + 1 => Xếp vào cuối
+        if not db_obj.order_index or db_obj.order_index > max_order + 1:
+            db_obj.order_index = max_order + 1
+        else:
+            # Nếu chèn vào giữa, đẩy các bài học đứng phía sau lên +1 vị trí
+            existing_lessons = db.exec(
+                select(Lesson)
+                .where(Lesson.module_id == db_obj.module_id)
+                .where(Lesson.order_index >= db_obj.order_index)
+            ).all()
+            for lesson in existing_lessons:
+                lesson.order_index += 1
+                db.add(lesson)
+
+        db.add(db_obj)
+        db.flush()
+
+        # 3. Tăng total_lessons của Course tương ứng lên 1
         course_id = db.scalar(
             select(Subject.course_id)
             .join(Module, Subject.subject_id == Module.subject_id)
             .where(Module.module_id == db_obj.module_id)
         )
 
-        # 3. Tăng total_lessons của Course lên 1 đơn vị
         if course_id:
             course = db.get(Course, course_id)
             if course:
                 course.total_lessons += 1
                 db.add(course)
 
-        # 4. Commit toàn bộ thay đổi cùng một lúc
+        db.commit()
+        db.refresh(db_obj)
+        return db_obj
+
+    def update(
+        self,
+        db: Session,
+        *,
+        db_obj: Lesson,
+        obj_in: Union[LessonUpdate, Dict[str, Any]]
+    ) -> Lesson:
+        old_module_id = db_obj.module_id
+        old_order_index = db_obj.order_index
+
+        # Parse dữ liệu đầu vào
+        if isinstance(obj_in, dict):
+            update_data = obj_in
+        else:
+            update_data = obj_in.model_dump(exclude_unset=True)
+
+        # Cập nhật giá trị vào object
+        for field in update_data:
+            setattr(db_obj, field, update_data[field])
+
+        # Logic nghiệp vụ Quiz
+        if db_obj.is_quiz:
+            db_obj.is_optional = False
+
+        new_module_id = db_obj.module_id
+        new_order_index = db_obj.order_index
+
+        # TRƯỜNG HỢP 1: Di chuyển Lesson sang Module khác
+        if old_module_id != new_module_id:
+            # 1.1 Dồn các bài ở Module cũ lên để dọn chỗ trống
+            old_module_lessons = db.exec(
+                select(Lesson)
+                .where(Lesson.module_id == old_module_id)
+                .where(Lesson.order_index > old_order_index)
+            ).all()
+            for lesson in old_module_lessons:
+                lesson.order_index -= 1
+                db.add(lesson)
+
+            # 1.2 Đẩy các bài ở Module mới ra sau để lấy chỗ chèn
+            max_new_order = db.scalar(
+                select(func.max(Lesson.order_index))
+                .where(Lesson.module_id == new_module_id)
+            ) or 0
+
+            if not new_order_index or new_order_index > max_new_order + 1:
+                db_obj.order_index = max_new_order + 1
+            else:
+                new_module_lessons = db.exec(
+                    select(Lesson)
+                    .where(Lesson.module_id == new_module_id)
+                    .where(Lesson.order_index >= new_order_index)
+                ).all()
+                for lesson in new_module_lessons:
+                    lesson.order_index += 1
+                    db.add(lesson)
+
+            # 1.3 Cập nhật total_lessons nếu Module mới thuộc về Khóa học (Course) khác
+            old_course_id = db.scalar(
+                select(Subject.course_id)
+                .join(Module, Subject.subject_id == Module.subject_id)
+                .where(Module.module_id == old_module_id)
+            )
+            new_course_id = db.scalar(
+                select(Subject.course_id)
+                .join(Module, Subject.subject_id == Module.subject_id)
+                .where(Module.module_id == new_module_id)
+            )
+
+            if old_course_id != new_course_id:
+                if old_course_id:
+                    old_course = db.get(Course, old_course_id)
+                    if old_course and old_course.total_lessons > 0:
+                        old_course.total_lessons -= 1
+                        db.add(old_course)
+                if new_course_id:
+                    new_course = db.get(Course, new_course_id)
+                    if new_course:
+                        new_course.total_lessons += 1
+                        db.add(new_course)
+
+        # TRƯỜNG HỢP 2: Cùng Module nhưng thay đổi vị trí order_index (Drag & Drop Reorder)
+        elif old_order_index != new_order_index:
+            if new_order_index > old_order_index:
+                # Kéo xuống dưới: Giảm order_index các bài ở khoảng trung gian (old, new] đi 1
+                shift_lessons = db.exec(
+                    select(Lesson)
+                    .where(Lesson.module_id == old_module_id)
+                    .where(Lesson.lesson_id != db_obj.lesson_id)
+                    .where(Lesson.order_index > old_order_index)
+                    .where(Lesson.order_index <= new_order_index)
+                ).all()
+                for lesson in shift_lessons:
+                    lesson.order_index -= 1
+                    db.add(lesson)
+            else:
+                # Kéo lên trên: Tăng order_index các bài ở khoảng trung gian [new, old) lên 1
+                shift_lessons = db.exec(
+                    select(Lesson)
+                    .where(Lesson.module_id == old_module_id)
+                    .where(Lesson.lesson_id != db_obj.lesson_id)
+                    .where(Lesson.order_index >= new_order_index)
+                    .where(Lesson.order_index < old_order_index)
+                ).all()
+                for lesson in shift_lessons:
+                    lesson.order_index += 1
+                    db.add(lesson)
+
+        db.add(db_obj)
         db.commit()
         db.refresh(db_obj)
         return db_obj
 
     def delete(self, db: Session, id: UUID) -> Lesson | None:
-        # 1. Lấy thông tin bài học trước khi xóa để biết nó thuộc module nào
         db_obj = db.get(self.model, id)
         if not db_obj:
             return None
 
-        # 2. Tìm course_id tương tự như lúc tạo
+        deleted_module_id = db_obj.module_id
+        deleted_order_index = db_obj.order_index
+
+        # 1. Lấy course_id phục vụ cập nhật thống kê
         course_id = db.scalar(
             select(Subject.course_id)
             .join(Module, Subject.subject_id == Module.subject_id)
-            .where(Module.module_id == db_obj.module_id)
+            .where(Module.module_id == deleted_module_id)
         )
 
-        # 3. Giảm total_lessons của Course đi 1 đơn vị
+        # 2. Xóa bài học
+        db.delete(db_obj)
+        db.flush()
+
+        # 3. Dồn vị trí order_index của các bài học nằm đằng sau lên 1 đơn vị
+        remaining_lessons = db.exec(
+            select(Lesson)
+            .where(Lesson.module_id == deleted_module_id)
+            .where(Lesson.order_index > deleted_order_index)
+        ).all()
+        for lesson in remaining_lessons:
+            lesson.order_index -= 1
+            db.add(lesson)
+
+        # 4. Giảm total_lessons của Course đi 1
         if course_id:
             course = db.get(Course, course_id)
             if course and course.total_lessons > 0:
                 course.total_lessons -= 1
                 db.add(course)
 
-        # 4. Xóa bài học và commit toàn bộ
-        db.delete(db_obj)
         db.commit()
         return db_obj
 
-# Đổi tên biến cho đúng ngữ cảnh của Lesson
+
 crud_lesson = CRUDLesson(Lesson)

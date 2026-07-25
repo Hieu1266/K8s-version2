@@ -75,6 +75,50 @@ def delete_lesson(
     # 204 NO CONTENT không trả về dữ liệu ở Body
     return None
 
+@router.put("/{lesson_id}", response_model=Lesson)
+def update_lesson(
+    db: SessionDep,
+    lesson_id: UUID,
+    lesson_in: LessonUpdate,
+    current_user: dict = Depends(RoleChecker(["Instructor", "Admin", "Manager"]))
+):
+    """
+    API cập nhật thông tin bài học.
+    - Tự động sắp xếp lại `order_index` (khi kéo thả / đổi thứ tự).
+    - Hỗ trợ đổi bài học sang Module khác (nếu schema hỗ trợ module_id).
+    - Quyền truy cập: Admin/Manager hoặc Giảng viên sở hữu khóa học chứa bài học này.
+    """
+    # 1. Kiểm tra bài học có tồn tại hay không
+    lesson = crud_lesson.get_by_id(db, id=lesson_id)
+    if not lesson:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Bài học không tồn tại"
+        )
+
+    # 2. Kiểm tra quyền sở hữu đối với Giảng viên
+    if "Admin" not in current_user.get("roles", []) and "Manager" not in current_user.get("roles", []):
+        # Kiểm tra quyền trên Module hiện tại
+        current_owner = crud_module.get_course_owner(db, lesson.module_id)
+        if current_owner is None or str(current_user["user_id"]) != str(current_owner):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Bạn không có quyền chỉnh sửa bài học thuộc khóa học này"
+            )
+
+        # Nếu người dùng muốn chuyển Lesson sang Module mới, kiểm tra quyền trên Module mới
+        new_module_id = getattr(lesson_in, "module_id", None)
+        if new_module_id and new_module_id != lesson.module_id:
+            new_owner = crud_module.get_course_owner(db, new_module_id)
+            if new_owner is None or str(current_user["user_id"]) != str(new_owner):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Bạn không có quyền chuyển bài học sang Module thuộc sở hữu của giảng viên khác"
+                )
+
+    # 3. Gọi tầng CRUD đã xử lý logic tự động reorder & cập nhật database
+    return crud_lesson.update(db, db_obj=lesson, obj_in=lesson_in)
+
 @router.get("/is-existed/{lesson_id}")
 def is_existed(
     db: SessionDep,
