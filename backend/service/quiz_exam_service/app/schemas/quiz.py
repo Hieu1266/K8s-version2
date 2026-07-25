@@ -13,6 +13,7 @@ class QuizCreate(BaseModel):
     quiz_type: QuizType
     placement_type: QuizPlacementType
     target_lesson_id: UUID | None = None
+    is_peer_review: bool
 
 class QuizUpdate(BaseModel):
     title: str | None = None
@@ -23,6 +24,7 @@ class QuizUpdate(BaseModel):
     placement_type: QuizPlacementType | None = None
     target_lesson_id: UUID | None = None
     is_active: bool | None = None
+    is_peer_review: bool
 
 class QuizItem(BaseModel):
     title: str 
@@ -33,3 +35,4 @@ class QuizItem(BaseModel):
     placement_type: QuizPlacementType 
     is_active: bool 
     created_at: date
+    is_peer_review: bool

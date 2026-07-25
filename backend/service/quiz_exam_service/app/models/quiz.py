@@ -29,6 +29,7 @@ class Quiz(SQLModel, table=True):
     placement_type: QuizPlacementType = Field(default=QuizPlacementType.STANDALONE_LESSON)
     target_lesson_id: Optional[UUID] = Field(default=None, index=True)
     is_active: bool = Field(default=True, nullable=False)
+    is_peer_review: bool = Field(default=False, nullable=False)
     created_at: date = Field(default_factory=date.today)
 
     # Quan hệ nội bộ phân hệ

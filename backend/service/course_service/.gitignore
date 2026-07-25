@@ -1,6 +1,6 @@
 .env
-static/*
-!static/.gitkeep
+documents/syllabus/*
+!documents/syllabus/.gitkeep
 __pycache__/
 *.pyc
 *.pyo
