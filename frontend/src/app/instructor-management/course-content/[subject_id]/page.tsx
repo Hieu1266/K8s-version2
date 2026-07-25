@@ -135,7 +135,7 @@ export default function SubjectPage() {
   const [deletingModuleId, setDeletingModuleId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<boolean>(false);
 
-  // States quản lý Syllabus (Chỉ cho phép Download)
+  // States quản lý Syllabus (Chỉ xem & Tải về)
   const [syllabus, setSyllabus] = useState<SyllabusData | null>(null);
   const [loadingSyllabus, setLoadingSyllabus] = useState<boolean>(true);
   const [downloadingSyllabus, setDownloadingSyllabus] = useState<boolean>(false);
@@ -478,7 +478,7 @@ export default function SubjectPage() {
           </div>
         </div>
 
-        {/* Khối Đề Cương Môn Học (Syllabus) - READ ONLY CHỈ CHO TẢI VỀ */}
+        {/* Khối Đề Cương Môn Học (Syllabus) */}
         <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-4">
           <div className="flex justify-between items-center border-b border-slate-100 pb-4">
             <div className="flex items-center gap-2">
@@ -489,7 +489,6 @@ export default function SubjectPage() {
             </div>
             {syllabus && (
               <div className="flex items-center gap-3">
-                {/* Badge trạng thái Đề cương (Chỉ hiển thị) */}
                 <span
                   className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border ${syllabusStatus.className}`}
                 >
@@ -525,10 +524,10 @@ export default function SubjectPage() {
                 <button
                   disabled={downloadingSyllabus}
                   onClick={handleDownloadSyllabus}
-                  className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-xs font-semibold transition disabled:opacity-50 shadow-sm"
+                  className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 text-xs font-semibold transition disabled:opacity-50 shadow-sm"
                 >
                   {downloadingSyllabus ? (
-                    <Loader2 size={15} className="animate-spin text-white" />
+                    <Loader2 size={15} className="animate-spin text-blue-600" />
                   ) : (
                     <Download size={15} />
                   )}
@@ -537,10 +536,10 @@ export default function SubjectPage() {
               </div>
             </div>
           ) : (
-            <div className="bg-slate-50 border border-dashed border-slate-200 rounded-xl p-8 text-center flex flex-col items-center justify-center gap-2">
+            <div className="bg-slate-50 border border-dashed border-slate-200 rounded-xl p-8 text-center flex flex-col items-center justify-center gap-3">
               <AlertCircle size={28} className="text-slate-400" />
               <p className="text-sm text-slate-600">
-                Môn học này hiện chưa có đề cương chi tiết.
+                Môn học này hiện chưa được cập nhật đề cương chi tiết.
               </p>
             </div>
           )}
@@ -584,8 +583,8 @@ export default function SubjectPage() {
                     onDragOver={(e) => handleDragOver(e, index)}
                     onDragEnd={handleDragEnd}
                     className={`bg-white rounded-xl border p-5 shadow-sm transition-all duration-150 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 ${isDragging
-                        ? "opacity-40 border-dashed border-blue-500 scale-[0.99]"
-                        : "border-slate-200 hover:border-slate-300"
+                      ? "opacity-40 border-dashed border-blue-500 scale-[0.99]"
+                      : "border-slate-200 hover:border-slate-300"
                       }`}
                   >
                     <div className="flex items-center gap-3 max-w-3xl min-w-0 w-full sm:w-auto">
