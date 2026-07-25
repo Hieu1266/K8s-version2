@@ -1,290 +1,91 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import Navbar from "@/components/Navbar";
+import { Subject, SubjectStatus } from "@/types/exam-management";
 
-interface Exam {
-  id: string;
-  title: string;
-  course: string;
-  duration: string; 
-  questionsCount: number;
-  status: string;
-  createdAt: string;
-  description?: string; // Thêm trường mô tả
-  password?: string;    // Thêm trường mật khẩu
-}
-
-// Cập nhật định nghĩa: Thêm trường 'type' để phân biệt Tự luận và Trắc nghiệm
-interface Question {
-  id: string;
-  content: string;
-  type: "trac_nghiem" | "tu_luan";
-  options?: string[]; // Trắc nghiệm mới cần field này
-  correctAnswer?: string; // Trắc nghiệm mới cần field này
-  level: "Dễ" | "Trung bình" | "Khó";
-}
-
-export default function ExamManagement() {
-  const router = useRouter();
-  
-  // Khởi tạo State Danh sách Bài thi ban đầu
-  const [exams, setExams] = useState<Exam[]>([
+export default function InstructorSubjectsPage() {
+  // Mock dữ liệu khớp với SQLModel Subject
+  const [subjects] = useState<Subject[]>([
     {
-      id: "EX-001",
-      title: "Kiểm tra Giữa kỳ - Lập trình Web nâng cao",
-      course: "Lập trình ReactJS & Next.js",
-      duration: "60 phút",
-      questionsCount: 4, 
-      status: "Đang mở",
-      createdAt: "15/06/2026",
+      subject_id: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+      course_id: "c8f2d1e0-8a1a-4b9e-9d2c-3f4e5a6b7c8d",
+      title: "Lập trình Hướng đối tượng với Java",
+      description:
+        "Cung cấp kiến thức về Encapsulation, Inheritance, Polymorphism và Abstraction.",
+      order_index: 1,
+      status_id: "PUBLISHED",
+      course_title: "Công nghệ Thông tin K48",
+      total_modules: 5,
+      total_quizzes: 4,
     },
     {
-      id: "EX-002",
-      title: "Thi cuối kỳ - Thiết kế giao diện UI/UX",
-      course: "Thiết kế UI/UX Chuyên nghiệp",
-      duration: "90 phút",
-      questionsCount: 0,
-      status: "Bản nháp",
-      createdAt: "28/06/2026",
+      subject_id: "b1f3c882-7d22-4e92-9e1d-8f921a418b22",
+      course_id: "c8f2d1e0-8a1a-4b9e-9d2c-3f4e5a6b7c8d",
+      title: "Mạng máy tính & Lập trình Socket",
+      description:
+        "Cấu trúc mạng OSI/TCP-IP, định tuyến OSPF và lập trình truyền thông Socket.",
+      order_index: 2,
+      status_id: "PUBLISHED",
+      course_title: "Công nghệ Thông tin K48",
+      total_modules: 4,
+      total_quizzes: 3,
     },
     {
-      id: "EX-003",
-      title: "Trắc nghiệm chương 1 & 2 - Cơ sở dữ liệu",
-      course: "Cơ sở dữ liệu SQL Server",
-      duration: "15 phút",
-      questionsCount: 0,
-      status: "Đang đóng",
-      createdAt: "10/05/2026",
+      subject_id: "c2d4e993-8e33-4f03-af2e-9a032b529c33",
+      course_id: "d9e3f2a1-9b2b-5c0f-0e3d-4a5b6c7d8e9f",
+      title: "Cơ sở dữ liệu Quan hệ",
+      description:
+        "Mô hình ER, chuẩn hóa dữ liệu, truy vấn SQL nâng cao và quản lý giao dịch.",
+      order_index: 1,
+      status_id: "DRAFT",
+      course_title: "Hệ thống Thông tin K49",
+      total_modules: 6,
+      total_quizzes: 2,
     },
   ]);
 
-  // State lưu trữ các câu hỏi thật của từng bài thi kèm theo loại hình thức câu hỏi
-  const [examQuestions, setExamQuestions] = useState<Record<string, Question[]>>({
-    "EX-001": [
-      { id: "Q-1", type: "trac_nghiem", content: "ReactJS là gì?", options: ["Một thư viện JavaScript", "Một Framework của PHP", "Một hệ quản trị CSDL", "Một hệ điều hành"], correctAnswer: "A", level: "Dễ" },
-      { id: "Q-2", type: "trac_nghiem", content: "Hook 'useState' dùng để làm gì?", options: ["Gọi API", "Quản lý trạng thái (state) trong component", "Định tuyến trang", "Tối ưu hiệu năng"], correctAnswer: "B", level: "Trung bình" },
-      { id: "Q-3", type: "trac_nghiem", content: "Trong Next.js App Router, folder nào đại diện cho một Route?", options: ["Folder nằm trong thư mục 'app'", "Folder nằm trong thư mục 'public'", "Folder 'components'", "Folder 'styles'"], correctAnswer: "A", level: "Dễ" },
-      { id: "Q-4", type: "tu_luan", content: "Phân biệt sự khác nhau cốt lõi giữa Server Component và Client Component trong Next.js App Router. Cho ví dụ thực tế khi nào nên áp dụng mỗi loại?", level: "Khó" }
-    ]
-  });
-
-  // States dành cho Tìm kiếm & Bộ lọc
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCourse, setSelectedCourse] = useState("Tất cả môn học");
-  const [selectedStatus, setSelectedStatus] = useState("Tất cả trạng thái");
+  const [selectedStatus, setSelectedStatus] = useState<"ALL" | SubjectStatus>(
+    "ALL",
+  );
 
-// --- STATE QUẢN LÝ MODAL TẠO BÀI THI MỚI ---
-  const [moModalTaoMoi, setMoModalTaoMoi] = useState(false);
-  const [createTitle, setCreateTitle] = useState("");
-  const [createCourse, setCreateCourse] = useState("Lập trình ReactJS & Next.js");
-  const [createDuration, setCreateDuration] = useState("60");
-  const [createStatus, setCreateStatus] = useState("Bản nháp");
-  const [createDescription, setCreateDescription] = useState(""); // State mới
-  const [createPassword, setCreatePassword] = useState("");       // State mới
-
-// --- STATE QUẢN LÝ MODAL THIẾT LẬP ĐỀ ---
-  const [moModalThietLap, setMoModalThietLap] = useState(false);
-  const [baiThiDangChon, setBaiThiDangChon] = useState<Exam | null>(null);
-  
-  const [editTitle, setEditTitle] = useState("");
-  const [editDuration, setEditDuration] = useState("");
-  const [editCourse, setEditCourse] = useState("");
-  const [editStatus, setEditStatus] = useState("");
-
-  // States ma trận bốc câu hỏi mới (Trắc nghiệm & Tự luận)
-  const [tracNghiemDe, setTracNghiemDe] = useState(0);
-  const [tracNghiemTB, setTracNghiemTB] = useState(0);
-  const [tracNghiemKho, setTracNghiemKho] = useState(0);
-  
-  const [tuLuanDe, setTuLuanDe] = useState(0);
-  const [tuLuanTB, setTuLuanTB] = useState(0);
-  const [tuLuanKho, setTuLuanKho] = useState(0);
-
-  const [tronCauHoi, setTronCauHoi] = useState(true);
-  const [tronDapAn, setTronDapAn] = useState(true);
-
-
-
-  // --- STATE QUẢN LÝ MODAL XEM/THÊM CÂU HỎI CHI TIẾT ---
-  const [moModalCauHoi, setMoModalCauHoi] = useState(false);
-  const [baiThiDangXemCauHoi, setBaiThiDangXemCauHoi] = useState<Exam | null>(null);
-  
-  // State Form nhập câu hỏi mới
-  const [newQuestionType, setNewQuestionType] = useState<"trac_nghiem" | "tu_luan">("trac_nghiem");
-  const [newQuestionContent, setNewQuestionContent] = useState("");
-  const [newOptA, setNewOptA] = useState("");
-  const [newOptB, setNewOptB] = useState("");
-  const [newOptC, setNewOptC] = useState("");
-  const [newOptD, setNewOptD] = useState("");
-  const [newCorrect, setNewCorrect] = useState("A");
-  const [newLevel, setNewLevel] = useState<"Dễ" | "Trung bình" | "Khó">("Dễ");
-
-// --- LOGIC XỬ LÝ: TẠO BÀI THI MỚI ---
-  const handleSaveCreateExam = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!createTitle.trim()) return alert("Vui lòng điền tên bài thi!");
-
-    const newId = `EX-00${exams.length + 1}`;
-    const newExam: Exam = {
-      id: newId,
-      title: createTitle,
-      course: createCourse,
-      duration: `${createDuration} phút`,
-      questionsCount: 0,
-      status: createStatus,
-      createdAt: new Date().toLocaleDateString("vi-VN"),
-      description: createDescription, // Lưu mô tả
-      password: createPassword,       // Lưu mật khẩu
-    };
-
-    setExams([newExam, ...exams]);
-    setExamQuestions({ ...examQuestions, [newId]: [] });
-    
-    // Reset form
-    setCreateTitle("");
-    setCreateCourse("Lập trình ReactJS & Next.js");
-    setCreateDuration("60");
-    setCreateStatus("Bản nháp");
-    setCreateDescription("");
-    setCreatePassword("");
-    setMoModalTaoMoi(false);
-  };
-
-  // --- LOGIC XỬ LÝ: NẠP VÀ LƯU THIẾT LẬP ĐỀ ---
-  const handleOpenThietLap = (exam: Exam) => {
-    setBaiThiDangChon(exam);
-    setEditTitle(exam.title);
-    setEditDuration(exam.duration.replace(" phút", ""));
-    setEditCourse(exam.course);
-    setEditStatus(exam.status);
-    
-    // Khởi tạo tạm thời số câu cho ma trận (do dữ liệu cũ không chia chi tiết)
-    setTracNghiemDe(Math.floor(exam.questionsCount * 0.4));
-    setTracNghiemTB(Math.floor(exam.questionsCount * 0.4));
-    setTracNghiemKho(exam.questionsCount - Math.floor(exam.questionsCount * 0.8));
-    setTuLuanDe(0);
-    setTuLuanTB(0);
-    setTuLuanKho(0);
-    
-    setMoModalThietLap(true);
-  };
-
-  const handleSaveThietLap = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!baiThiDangChon) return;
-
-    // Tổng của cả trắc nghiệm và tự luận
-    const tongSoCauMoi = 
-      Number(tracNghiemDe) + Number(tracNghiemTB) + Number(tracNghiemKho) +
-      Number(tuLuanDe) + Number(tuLuanTB) + Number(tuLuanKho);
-
-    setExams(exams.map((exam) => {
-      if (exam.id === baiThiDangChon.id) {
-        return {
-          ...exam,
-          title: editTitle,
-          course: editCourse,
-          duration: `${editDuration} phút`,
-          status: editStatus,
-          questionsCount: tongSoCauMoi
-        };
-      }
-      return exam;
-    }));
-
-    setMoModalThietLap(false);
-  };
-
-
-
-  // --- LOGIC XỬ LÝ: THÊM & XÓA CÂU HỎI ĐỀ THI ---
-  const handleOpenQuanLyCauHoi = (exam: Exam) => {
-    setBaiThiDangXemCauHoi(exam);
-    setMoModalCauHoi(true);
-  };
-
-  const handleAddQuestion = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!baiThiDangXemCauHoi) return;
-    if (!newQuestionContent.trim()) return alert("Vui lòng nhập nội dung câu hỏi!");
-
-    // Nếu chọn hình thức trắc nghiệm, bắt buộc nhập ít nhất phương án A và B
-    if (newQuestionType === "trac_nghiem" && (!newOptA.trim() || !newOptB.trim())) {
-      return alert("Đối với câu hỏi trắc nghiệm, vui lòng điền ít nhất 2 đáp án A và B!");
-    }
-
-    const currentQuestions = examQuestions[baiThiDangXemCauHoi.id] || [];
-    
-    const newQ: Question = {
-      id: `Q-${Date.now()}`,
-      type: newQuestionType,
-      content: newQuestionContent,
-      level: newLevel,
-      ...(newQuestionType === "trac_nghiem" && {
-        options: [newOptA, newOptB, newOptC || "N/A", newOptD || "N/A"],
-        correctAnswer: newCorrect,
-      })
-    };
-
-    const updatedQuestions = [...currentQuestions, newQ];
-
-    setExamQuestions({
-      ...examQuestions,
-      [baiThiDangXemCauHoi.id]: updatedQuestions
-    });
-
-    setExams(exams.map(e => e.id === baiThiDangXemCauHoi.id ? { ...e, questionsCount: updatedQuestions.length } : e));
-
-    // Reset form nhập liệu
-    setNewQuestionContent("");
-    setNewOptA(""); setNewOptB(""); setNewOptC(""); setNewOptD("");
-    setNewCorrect("A"); setNewLevel("Dễ");
-  };
-
-  const handleDeleteQuestion = (qId: string) => {
-    if (!baiThiDangXemCauHoi) return;
-    const currentQuestions = examQuestions[baiThiDangXemCauHoi.id] || [];
-    const updatedQuestions = currentQuestions.filter(q => q.id !== qId);
-
-    setExamQuestions({
-      ...examQuestions,
-      [baiThiDangXemCauHoi.id]: updatedQuestions
-    });
-
-    setExams(exams.map(e => e.id === baiThiDangXemCauHoi.id ? { ...e, questionsCount: updatedQuestions.length } : e));
-  };
-
-  const handleDeleteExam = (id: string, title: string) => {
-    if (confirm(`Bạn có chắc chắn muốn xóa bài thi: "${title}" không?`)) {
-      setExams(exams.filter((exam) => exam.id !== id));
-      const copy = { ...examQuestions };
-      delete copy[id];
-      setExamQuestions(copy);
+  // Helper render badge trạng thái chuẩn theo Enum backend
+  const renderStatusBadge = (status: SubjectStatus) => {
+    switch (status) {
+      case "PUBLISHED":
+        return (
+          <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold px-2.5 py-0.5 rounded-full">
+            ● PUBLISHED
+          </span>
+        );
+      case "DRAFT":
+        return (
+          <span className="bg-amber-50 text-amber-700 border border-amber-200 text-xs font-bold px-2.5 py-0.5 rounded-full">
+            ○ DRAFT
+          </span>
+        );
+      case "ARCHIVED":
+        return (
+          <span className="bg-slate-100 text-slate-500 border border-slate-200 text-xs font-bold px-2.5 py-0.5 rounded-full">
+            🔒 ARCHIVED
+          </span>
+        );
     }
   };
 
-  const toggleStatus = (id: string) => {
-    setExams(
-      exams.map((exam) => {
-        if (exam.id === id) {
-          const statusOrder = ["Bản nháp", "Đang mở", "Đang đóng"];
-          const nextIndex = (statusOrder.indexOf(exam.status) + 1) % statusOrder.length;
-          return { ...exam, status: statusOrder[nextIndex] };
-        }
-        return exam;
-      })
-    );
-  };
+  // Filter dữ liệu
+  const filteredSubjects = subjects.filter((subject) => {
+    const matchesSearch =
+      subject.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      subject.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      subject.subject_id.toLowerCase().includes(searchTerm.toLowerCase());
 
-  const filteredExams = exams.filter((exam) => {
-    const matchesSearch = exam.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          exam.id.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCourse = selectedCourse === "Tất cả môn học" || exam.course === selectedCourse;
-    const matchesStatus = selectedStatus === "Tất cả trạng thái" || exam.status === selectedStatus;
+    const matchesStatus =
+      selectedStatus === "ALL" || subject.status_id === selectedStatus;
 
-    return matchesSearch && matchesCourse && matchesStatus;
+    return matchesSearch && matchesStatus;
   });
 
   return (
@@ -292,560 +93,153 @@ export default function ExamManagement() {
       <Navbar />
 
       {/* Header Banner */}
-
-<section className="bg-gradient-to-r from-[#66CCFF] to-[#0066FF] text-white">
-        {/* Đưa toàn bộ vào trong container để căn lề đồng bộ */}
-        <div className="max-w-7xl mx-auto px-6 pt-6 pb-10">
-          
-          {/* Nút quay lại (Đã sửa lại màu cho hợp với nền xanh và gắn router) */}
-          <div className="mb-6">
-            <button 
-              onClick={() => router.push('/instructor-management')}
-              className="flex items-center gap-2 text-sm font-bold text-white/80 hover:text-white transition-colors group"
-            >
-              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-white/20 group-hover:bg-white/30 transition-colors">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                </svg>
-              </div>
-              Quay lại Quản lý Giảng viên
-            </button>
-          </div>
-
+      <section className="bg-gradient-to-r from-[#66CCFF] to-[#0066FF] text-white py-10 px-6">
+        <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
-              <div className="text-sm font-medium text-blue-100 flex items-center gap-2 mb-2">
-                <span className="cursor-pointer hover:underline" onClick={() => router.push("/teacher/dashboard")}>Dashboard</span>
-                <span>/</span>
-                <span>Ngân hàng đề & Khảo thí</span>
-                <span>/</span>
-                <span className="text-white font-semibold">Quản lý bài thi</span>
+              {/* Điều hướng Quay về Dashboard & Badge Cổng Giảng Viên */}
+              <div className="flex items-center gap-3 mb-3">
+                <Link
+                  href="/instructor-management"
+                  className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-white/10 hover:bg-white/20 border border-white/20 px-3 py-1 rounded-full transition"
+                >
+                  ← Bàn làm việc
+                </Link>
+                <span className="text-xs font-bold uppercase tracking-wider bg-white/20 px-3 py-1 rounded-full">
+                  Cổng Giảng Viên
+                </span>
               </div>
-              <h1 className="text-3xl font-bold">Quản lý bài thi</h1>
+
+              <h1 className="text-3xl font-bold">Quản lý Môn học Đảm nhận</h1>
               <p className="text-blue-100 text-sm mt-1">
-                Tạo đề thi, thiết lập thời gian và bốc câu hỏi từ ngân hàng đề dùng chung hoặc thêm thủ công.
+                Danh sách các Subject thuộc các Khóa học (Courses) bạn phụ
+                trách.
               </p>
             </div>
 
-            <button 
-              onClick={() => setMoModalTaoMoi(true)}
-              className="bg-white text-[#0066FF] hover:bg-blue-50 font-bold px-5 py-3 rounded-xl shadow transition duration-200 flex items-center gap-2"
-            >
-              <span>➕</span> Tạo bài thi mới
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {/* Thống kê đếm số lượng */}
-      <section className="max-w-7xl mx-auto px-6 -mt-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex items-center gap-4">
-            <div className="p-3 bg-blue-50 text-[#0066FF] rounded-lg text-2xl">📝</div>
-            <div>
-              <p className="text-sm text-slate-500 font-medium">Tổng số bài thi</p>
-              <p className="text-2xl font-bold text-slate-800">{exams.length}</p>
-            </div>
-          </div>
-          <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex items-center gap-4">
-            <div className="p-3 bg-emerald-50 text-emerald-500 rounded-lg text-2xl">🟢</div>
-            <div>
-              <p className="text-sm text-slate-500 font-medium">Đang mở nhận bài</p>
-              <p className="text-2xl font-bold text-slate-800">
-                {exams.filter(e => e.status === "Đang mở").length}
-              </p>
-            </div>
-          </div>
-          <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex items-center gap-4">
-            <div className="p-3 bg-amber-50 text-amber-500 rounded-lg text-2xl">🗂️</div>
-            <div>
-              <p className="text-sm text-slate-500 font-medium">Kho câu hỏi liên kết</p>
-              <p className="text-xl font-bold text-slate-800">Quản lý trực tiếp / Tự động</p>
+            <div className="bg-white/10 backdrop-blur-md px-5 py-3 rounded-2xl border border-white/20 text-right shrink-0">
+              <span className="text-xs text-blue-100 block font-medium">
+                Tổng số Môn học
+              </span>
+              <span className="text-2xl font-extrabold">
+                {subjects.length} Subjects
+              </span>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Khu vực danh sách & Bộ lọc */}
+      {/* Main Content */}
       <section className="max-w-7xl mx-auto px-6 py-8">
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          
-          {/* Thanh Bộ lọc */}
-          <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row gap-4 justify-between items-center bg-slate-50/50">
-            <div className="relative w-full md:w-72">
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Tìm tên hoặc mã bài thi..."
-                className="w-full pl-9 pr-4 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:border-[#0066FF] text-slate-900 bg-white"
-              />
-              <span className="absolute left-3 top-2.5 text-slate-400 text-sm">🔍</span>
-            </div>
-            
-            <div className="flex gap-2 w-full md:w-auto justify-end">
-              <select 
-                value={selectedCourse} 
-                onChange={(e) => setSelectedCourse(e.target.value)}
-                className="px-3 py-2 rounded-lg border border-slate-200 text-sm bg-white focus:outline-none text-slate-600"
-              >
-                <option value="Tất cả môn học">Tất cả môn học</option>
-                <option value="Lập trình ReactJS & Next.js">Lập trình ReactJS & Next.js</option>
-                <option value="Thiết kế UI/UX Chuyên nghiệp">Thiết kế UI/UX Chuyên nghiệp</option>
-                <option value="Cơ sở dữ liệu SQL Server">Cơ sở dữ liệu SQL Server</option>
-              </select>
-
-              <select 
-                value={selectedStatus} 
-                onChange={(e) => setSelectedStatus(e.target.value)}
-                className="px-3 py-2 rounded-lg border border-slate-200 text-sm bg-white focus:outline-none text-slate-600"
-              >
-                <option value="Tất cả trạng thái">Tất cả trạng thái</option>
-                <option value="Đang mở">Đang mở</option>
-                <option value="Đang đóng">Đang đóng</option>
-                <option value="Bản nháp">Bản nháp</option>
-              </select>
-            </div>
+        {/* Bộ lọc và Tìm kiếm */}
+        <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 mb-6 flex flex-col md:flex-row justify-between gap-4">
+          <div className="relative flex-1">
+            <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+              🔍
+            </span>
+            <input
+              type="text"
+              placeholder="Tìm theo tên môn, mô tả hoặc UUID..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-[#0066FF] outline-none"
+            />
           </div>
 
-          {/* Table kết quả */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-50 text-slate-600 uppercase text-xs font-bold tracking-wider border-b border-slate-100">
-                  <th className="px-6 py-4">Mã số / Tên bài thi</th>
-                  <th className="px-6 py-4">Thuộc Môn học</th>
-                  <th className="px-6 py-4">Thời lượng</th>
-                  <th className="px-6 py-4 text-center">Số câu hỏi hiện tại</th>
-                  <th className="px-6 py-4">Trạng thái (Click đổi)</th>
-                  <th className="px-6 py-4 text-right">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-slate-700 text-sm">
-                {filteredExams.length > 0 ? (
-                  filteredExams.map((exam) => (
-                    <tr key={exam.id} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="px-6 py-4">
-                        <p className="font-semibold text-slate-800">{exam.title}</p>
-                        <span className="text-xs text-slate-400 font-mono">{exam.id} • Tạo ngày: {exam.createdAt}</span>
-                      </td>
-                      <td className="px-6 py-4 text-slate-600 font-medium">{exam.course}</td>
-                      <td className="px-6 py-4">{exam.duration}</td>
-                      <td className="px-6 py-4 text-center font-semibold text-blue-600 bg-blue-50/40">{exam.questionsCount} câu</td>
-                      <td className="px-6 py-4">
-                        <span 
-                          onClick={() => toggleStatus(exam.id)}
-                          className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold cursor-pointer select-none transition active:scale-95
-                            ${exam.status === "Đang mở" ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200" : ""}
-                            ${exam.status === "Đang đóng" ? "bg-rose-100 text-rose-700 hover:bg-rose-200" : ""}
-                            ${exam.status === "Bản nháp" ? "bg-amber-100 text-amber-700 hover:bg-amber-200" : ""}
-                          `}
-                          title="Click để đổi nhanh trạng thái"
-                        >
-                          {exam.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex justify-end gap-1.5">
-                          <button 
-                            onClick={() => handleOpenQuanLyCauHoi(exam)}
-                            className="p-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-md transition text-xs font-bold border border-emerald-200"
-                          >
-                            👁️ Câu hỏi
-                          </button>
-                          <button 
-                            onClick={() => handleOpenThietLap(exam)}
-                            className="p-1.5 hover:bg-blue-50 text-[#0066FF] rounded-md transition text-xs font-bold border border-blue-200"
-                          >
-                            ⚙️ Thiết lập đề
-                          </button>
-                          <button 
-                            onClick={() => handleDeleteExam(exam.id, exam.title)}
-                            className="p-1.5 hover:bg-rose-50 text-rose-600 rounded-md transition"
-                          >
-                            🗑️
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-slate-400">
-                      Không tìm thấy bài thi nào phù hợp với bộ lọc hiện tại.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Footer đếm số */}
-          <div className="p-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 bg-slate-50/30">
-            <p>Hiển thị {filteredExams.length} trên tổng số {exams.length} bài thi</p>
-            <div className="flex gap-1">
-              <button className="px-2.5 py-1.5 rounded border border-slate-200 bg-white hover:bg-slate-50" disabled>Trước</button>
-              <button className="px-3 py-1.5 rounded bg-[#0066FF] text-white font-medium">1</button>
-              <button className="px-2.5 py-1.5 rounded border border-slate-200 bg-white hover:bg-slate-50" disabled>Sau</button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-
-      {/* ================= MODAL QUẢN LÝ VÀ THÊM CÂU HỎI TRỰC TIẾP (Đã bổ sung cấu trúc Tự luận) ================= */}
-      {moModalCauHoi && baiThiDangXemCauHoi && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl p-6 max-h-[92vh] overflow-y-auto grid grid-cols-1 lg:grid-cols-12 gap-6">
-            
-            {/* Header Modal */}
-            <div className="col-span-12 flex justify-between items-center border-b pb-3">
-              <div>
-                <h2 className="text-xl font-bold text-slate-900">📝 Nội dung chi tiết câu hỏi trong đề</h2>
-                <p className="text-xs text-slate-500 mt-0.5">Bài thi: <span className="font-bold text-blue-600">{baiThiDangXemCauHoi.title}</span></p>
-              </div>
-              <button onClick={() => setMoModalCauHoi(false)} className="text-slate-400 text-3xl hover:text-slate-600">&times;</button>
-            </div>
-
-            {/* Bên trái: Form thêm câu hỏi mới trực tiếp vào đề */}
-            <div className="lg:col-span-5 bg-slate-50 p-4 rounded-xl border border-slate-200 h-fit space-y-4">
-              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider border-b pb-2">➕ Thêm câu hỏi mới</h3>
-              <form onSubmit={handleAddQuestion} className="space-y-3">
-                
-                {/* Lựa chọn hình thức câu hỏi */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Hình thức câu hỏi</label>
-                  <select 
-                    value={newQuestionType} 
-                    onChange={(e) => setNewQuestionType(e.target.value as any)}
-                    className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-900 bg-white font-bold focus:outline-none focus:border-blue-500"
-                  >
-                    <option value="trac_nghiem">Trắc nghiệm khách quan</option>
-                    <option value="tu_luan">Tự luận viết bài</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Nội dung câu hỏi *</label>
-                  <textarea value={newQuestionContent} onChange={(e) => setNewQuestionContent(e.target.value)} placeholder={newQuestionType === "trac_nghiem" ? "Nhập câu hỏi trắc nghiệm..." : "Nhập đề bài hoặc yêu cầu câu hỏi tự luận..."} rows={3} className="w-full px-3 py-2 border rounded-lg text-xs font-medium focus:outline-none focus:border-blue-500 text-slate-900 bg-white border-slate-200" required />
-                </div>
-
-                {/* Ẩn/Hiện phần điền đáp án tùy thuộc vào Hình thức Câu hỏi */}
-                {newQuestionType === "trac_nghiem" && (
-                  <>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-600 mb-1">Đáp án A *</label>
-                        <input type="text" value={newOptA} onChange={(e) => setNewOptA(e.target.value)} className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-900 bg-white" />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-600 mb-1">Đáp án B *</label>
-                        <input type="text" value={newOptB} onChange={(e) => setNewOptB(e.target.value)} className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-900 bg-white" />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-600 mb-1">Đáp án C</label>
-                        <input type="text" value={newOptC} onChange={(e) => setNewOptC(e.target.value)} className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-900 bg-white" />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-600 mb-1">Đáp án D</label>
-                        <input type="text" value={newOptD} onChange={(e) => setNewOptD(e.target.value)} className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-900 bg-white" />
-                      </div>
-                    </div>
-
-                    <div className="pt-1">
-                      <label className="block text-xs font-semibold text-slate-600 mb-1">Đáp án đúng</label>
-                      <select value={newCorrect} onChange={(e) => setNewCorrect(e.target.value)} className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-900 bg-white font-bold focus:outline-none">
-                        <option value="A">Đáp án A</option>
-                        <option value="B">Đáp án B</option>
-                        <option value="C">Đáp án C</option>
-                        <option value="D">Đáp án D</option>
-                      </select>
-                    </div>
-                  </>
-                )}
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Mức độ nhận thức</label>
-                  <select value={newLevel} onChange={(e) => setNewLevel(e.target.value as any)} className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-900 bg-white focus:outline-none">
-                    <option value="Dễ">Dễ</option>
-                    <option value="Trung bình">Trung bình</option>
-                    <option value="Khó">Khó</option>
-                  </select>
-                </div>
-
-                <button type="submit" className="w-full mt-2 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs shadow transition">
-                  Nạp câu hỏi vào đề
+          <div className="flex gap-2">
+            {(["ALL", "PUBLISHED", "DRAFT", "ARCHIVED"] as const).map(
+              (status) => (
+                <button
+                  key={status}
+                  onClick={() => setSelectedStatus(status)}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold transition ${
+                    selectedStatus === status
+                      ? "bg-[#0066FF] text-white shadow-sm"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
+                >
+                  {status === "ALL" ? "Tất cả" : status}
                 </button>
-              </form>
-            </div>
-
-            {/* Bên phải: Danh sách câu hỏi hiện có trong bài thi này */}
-            <div className="lg:col-span-7 space-y-3">
-              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider border-b pb-2">
-                📋 Các câu hỏi đang có ({examQuestions[baiThiDangXemCauHoi.id]?.length || 0})
-              </h3>
-
-              <div className="space-y-3 max-h-[52vh] overflow-y-auto pr-1">
-                {(!examQuestions[baiThiDangXemCauHoi.id] || examQuestions[baiThiDangXemCauHoi.id].length === 0) ? (
-                  <p className="text-center text-xs text-slate-400 py-12">Đề thi này chưa có câu hỏi nào. Hãy điền bảng bên trái để nạp câu hỏi!</p>
-                ) : (
-                  examQuestions[baiThiDangXemCauHoi.id].map((q, index) => (
-                    <div key={q.id} className="p-3 bg-white border border-slate-200 rounded-xl relative hover:border-blue-300 transition shadow-sm">
-                      <div className="flex justify-between items-start gap-2 mb-1.5">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <span className="font-bold text-xs text-slate-900">Câu {index + 1}:</span>
-                          <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${q.type === "trac_nghiem" ? "bg-blue-50 text-blue-700 border border-blue-200" : "bg-purple-50 text-purple-700 border border-purple-200"}`}>
-                            {q.type === "trac_nghiem" ? "Trắc nghiệm" : "Tự luận"}
-                          </span>
-                        </div>
-                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${q.level === "Dễ" ? "bg-emerald-50 text-emerald-700" : q.level === "Khó" ? "bg-rose-50 text-rose-700" : "bg-amber-50 text-amber-700"}`}>{q.level}</span>
-                      </div>
-                      
-                      <p className="text-xs text-slate-800 mb-2 font-medium bg-slate-50/50 p-2 rounded border border-dashed border-slate-100">{q.content}</p>
-
-                      {/* Hiển thị danh sách đáp án nếu là câu hỏi trắc nghiệm */}
-                      {q.type === "trac_nghiem" && q.options && (
-                        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-slate-600 font-medium pl-2 mb-4">
-                          <p className={q.correctAnswer === "A" ? "text-emerald-600 font-bold" : ""}>A. {q.options[0]}</p>
-                          <p className={q.correctAnswer === "B" ? "text-emerald-600 font-bold" : ""}>B. {q.options[1]}</p>
-                          <p className={q.correctAnswer === "C" ? "text-emerald-600 font-bold" : ""}>C. {q.options[2]}</p>
-                          <p className={q.correctAnswer === "D" ? "text-emerald-600 font-bold" : ""}>D. {q.options[3]}</p>
-                        </div>
-                      )}
-
-                      {/* Khung giả lập vùng làm bài nếu là tự luận */}
-                      {q.type === "tu_luan" && (
-                        <div className="text-[11px] text-slate-400 italic bg-slate-50 p-2 rounded border border-slate-100 mb-4">
-                          * Học sinh làm bài trực tiếp vào trình soạn thảo văn bản hệ thống...
-                        </div>
-                      )}
-
-                      <button onClick={() => handleDeleteQuestion(q.id)} className="absolute bottom-2 right-2 text-slate-400 hover:text-rose-600 text-xs flex items-center gap-0.5" title="Xóa câu hỏi">
-                        🗑️ <span className="hover:underline text-[10px]">Xóa</span>
-                      </button>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
+              ),
+            )}
           </div>
         </div>
-      )}
 
-{/* ================= MODAL 1: FORM TẠO BÀI THI MỚI ================= */}
-      {moModalTaoMoi && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto my-auto">
-            <div className="flex justify-between items-center border-b border-slate-100 pb-4 mb-5">
-              <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-                <span className="text-[#0066FF] text-2xl font-normal">➕</span> Tạo bài thi mới
-              </h2>
-              <button onClick={() => setMoModalTaoMoi(false)} className="text-slate-400 text-2xl hover:text-slate-600 transition-colors">&times;</button>
-            </div>
-
-            <form onSubmit={handleSaveCreateExam} className="space-y-4">
-              <div>
-                <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1.5">Tên bài thi *</label>
-                <input 
-                  type="text" 
-                  value={createTitle}
-                  onChange={(e) => setCreateTitle(e.target.value)}
-                  placeholder="Ví dụ: Kiểm tra định kỳ Chương 1..."
-                  className="w-full px-4 py-2.5 border border-slate-200 bg-white text-slate-900 text-sm font-medium rounded-lg focus:outline-none focus:border-[#0066FF] focus:ring-1 focus:ring-[#0066FF] transition-all"
-                  required 
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1.5">Thuộc môn học / Học phần</label>
-                <select 
-                  value={createCourse}
-                  onChange={(e) => setCreateCourse(e.target.value)}
-                  className="w-full px-4 py-2.5 border border-slate-200 bg-white text-slate-900 text-sm font-medium rounded-lg focus:outline-none focus:border-[#0066FF] focus:ring-1 focus:ring-[#0066FF] transition-all"
-                >
-                  <option value="Lập trình ReactJS & Next.js">Lập trình ReactJS & Next.js</option>
-                  <option value="Thiết kế UI/UX Chuyên nghiệp">Thiết kế UI/UX Chuyên nghiệp</option>
-                  <option value="Cơ sở dữ liệu SQL Server">Cơ sở dữ liệu SQL Server</option>
-                </select>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1.5">Thời lượng (Phút) *</label>
-                  <input 
-                    type="number" 
-                    value={createDuration}
-                    onChange={(e) => setCreateDuration(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-slate-200 bg-white text-slate-900 text-sm font-medium rounded-lg focus:outline-none focus:border-[#0066FF] focus:ring-1 focus:ring-[#0066FF] transition-all"
-                    min="1"
-                    required 
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1.5">Mật khẩu thi (Tùy chọn)</label>
-                  <input 
-                    type="text" 
-                    value={createPassword}
-                    onChange={(e) => setCreatePassword(e.target.value)}
-                    placeholder="Để trống nếu thi tự do..."
-                    className="w-full px-4 py-2.5 border border-slate-200 bg-white text-slate-900 text-sm font-medium rounded-lg focus:outline-none focus:border-[#0066FF] focus:ring-1 focus:ring-[#0066FF] transition-all"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1.5">Mô tả / Hướng dẫn làm bài</label>
-                <textarea 
-                  value={createDescription}
-                  onChange={(e) => setCreateDescription(e.target.value)}
-                  placeholder="Nhập ghi chú, quy chế hoặc hướng dẫn cho sinh viên..."
-                  rows={3}
-                  className="w-full px-4 py-2.5 border border-slate-200 bg-white text-slate-900 text-sm font-medium rounded-lg focus:outline-none focus:border-[#0066FF] focus:ring-1 focus:ring-[#0066FF] transition-all resize-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1.5">Trạng thái khởi tạo</label>
-                <select 
-                  value={createStatus}
-                  onChange={(e) => setCreateStatus(e.target.value)}
-                  className="w-full px-4 py-2.5 border border-slate-200 bg-white text-slate-900 text-sm font-medium rounded-lg focus:outline-none focus:border-[#0066FF] focus:ring-1 focus:ring-[#0066FF] transition-all"
-                >
-                  <option value="Bản nháp">Bản nháp</option>
-                  <option value="Đang mở">Đang mở luôn</option>
-                  <option value="Đang đóng">Đang đóng</option>
-                </select>
-              </div>
-
-              <div className="flex gap-3 justify-end pt-5 mt-2 border-t border-slate-100">
-                <button type="button" onClick={() => setMoModalTaoMoi(false)} className="px-6 py-2.5 text-sm text-slate-700 font-bold bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors">Hủy</button>
-                <button type="submit" className="px-6 py-2.5 text-sm font-bold text-white bg-[#0066FF] rounded-lg hover:bg-blue-700 shadow-sm transition-colors">Tạo bài thi</button>
-              </div>
-            </form>
+        {/* List Môn học */}
+        {filteredSubjects.length === 0 ? (
+          <div className="bg-white rounded-2xl p-12 text-center border border-slate-200">
+            <p className="text-slate-400 font-medium text-sm">
+              Không tìm thấy môn học nào phù hợp.
+            </p>
           </div>
-        </div>
-      )}
-
-
-{/* ================= MODAL 2: FORM THIẾT LẬP ĐỀ THI ================= */}
-      {moModalThietLap && baiThiDangChon && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm overflow-y-auto p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center border-b border-slate-100 pb-4 mb-5">
-              <div>
-                <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-                  <span className="text-slate-400 text-2xl font-normal">⚙️</span> Thiết lập cấu hình đề thi
-                </h2>
-                <p className="text-[13px] text-slate-500 mt-1">Mã cấu hình: <span className="font-mono font-bold text-slate-700">{baiThiDangChon.id}</span></p>
-              </div>
-              <button onClick={() => setMoModalThietLap(false)} className="text-slate-400 text-2xl hover:text-slate-600 transition-colors">&times;</button>
-            </div>
-
-            <form onSubmit={handleSaveThietLap} className="space-y-5">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                <div className="sm:col-span-2">
-                  <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-2">Tên tiêu đề bài thi *</label>
-                  <input type="text" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className="w-full px-4 py-2.5 border border-slate-200 bg-white text-slate-900 text-sm font-medium rounded-lg focus:outline-none focus:border-[#0066FF] focus:ring-1 focus:ring-[#0066FF] transition-all" required />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-2">Thời gian làm bài (Phút) *</label>
-                  <input type="number" value={editDuration} onChange={(e) => setEditDuration(e.target.value)} className="w-full px-4 py-2.5 border border-slate-200 bg-white text-slate-900 text-sm font-medium rounded-lg focus:outline-none focus:border-[#0066FF] focus:ring-1 focus:ring-[#0066FF] transition-all" min="1" required />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-2">Trạng thái phát hành</label>
-                  <select value={editStatus} onChange={(e) => setEditStatus(e.target.value)} className="w-full px-4 py-2.5 border border-slate-200 bg-white text-slate-900 text-sm font-medium rounded-lg focus:outline-none focus:border-[#0066FF] focus:ring-1 focus:ring-[#0066FF] transition-all">
-                    <option value="Bản nháp">Bản nháp</option>
-                    <option value="Đang mở">Đang mở (Cho sinh viên thi)</option>
-                    <option value="Đang đóng">Đang đóng (Khóa đề)</option>
-                  </select>
-                </div>
-                <div className="sm:col-span-2">
-                  <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-2">Thuộc học phần / Môn học</label>
-                  <select value={editCourse} onChange={(e) => setEditCourse(e.target.value)} className="w-full px-4 py-2.5 border border-slate-200 bg-white text-slate-900 text-sm font-medium rounded-lg focus:outline-none focus:border-[#0066FF] focus:ring-1 focus:ring-[#0066FF] transition-all">
-                    <option value="Lập trình ReactJS & Next.js">Lập trình ReactJS & Next.js</option>
-                    <option value="Thiết kế UI/UX Chuyên nghiệp">Thiết kế UI/UX Chuyên nghiệp</option>
-                    <option value="Cơ sở dữ liệu SQL Server">Cơ sở dữ liệu SQL Server</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Ma trận bốc câu hỏi */}
-              <div className="bg-slate-50 p-5 rounded-xl border border-slate-200 space-y-5">
-                <div>
-                  <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                    📊 Ma trận bốc câu hỏi tự động
-                  </h3>
-                  <p className="text-[13px] text-slate-500 mt-1">Hệ thống bốc ngẫu nhiên từ Ngân hàng câu hỏi theo tỷ lệ khó dễ.</p>
-                </div>
-
-                {/* --- Khu vực Trắc nghiệm --- */}
-                <div className="space-y-3">
-                  <h4 className="text-xs font-bold text-blue-700 uppercase bg-blue-50/50 inline-block px-2 py-1 rounded border border-blue-100">Phần Trắc nghiệm</h4>
-                  <div className="grid grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-2">Mức DỄ</label>
-                      <input type="number" value={tracNghiemDe} onChange={(e) => setTracNghiemDe(Math.max(0, parseInt(e.target.value) || 0))} className="w-full px-4 py-2.5 border border-slate-200 bg-white text-slate-900 font-bold text-center rounded-lg text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none transition-all" min="0" />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-amber-600 uppercase tracking-wider mb-2">TRUNG BÌNH</label>
-                      <input type="number" value={tracNghiemTB} onChange={(e) => setTracNghiemTB(Math.max(0, parseInt(e.target.value) || 0))} className="w-full px-4 py-2.5 border border-slate-200 bg-white text-slate-900 font-bold text-center rounded-lg text-sm focus:border-amber-500 focus:ring-1 focus:ring-amber-500 focus:outline-none transition-all" min="0" />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-rose-600 uppercase tracking-wider mb-2">Mức KHÓ</label>
-                      <input type="number" value={tracNghiemKho} onChange={(e) => setTracNghiemKho(Math.max(0, parseInt(e.target.value) || 0))} className="w-full px-4 py-2.5 border border-slate-200 bg-white text-slate-900 font-bold text-center rounded-lg text-sm focus:border-rose-500 focus:ring-1 focus:ring-rose-500 focus:outline-none transition-all" min="0" />
-                    </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredSubjects.map((subject) => (
+              <div
+                key={subject.subject_id}
+                className="bg-white rounded-2xl border border-slate-200 hover:border-[#0066FF] hover:shadow-lg transition flex flex-col justify-between overflow-hidden group"
+              >
+                <div className="p-6">
+                  {/* Status & Order Index */}
+                  <div className="flex justify-between items-center mb-3">
+                    <span className="text-[11px] font-mono bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-semibold">
+                      Thứ tự: #{subject.order_index}
+                    </span>
+                    {renderStatusBadge(subject.status_id)}
                   </div>
-                </div>
 
-                {/* --- Khu vực Tự luận --- */}
-                <div className="space-y-3 pt-4 border-t border-slate-200">
-                  <h4 className="text-xs font-bold text-purple-700 uppercase bg-purple-50/50 inline-block px-2 py-1 rounded border border-purple-100">Phần Tự luận</h4>
-                  <div className="grid grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-2">Mức DỄ</label>
-                      <input type="number" value={tuLuanDe} onChange={(e) => setTuLuanDe(Math.max(0, parseInt(e.target.value) || 0))} className="w-full px-4 py-2.5 border border-slate-200 bg-white text-slate-900 font-bold text-center rounded-lg text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none transition-all" min="0" />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-amber-600 uppercase tracking-wider mb-2">TRUNG BÌNH</label>
-                      <input type="number" value={tuLuanTB} onChange={(e) => setTuLuanTB(Math.max(0, parseInt(e.target.value) || 0))} className="w-full px-4 py-2.5 border border-slate-200 bg-white text-slate-900 font-bold text-center rounded-lg text-sm focus:border-amber-500 focus:ring-1 focus:ring-amber-500 focus:outline-none transition-all" min="0" />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-rose-600 uppercase tracking-wider mb-2">Mức KHÓ</label>
-                      <input type="number" value={tuLuanKho} onChange={(e) => setTuLuanKho(Math.max(0, parseInt(e.target.value) || 0))} className="w-full px-4 py-2.5 border border-slate-200 bg-white text-slate-900 font-bold text-center rounded-lg text-sm focus:border-rose-500 focus:ring-1 focus:ring-rose-500 focus:outline-none transition-all" min="0" />
-                    </div>
-                  </div>
-                </div>
-
-                {/* --- Box tổng số --- */}
-                <div className="bg-blue-50 text-[#0066FF] px-5 py-4 rounded-lg text-[13px] font-bold flex justify-between items-center mt-2">
-                  <span>Tổng số lượng câu hỏi của đề:</span>
-                  <span className="text-sm bg-white text-[#0066FF] border border-[#0066FF]/20 px-4 py-1.5 rounded-md shadow-sm">
-                    {Number(tracNghiemDe) + Number(tracNghiemTB) + Number(tracNghiemKho) + Number(tuLuanDe) + Number(tuLuanTB) + Number(tuLuanKho)} câu hỏi
+                  {/* Tên Môn học & Khóa học */}
+                  <span className="text-xs font-semibold text-[#0066FF] block mb-1">
+                    📚 {subject.course_title || "Chưa gán khóa học"}
                   </span>
+                  <h2 className="text-lg font-bold text-slate-800 group-hover:text-[#0066FF] transition line-clamp-1">
+                    {subject.title}
+                  </h2>
+                  <p className="text-xs text-slate-500 mt-2 line-clamp-2 leading-relaxed">
+                    {subject.description}
+                  </p>
+
+                  {/* Thống kê Modules & Quizzes */}
+                  <div className="grid grid-cols-2 gap-2 mt-6 pt-4 border-t border-slate-100">
+                    <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-center">
+                      <span className="text-[11px] text-slate-400 block font-medium">
+                        Modules
+                      </span>
+                      <span className="text-sm font-bold text-slate-700">
+                        {subject.total_modules || 0} Học phần
+                      </span>
+                    </div>
+                    <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-center">
+                      <span className="text-[11px] text-slate-400 block font-medium">
+                        Bài thi (Quizzes)
+                      </span>
+                      <span className="text-sm font-bold text-slate-700">
+                        {subject.total_quizzes || 0} Đề thi
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Footer Link chuyển hướng kèm Subject ID */}
+                <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
+                  <span
+                    className="text-[10px] font-mono text-slate-400 truncate max-w-[140px]"
+                    title={subject.subject_id}
+                  >
+                    {subject.subject_id}
+                  </span>
+                  <Link
+                    href={`/instructor-management/exam-manage/${subject.subject_id}`}
+                    className="inline-flex items-center gap-1 text-xs font-bold text-[#0066FF] hover:text-blue-700 group-hover:translate-x-1 transition-transform"
+                  >
+                    Quản lý ngân hàng & đề thi →
+                  </Link>
                 </div>
               </div>
-
-              {/* Tùy chọn đảo đề */}
-              <div className="flex flex-col sm:flex-row gap-6 px-1 py-2">
-                <label className="flex items-center gap-2.5 cursor-pointer select-none">
-                  <input type="checkbox" checked={tronCauHoi} onChange={(e) => setTronCauHoi(e.target.checked)} className="w-4 h-4 rounded text-[#0066FF] border-slate-300 focus:ring-[#0066FF]" />
-                  <span className="text-[13px] font-bold text-slate-700">Tự động xáo trộn thứ tự câu hỏi</span>
-                </label>
-                <label className="flex items-center gap-2.5 cursor-pointer select-none">
-                  <input type="checkbox" checked={tronDapAn} onChange={(e) => setTronDapAn(e.target.checked)} className="w-4 h-4 rounded text-[#0066FF] border-slate-300 focus:ring-[#0066FF]" />
-                  <span className="text-[13px] font-bold text-slate-700">Tự động xáo trộn đáp án</span>
-                </label>
-              </div>
-
-              <div className="flex gap-3 justify-end pt-4 mt-2 border-t border-slate-100">
-                <button type="button" onClick={() => setMoModalThietLap(false)} className="px-6 py-2.5 text-sm text-slate-700 font-bold bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors">Hủy bỏ</button>
-                <button type="submit" className="px-6 py-2.5 text-sm font-bold text-white bg-[#0066FF] rounded-lg hover:bg-blue-700 shadow-sm transition-colors">Cập nhật đề thi</button>
-              </div>
-            </form>
+            ))}
           </div>
-        </div>
-      )}
+        )}
+      </section>
     </div>
   );
 }
