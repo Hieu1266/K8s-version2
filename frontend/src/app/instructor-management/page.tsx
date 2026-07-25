@@ -9,14 +9,6 @@ export default function TeacherDashboard() {
   // Danh sách chức năng
   const features = [
     {
-      title: "Đề cương môn học",
-      desc: "Biên soạn mục tiêu, nội dung chi tiết và chuẩn đầu ra cho từng môn học.",
-      route: "/instructor-management/course-outline",
-      icon: "📘",
-      tag: "Cấu trúc",
-      badgeColor: "bg-sky-50 text-sky-600 border-sky-100",
-    },
-    {
       title: "Quản lý môn học",
       desc: "Tạo môn học, thiết lập các chương, module và quản lý danh sách bài học.",
       route: "/instructor-management/course-content",
