@@ -109,7 +109,8 @@ export default function SubjectPage() {
   // 0️⃣ State quản lý thông tin Môn học (Subject)
   const [subject, setSubject] = useState<SubjectData | null>(null);
   const [loadingSubject, setLoadingSubject] = useState<boolean>(true);
-  const [updatingSubjectStatus, setUpdatingSubjectStatus] = useState<boolean>(false);
+  const [updatingSubjectStatus, setUpdatingSubjectStatus] =
+    useState<boolean>(false);
 
   // States quản lý Module
   const [modules, setModules] = useState<ModuleData[]>([]);
@@ -138,7 +139,8 @@ export default function SubjectPage() {
   // States quản lý Syllabus (Chỉ xem & Tải về)
   const [syllabus, setSyllabus] = useState<SyllabusData | null>(null);
   const [loadingSyllabus, setLoadingSyllabus] = useState<boolean>(true);
-  const [downloadingSyllabus, setDownloadingSyllabus] = useState<boolean>(false);
+  const [downloadingSyllabus, setDownloadingSyllabus] =
+    useState<boolean>(false);
 
   // Tải thông tin Môn học
   const fetchSubject = async () => {
@@ -202,7 +204,10 @@ export default function SubjectPage() {
       });
       await fetchSubject();
     } catch (err: any) {
-      alert("Lỗi khi cập nhật trạng thái môn học: " + (err.message || "Đã xảy ra lỗi"));
+      alert(
+        "Lỗi khi cập nhật trạng thái môn học: " +
+          (err.message || "Đã xảy ra lỗi"),
+      );
     } finally {
       setUpdatingSubjectStatus(false);
     }
@@ -428,7 +433,9 @@ export default function SubjectPage() {
                 <button
                   type="button"
                   disabled={updatingSubjectStatus}
-                  onClick={() => handleToggleSubjectStatus(SubjectStatus.SUBJECT_ACTIVE)}
+                  onClick={() =>
+                    handleToggleSubjectStatus(SubjectStatus.SUBJECT_ACTIVE)
+                  }
                   className="inline-flex items-center gap-1.5 text-xs font-semibold px-3.5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white transition shadow-sm disabled:opacity-50 cursor-pointer"
                 >
                   {updatingSubjectStatus ? (
@@ -445,7 +452,9 @@ export default function SubjectPage() {
                 <button
                   type="button"
                   disabled={updatingSubjectStatus}
-                  onClick={() => handleToggleSubjectStatus(SubjectStatus.SUBJECT_DEVELOPING)}
+                  onClick={() =>
+                    handleToggleSubjectStatus(SubjectStatus.SUBJECT_DEVELOPING)
+                  }
                   className="inline-flex items-center gap-1.5 text-xs font-semibold px-3.5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white transition shadow-sm disabled:opacity-50 cursor-pointer"
                 >
                   {updatingSubjectStatus ? (
@@ -459,7 +468,7 @@ export default function SubjectPage() {
 
               <button
                 onClick={() =>
-                  router.push(`/instructor-management/exam-manage/`)
+                  router.push(`/instructor-management/exam-manage/${subjectId}`)
                 }
                 className="inline-flex items-center gap-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 px-4 py-2.5 rounded-xl text-sm font-semibold transition shadow-sm"
               >
@@ -582,10 +591,11 @@ export default function SubjectPage() {
                     onDragStart={() => handleDragStart(index)}
                     onDragOver={(e) => handleDragOver(e, index)}
                     onDragEnd={handleDragEnd}
-                    className={`bg-white rounded-xl border p-5 shadow-sm transition-all duration-150 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 ${isDragging
-                      ? "opacity-40 border-dashed border-blue-500 scale-[0.99]"
-                      : "border-slate-200 hover:border-slate-300"
-                      }`}
+                    className={`bg-white rounded-xl border p-5 shadow-sm transition-all duration-150 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 ${
+                      isDragging
+                        ? "opacity-40 border-dashed border-blue-500 scale-[0.99]"
+                        : "border-slate-200 hover:border-slate-300"
+                    }`}
                   >
                     <div className="flex items-center gap-3 max-w-3xl min-w-0 w-full sm:w-auto">
                       <div

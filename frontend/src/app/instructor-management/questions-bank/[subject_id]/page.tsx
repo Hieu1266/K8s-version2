@@ -77,18 +77,24 @@ export default function QuestionBankDetailPage() {
   const pageSize = 5;
 
   const modules = useMemo(() => {
-    return [...new Set(questions.map((q) => q.module))];
+    return [...new Set(questions.map((q) => q.module).filter(Boolean))];
   }, [questions]);
 
   const topics = useMemo(() => {
-    return [...new Set(questions.flatMap((q) => q.chuDe))];
+    return [...new Set(questions.flatMap((q) => q.chuDe || []))];
   }, [questions]);
 
   const filteredQuestions = useMemo(() => {
     return questions.filter((q) => {
+      // Chuẩn hóa từ khóa tìm kiếm
+      const searchKeyword = keyword?.trim().toLowerCase() || "";
+
+      // Kiểm tra id và noiDung an toàn (ép kiểu chuỗi + phòng ngừa null/undefined)
       const matchKeyword =
-        q.id.toLowerCase().includes(keyword.toLowerCase()) ||
-        q.noiDung.toLowerCase().includes(keyword.toLowerCase());
+        String(q.id ?? "")
+          .toLowerCase()
+          .includes(searchKeyword) ||
+        (q.noiDung ?? "").toLowerCase().includes(searchKeyword);
 
       const matchModule =
         selectedModule === "Tất cả Module" || q.module === selectedModule;
@@ -101,7 +107,8 @@ export default function QuestionBankDetailPage() {
         q.mucDo === selectedDifficulty;
 
       const matchTopic =
-        selectedTopic === "Tất cả chủ đề" || q.chuDe.includes(selectedTopic);
+        selectedTopic === "Tất cả chủ đề" ||
+        (q.chuDe && q.chuDe.includes(selectedTopic));
 
       return (
         matchKeyword &&
@@ -129,11 +136,28 @@ export default function QuestionBankDetailPage() {
 
   const handleSave = (question: CauHoi) => {
     if (editingQuestion) {
-      setQuestions(questions.map((q) => (q.id === question.id ? question : q)));
+      // Đang chỉnh sửa: Dùng ID của editingQuestion làm gốc và ép kiểu String khi so sánh
+      const targetId = String(editingQuestion.id);
+
+      setQuestions((prevQuestions) =>
+        prevQuestions.map((q) =>
+          String(q.id) === targetId
+            ? { ...question, id: editingQuestion.id } // Giữ nguyên ID chuẩn của câu hỏi
+            : q,
+        ),
+      );
     } else {
-      setQuestions([question, ...questions]);
+      // Đang thêm mới: Tạo ID mới nếu chưa có
+      const newQuestion = {
+        ...question,
+        id: question.id || `CH_${Date.now()}`,
+      };
+      setQuestions((prevQuestions) => [newQuestion, ...prevQuestions]);
     }
+
+    // Đóng trạng thái chỉnh sửa
     setEditingQuestion(undefined);
+    setOpenModal(false); // Đóng modal sau khi lưu thành công
   };
 
   const handleEdit = (question: CauHoi) => {

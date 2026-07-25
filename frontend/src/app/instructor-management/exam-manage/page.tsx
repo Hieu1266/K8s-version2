@@ -57,19 +57,19 @@ export default function InstructorSubjectsPage() {
       case "PUBLISHED":
         return (
           <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold px-2.5 py-0.5 rounded-full">
-            ● PUBLISHED
+            ● Đã duyệt
           </span>
         );
       case "DRAFT":
         return (
           <span className="bg-amber-50 text-amber-700 border border-amber-200 text-xs font-bold px-2.5 py-0.5 rounded-full">
-            ○ DRAFT
+            ○ Bản nháp
           </span>
         );
       case "ARCHIVED":
         return (
           <span className="bg-slate-100 text-slate-500 border border-slate-200 text-xs font-bold px-2.5 py-0.5 rounded-full">
-            🔒 ARCHIVED
+            🔒 Hết hạn
           </span>
         );
     }
@@ -110,10 +110,9 @@ export default function InstructorSubjectsPage() {
                 </span>
               </div>
 
-              <h1 className="text-3xl font-bold">Quản lý Môn học Đảm nhận</h1>
+              <h1 className="text-3xl font-bold">Quản lý bài thi</h1>
               <p className="text-blue-100 text-sm mt-1">
-                Danh sách các Subject thuộc các Khóa học (Courses) bạn phụ
-                trách.
+                Danh sách các Môn học bạn phụ trách.
               </p>
             </div>
 
@@ -122,7 +121,7 @@ export default function InstructorSubjectsPage() {
                 Tổng số Môn học
               </span>
               <span className="text-2xl font-extrabold">
-                {subjects.length} Subjects
+                {subjects.length} Môn
               </span>
             </div>
           </div>
@@ -232,7 +231,7 @@ export default function InstructorSubjectsPage() {
                     href={`/instructor-management/exam-manage/${subject.subject_id}`}
                     className="inline-flex items-center gap-1 text-xs font-bold text-[#0066FF] hover:text-blue-700 group-hover:translate-x-1 transition-transform"
                   >
-                    Quản lý ngân hàng & đề thi →
+                    Quản lý đề thi →
                   </Link>
                 </div>
               </div>
