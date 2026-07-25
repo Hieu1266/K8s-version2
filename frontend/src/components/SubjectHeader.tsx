@@ -14,7 +14,7 @@ export default function SubjectHeader({ subject }: Props) {
     <section className="bg-gradient-to-r from-[#66CCFF] to-[#0066FF] text-white pb-24">
       <div className="max-w-7xl mx-auto px-6 pt-6">
         <button
-          onClick={() => router.push("/question-bank")}
+          onClick={() => router.push("/instructor-management/questions-bank")}
           className="mb-6 flex items-center gap-2 text-xs font-bold bg-white/10 hover:bg-white/20 border border-white/20 px-4 py-2 rounded-xl transition backdrop-blur-sm"
         >
           ← Danh sách Subject

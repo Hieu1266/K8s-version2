@@ -103,7 +103,8 @@ export default function SubjectPage() {
   const [syllabus, setSyllabus] = useState<SyllabusData | null>(null);
   const [loadingSyllabus, setLoadingSyllabus] = useState<boolean>(true);
   const [uploadingSyllabus, setUploadingSyllabus] = useState<boolean>(false);
-  const [downloadingSyllabus, setDownloadingSyllabus] = useState<boolean>(false);
+  const [downloadingSyllabus, setDownloadingSyllabus] =
+    useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Tải thông tin Đề cương
@@ -128,7 +129,7 @@ export default function SubjectPage() {
       const data = await getModulesAction(subjectId);
       // Sắp xếp theo order_index tăng dần
       const sorted = [...data].sort(
-        (a, b) => (a.order_index ?? 0) - (b.order_index ?? 0)
+        (a, b) => (a.order_index ?? 0) - (b.order_index ?? 0),
       );
       setModules(sorted);
     } catch (err) {
@@ -181,7 +182,7 @@ export default function SubjectPage() {
             order_index: mod.order_index,
             subject_id: subjectId,
           });
-        })
+        }),
       );
     } catch (err) {
       console.error("Lỗi cập nhật thứ tự module:", err);
@@ -202,7 +203,7 @@ export default function SubjectPage() {
         `De_cuong_${subjectId}.pdf`;
 
       const { base64Data, contentType } = await downloadSyllabusFileAction(
-        syllabus.syllabus_id
+        syllabus.syllabus_id,
       );
 
       const byteCharacters = atob(base64Data);
@@ -394,9 +395,7 @@ export default function SubjectPage() {
             <div className="flex items-center gap-3">
               <button
                 onClick={() =>
-                  router.push(
-                    `/instructor-management/course-content/${subjectId}/quizzes`
-                  )
+                  router.push(`/instructor-management/exam-manage/`)
                 }
                 className="inline-flex items-center gap-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 px-4 py-2.5 rounded-xl text-sm font-semibold transition shadow-sm"
               >
@@ -498,7 +497,9 @@ export default function SubjectPage() {
                 ) : (
                   <Upload size={15} />
                 )}
-                {uploadingSyllabus ? "Đang tải lên..." : "Tải lên Đề Cương Chi Tiết"}
+                {uploadingSyllabus
+                  ? "Đang tải lên..."
+                  : "Tải lên Đề Cương Chi Tiết"}
               </button>
             </div>
           )}
@@ -541,10 +542,11 @@ export default function SubjectPage() {
                     onDragStart={() => handleDragStart(index)}
                     onDragOver={(e) => handleDragOver(e, index)}
                     onDragEnd={handleDragEnd}
-                    className={`bg-white rounded-xl border p-5 shadow-sm transition-all duration-150 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 ${isDragging
+                    className={`bg-white rounded-xl border p-5 shadow-sm transition-all duration-150 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 ${
+                      isDragging
                         ? "opacity-40 border-dashed border-blue-500 scale-[0.99]"
                         : "border-slate-200 hover:border-slate-300"
-                      }`}
+                    }`}
                   >
                     <div className="flex items-center gap-3 max-w-3xl min-w-0 w-full sm:w-auto">
                       {/* 🖐️ Tay cầm Kéo Thả */}
@@ -564,7 +566,10 @@ export default function SubjectPage() {
                         </h3>
                         <div className="flex items-center gap-4 pt-1 text-xs text-slate-500 font-medium">
                           <span className="flex items-center gap-1">
-                            <FileQuestion size={14} className="text-indigo-500" />
+                            <FileQuestion
+                              size={14}
+                              className="text-indigo-500"
+                            />
                             {mod.total_lessons ?? 0} Bài học
                           </span>
                         </div>
@@ -595,7 +600,7 @@ export default function SubjectPage() {
                       <button
                         onClick={() =>
                           router.push(
-                            `/instructor-management/course-content/${subjectId}/modules/${targetId}`
+                            `/instructor-management/course-content/${subjectId}/modules/${targetId}`,
                           )
                         }
                         className="inline-flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-lg text-xs font-semibold transition"
@@ -617,7 +622,9 @@ export default function SubjectPage() {
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-xl space-y-4">
             <div className="flex justify-between items-center">
-              <h3 className="text-lg font-bold text-slate-900">Tạo Module Mới</h3>
+              <h3 className="text-lg font-bold text-slate-900">
+                Tạo Module Mới
+              </h3>
               <button
                 onClick={() => setShowCreateModal(false)}
                 className="text-slate-400 hover:text-slate-600 p-1"
@@ -653,7 +660,9 @@ export default function SubjectPage() {
                   disabled={creatingModule}
                   className="inline-flex items-center gap-1 px-4 py-2 text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition disabled:opacity-50"
                 >
-                  {creatingModule && <Loader2 size={14} className="animate-spin" />}
+                  {creatingModule && (
+                    <Loader2 size={14} className="animate-spin" />
+                  )}
                   {creatingModule ? "Đang tạo..." : "Tạo Module"}
                 </button>
               </div>
@@ -667,7 +676,9 @@ export default function SubjectPage() {
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-xl space-y-4">
             <div className="flex justify-between items-center">
-              <h3 className="text-lg font-bold text-slate-900">Chỉnh Sửa Module</h3>
+              <h3 className="text-lg font-bold text-slate-900">
+                Chỉnh Sửa Module
+              </h3>
               <button
                 onClick={() => setShowEditModal(false)}
                 className="text-slate-400 hover:text-slate-600 p-1"
@@ -703,7 +714,9 @@ export default function SubjectPage() {
                   disabled={updatingModule}
                   className="inline-flex items-center gap-1 px-4 py-2 text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition disabled:opacity-50"
                 >
-                  {updatingModule && <Loader2 size={14} className="animate-spin" />}
+                  {updatingModule && (
+                    <Loader2 size={14} className="animate-spin" />
+                  )}
                   {updatingModule ? "Đang lưu..." : "Lưu Thay Đổi"}
                 </button>
               </div>
@@ -720,9 +733,12 @@ export default function SubjectPage() {
               <AlertTriangle size={24} />
             </div>
             <div className="space-y-1">
-              <h3 className="text-lg font-bold text-slate-900">Xác nhận xóa Module?</h3>
+              <h3 className="text-lg font-bold text-slate-900">
+                Xác nhận xóa Module?
+              </h3>
               <p className="text-xs text-slate-500">
-                Hành động này không thể hoàn tác. Bạn có chắc chắn muốn xóa module này không?
+                Hành động này không thể hoàn tác. Bạn có chắc chắn muốn xóa
+                module này không?
               </p>
             </div>
             <div className="flex items-center justify-center gap-2 pt-2">
