@@ -1,9 +1,9 @@
 "use server";
 import { cookies } from "next/headers";
 import { GeneralInfoInstructorSubject } from "@/types/subject";
+import { SubjectData, SubjectUpdateInput } from "@/types/subjects";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_COURSE_BACKEND_URL;
-
 
 // Hàm trợ giúp lấy token an toàn
 async function getServerToken() {
@@ -12,36 +12,36 @@ async function getServerToken() {
   return token.trim().replace(/^"|"$/g, "");
 }
 
+// 1. Tạo môn học mới
 export async function createSubjectAction(payload: any) {
   try {
-    // 🟢 1. LẤY TOKEN TỪ COOKIE
     const token = await getServerToken();
 
     if (!token) {
       throw new Error("Bạn chưa đăng nhập hoặc phiên làm việc đã hết hạn!");
     }
 
-    // 🟢 2. CẤU HÌNH API ENDPOINT (Đảm bảo BACKEND_URL đúng cổng FastAPI)
-    const endpoint = `${BACKEND_URL}/subjects/`; 
+    const endpoint = `${BACKEND_URL}/subjects/`;
 
     const response = await fetch(endpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`, // 🟢 3. TRUYỀN TOKEN ĐỂ PASS QUA RoleChecker
+        Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify(payload),
     });
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      
+
       let errorMessage = `Lỗi Backend (${response.status})`;
       if (typeof errorData.detail === "string") {
         errorMessage = errorData.detail;
       } else if (Array.isArray(errorData.detail)) {
-        // Render chi tiết lỗi từng trường Pydantic
-        errorMessage = errorData.detail.map((e: any) => `${e.loc?.slice(1).join(".")}: ${e.msg}`).join(" | ");
+        errorMessage = errorData.detail
+          .map((e: any) => `${e.loc?.slice(1).join(".")}: ${e.msg}`)
+          .join(" | ");
       }
 
       throw new Error(errorMessage);
@@ -54,7 +54,7 @@ export async function createSubjectAction(payload: any) {
   }
 }
 
-// 2. Bổ sung hàm getSubjectsByCourseAction mà Client đang cần
+// 2. Lấy môn học theo ID khóa học
 export async function getSubjectsByCourseAction(courseId: string | number) {
   try {
     const token = await getServerToken();
@@ -67,10 +67,13 @@ export async function getSubjectsByCourseAction(courseId: string | number) {
       cache: "no-store",
     });
 
-    if (!response.ok) throw new Error(`Lỗi Server (${response.status}) khi tải môn học`);
+    if (!response.ok)
+      throw new Error(`Lỗi Server (${response.status}) khi tải môn học`);
     return await response.json();
   } catch (error: any) {
-    throw new Error(error.message || "Lỗi kết nối Server Action [getSubjectsByCourseAction]");
+    throw new Error(
+      error.message || "Lỗi kết nối Server Action [getSubjectsByCourseAction]"
+    );
   }
 }
 
@@ -102,14 +105,16 @@ export async function getInstructorGeneralInfoAction(
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       throw new Error(
-        errorData.detail || `Lỗi Server (${response.status}): Không thể tải danh sách môn học`
+        errorData.detail ||
+        `Lỗi Server (${response.status}): Không thể tải danh sách môn học`
       );
     }
 
     return await response.json();
   } catch (error: any) {
     throw new Error(
-      error.message || "Lỗi kết nối Server Action [getInstructorGeneralInfoAction]"
+      error.message ||
+      "Lỗi kết nối Server Action [getInstructorGeneralInfoAction]"
     );
   }
 }
@@ -118,18 +123,23 @@ export async function getInstructorGeneralInfoAction(
 export async function getSubjectsByCurriculum(curriculumId: string) {
   try {
     const token = await getServerToken();
-    const response = await fetch(`${BACKEND_URL}/subjects/curriculum/${curriculumId}`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-    });
+    const response = await fetch(
+      `${BACKEND_URL}/subjects/curriculum/${curriculumId}`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
 
     if (!response.ok) throw new Error(`Lỗi Server (${response.status})`);
     return await response.json();
   } catch (error: any) {
-    throw new Error(error.message || "Lỗi kết nối Server Action [getSubjectsByCurriculum]");
+    throw new Error(
+      error.message || "Lỗi kết nối Server Action [getSubjectsByCurriculum]"
+    );
   }
 }
 
@@ -173,3 +183,62 @@ export async function getSubjectsAction(): Promise<any[]> {
     return [];
   }
 }
+
+// 7. Cập nhật môn học
+export async function updateSubjectAction(
+  subjectId: string,
+  payload: SubjectUpdateInput
+): Promise<SubjectData> {
+  const token = await getServerToken();
+
+  const response = await fetch(`${BACKEND_URL}/subjects/${subjectId}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.detail || "Cập nhật môn học thất bại.");
+  }
+
+  return response.json();
+}
+
+// 8. 🆕 Lấy chi tiết 1 môn học theo ID (Cho SubjectPage.tsx)
+export async function getSubjectByIdAction(
+  subjectId: string
+): Promise<SubjectData> {
+  try {
+    const token = await getServerToken();
+
+    const response = await fetch(`${BACKEND_URL}/subjects/${subjectId}`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(
+        errorData.detail ||
+        `Lỗi Server (${response.status}): Không thể lấy thông tin môn học`
+      );
+    }
+
+    return await response.json();
+  } catch (error: any) {
+    throw new Error(
+      error.message || "Lỗi kết nối Server Action [getSubjectByIdAction]"
+    );
+  }
+}
+
+// Tùy chọn: Export alias để bạn thích dùng tên getSubjectAction hay getSubjectByIdAction đều được
+export { getSubjectByIdAction as getSubjectAction };

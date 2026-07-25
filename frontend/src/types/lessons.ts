@@ -29,7 +29,7 @@ export interface LessonLearningStructure {
     lesson_id: string;
     video_url?: string | null;
     content_body?: string | null;
-    duration_minutes: number;
+    duration_seconds: number;
     is_optional: boolean;
     is_quiz: boolean;
 }

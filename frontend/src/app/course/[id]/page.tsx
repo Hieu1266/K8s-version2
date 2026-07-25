@@ -436,8 +436,8 @@ export default function CourseLearningPage() {
                     {/* 1. HIỂN THỊ VIDEO */}
                     {currentLesson.video_url && currentLesson.video_url.trim() !== '' ? (
                       renderVideoPlayer(currentLesson.video_url)
-                    ) : currentLesson.duration_minutes > 0 ? (
-                      /* Nếu có duration_minutes > 0 nhưng chưa có video_url cụ thể thì dùng VideoTracking */
+                    ) : currentLesson.duration_seconds > 0 ? (
+                      /* Nếu có duration_seconds > 0 nhưng chưa có video_url cụ thể thì dùng VideoTracking */
                       <VideoTracking
                         progressData={currentVideoProgress}
                         onProgressUpdate={handleProgressUpdate}
@@ -456,7 +456,7 @@ export default function CourseLearningPage() {
                         />
                       </div>
                     ) : (
-                      !currentLesson.video_url && currentLesson.duration_minutes === 0 && (
+                      !currentLesson.video_url && currentLesson.duration_seconds === 0 && (
                         <div className="bg-white border border-[#ECEAF0] rounded-2xl p-6 text-center text-xs text-[#8A8FA3]">
                           Bài học này hiện chưa có nội dung chi tiết.
                         </div>
