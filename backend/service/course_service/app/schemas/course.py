@@ -51,6 +51,8 @@ class CourseImageUploadResponse(BaseModel):
 class LessonOrderInfo(BaseModel):
     lesson_id: UUID
     is_optional: bool
+    is_quiz: bool
+    duration_seconds: int = 0
 
 class CourseLessonsResponse(BaseModel):
     course_id: UUID

@@ -20,7 +20,7 @@ class Lesson(SQLModel, table=True):
     title: str = Field(nullable=False, max_length=255)
     # Đường dẫn video (để trống nếu bài học không có video)
     video_url: Optional[str] = Field(default=None, max_length=500)
-    duration_minutes: Optional[int] = Field(default=0, nullable=False)
+    duration_seconds: Optional[int] = Field(default=0, nullable=False)
 
     # Nội dung văn bản/bài đọc (để trống nếu bài học không có phần đọc)
     content_body: Optional[str] = Field(default=None)

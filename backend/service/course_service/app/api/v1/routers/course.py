@@ -10,7 +10,7 @@ from app.crud.course import crud_course
 from app.crud.course_media import crud_course_media
 from app.schemas.subject import SubjectPreview
 from app.schemas.module import ModulePreview
-from app.schemas.course import CourseCreate, CourseImageUploadResponse, CourseRead, CourseUpdate, CourseLessonsResponse, CoursePreview, CourseLearningStructure
+from app.schemas.course import CourseCreate, CourseImageUploadResponse, CourseRead, CourseUpdate, CourseLessonsResponse, CoursePreview, CourseLearningStructure, LessonOrderInfo
 from app.core.config import settings
 import httpx
 

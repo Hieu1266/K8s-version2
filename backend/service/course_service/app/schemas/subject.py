@@ -2,6 +2,7 @@ from pydantic import BaseModel
 from uuid import UUID
 from typing import Optional, List
 from app.schemas.module import ModulePreview, ModuleLearningStructure
+from app.schemas.enums import SubjectStatus
 
 class SubjectBase(BaseModel):
     title: str
@@ -16,6 +17,8 @@ class SubjectUpdate(BaseModel):
     title: Optional[str] = None
     order_index: Optional[int] = None
     description: str = None
+    status_id: SubjectStatus
+
 
 class SubjectPreview(BaseModel):
     title: str

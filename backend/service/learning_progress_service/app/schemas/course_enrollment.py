@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 from uuid import UUID
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 
 class CourseEnrollmentCreate(BaseModel):
     course_id: UUID
@@ -31,3 +31,13 @@ class GeneralUserEnrollmentInfo(BaseModel):
     inprogress_courses: int
     completed_courses: int
     certificate: int
+
+class LessonItem(BaseModel):
+    lesson_id: UUID
+    is_optional: bool
+    is_quiz: bool
+    duration_seconds: int
+
+class CourseLessonsResponse(BaseModel):
+    course_id: UUID
+    lessons: List[LessonItem]

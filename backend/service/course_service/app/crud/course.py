@@ -7,7 +7,7 @@ from app.models.course_tag_link import CourseTagLink
 from app.schemas.enums import CourseType, CourseStatus
 from typing import Optional, List, Tuple
 from app.schemas.course import GeneralCourseInfo
-from app.schemas.course import CourseCreate, CourseUpdate
+from app.schemas.course import CourseCreate, CourseUpdate, LessonOrderInfo
 from uuid import UUID
 from sqlmodel import Session, select, func, or_
 from sqlalchemy.orm import selectinload
@@ -38,20 +38,33 @@ class CRUDCourse(CRUDBase[Course, CourseCreate, CourseUpdate, UUID]):
         )
         return db.exec(statement).first()
     
-    def get_lesson_ids_by_course(self, db: Session, course_id: UUID) -> list[dict]:
+    def get_lesson_ids_by_course(self, db: Session, course_id: UUID) -> list[LessonOrderInfo]:
         """
         Lấy danh sách thông tin bài học sắp xếp theo lộ trình tuyến tính
         """
         statement = (
-            select(Lesson.lesson_id, Lesson.is_optional)
+            select(
+                Lesson.lesson_id, 
+                Lesson.is_optional, 
+                Lesson.is_quiz, 
+                Lesson.duration_seconds
+            )
             .join(Module, Lesson.module_id == Module.module_id)
             .join(Subject, Module.subject_id == Subject.subject_id)
             .where(Subject.course_id == course_id)
             .order_by(Subject.order_index, Module.order_index, Lesson.order_index)
         )
         results = db.exec(statement).all()
-        # Trả về list dạng dict [{"lesson_id": ..., "is_optional": ...}]
-        return [{"lesson_id": r[0], "is_optional": r[1]} for r in results]
+        
+        return [
+            {
+                "lesson_id": r[0], 
+                "is_optional": r[1],
+                "is_quiz": r[2],
+                "duration_seconds": r[3]
+            } 
+            for r in results
+        ]
     def get_course_name(self, db: Session, course_id: UUID) -> str:
         statement = select(Course.title).where(
             Course.course_id == course_id

@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException, Depends, status, Request
 from typing import List
 from uuid import UUID
 import httpx
-
+from app.crud.video_progress import crud_video_progress
 from app.core.config import settings
 from app.core.security import get_current_user_role
 from app.crud.course_enrollment import crud_course_enrollment
@@ -19,7 +19,7 @@ from app.schemas.course_enrollment import (
 
 router = APIRouter(prefix="/course_enrollment", tags=["course_enrollment"])
 
-# 1. ĐĂNG KÝ KHÓA HỌC (Tạo Enrollment + Tự động khởi tạo Tiến độ tất cả bài học)
+# 1. ĐĂNG KÝ KHÓA HỌC (Tạo Enrollment + Khởi tạo Tiến độ bài học & Video)
 @router.post("/", response_model=CourseEnrollmentResponse, status_code=status.HTTP_201_CREATED)
 async def enroll_course(
     db: SessionDep,
@@ -37,7 +37,7 @@ async def enroll_course(
             detail="Người dùng đã đăng ký khóa học này rồi."
         )
 
-    # Bước 2: Gọi sang Course Service lấy cấu trúc bài học
+    # Bước 2: Gọi sang Course Service lấy cấu trúc bài học mới
     course_lessons_url = f"{settings.BACKEND_COURSE_URL}/courses/{course_id}/lessons"
     
     async with httpx.AsyncClient() as client:
@@ -54,33 +54,29 @@ async def enroll_course(
         except httpx.RequestError:
             raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Course Service sập.")
 
-        # TỐI ƯU HIỆU NĂNG: Kiểm tra Quiz cho TẤT CẢ các bài học cùng một lúc (Bất đồng bộ)
-        quiz_service_base_url = settings.BACKEND_QUIZ_EXAM_URL
-        
-        async def check_quiz_async(lesson_dict: dict):
-            lid = lesson_dict["lesson_id"]
-            try:
-                res = await client.get(f"{quiz_service_base_url}/{lid}/had-quiz", timeout=2.0)
-                lesson_dict["has_quiz"] = res.json() if res.status_code == 200 else False
-            except Exception:
-                lesson_dict["has_quiz"] = False
-            return lesson_dict
-
-        # Chạy kiểm tra tất cả bài học song song để tiết kiệm thời gian phản hồi API
-        if lessons_list:
-            lessons_list = await asyncio.gather(*(check_quiz_async(l) for l in lessons_list))
+    # Chuẩn hóa dữ liệu: Map `is_quiz` sang `has_quiz` để tương thích với logic CRUD hiện tại
+    for lesson in lessons_list:
+        if "has_quiz" not in lesson:
+            lesson["has_quiz"] = lesson.get("is_quiz", False)
 
     # Bước 3: Tạo bản ghi Đăng ký học chính thức
     enroll = crud_course_enrollment.create(db, {"user_id": user_id, "course_id": course_id})
     
-    # Bước 4: Khởi tạo tiến độ hàng loạt 
+    # Bước 4: Khởi tạo tiến độ bài học & tiến độ video
     if lessons_list:
+        # 4.1. Khởi tạo tiến độ chung cho tất cả các bài học
         crud_lesson_progress.init_course_progress(
             db=db, user_id=user_id, course_id=course_id, lessons=lessons_list
         )
         
+        # 4.2. Lọc các bài học có video (duration_seconds > 0) để khởi tạo video progress
+        video_lessons = [l for l in lessons_list if l.get("duration_seconds", 0) > 0]
+        if video_lessons:
+            crud_video_progress.init_video_progress(
+                db=db, user_id=user_id, lessons=video_lessons
+            )
+        
     return enroll
-
 # 2. LẤY DANH SÁCH TIẾN ĐỘ KHÓA HỌC (Đang học / Đã xong)
 @router.get("/history/{is_completed}", response_model=List[CourseInProgress])
 async def get_progress_list(
@@ -193,7 +189,10 @@ def unenroll_course(
             detail="Khóa học đã hoàn thành, bạn không thể hủy đăng ký."
         )
         
-    # Bước 3: Xóa sạch tiến độ các bài học liên quan trước (đảm bảo Data Integrity)
+    # Bước 3: Xóa sạch tiến độ Video & tiến độ Bài học liên quan (Đảm bảo Data Integrity)
+    # Note: Phải xóa video_progress trước khi xóa lesson_progress 
+    # để lấy danh sách lesson_id tương ứng từ lesson_progress.
+    crud_video_progress.remove_by_course(db, user_id=user_id, course_id=course_id)
     crud_lesson_progress.remove_by_course(db, user_id=user_id, course_id=course_id)
 
     # Bước 4: Tiến hành xóa bản ghi đăng ký chính
