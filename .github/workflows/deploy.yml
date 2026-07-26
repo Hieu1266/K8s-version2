@@ -93,15 +93,11 @@ jobs:
       - name: Deploy Manifests
         shell: powershell
         run: |
-          # Chuyển hướng làm việc về thư mục gốc của Repository
-          Set-Location $env:GITHUB_WORKSPACE
+          # Gọi đúng tên file có đuôi .yml
+          kubectl apply -f k8s/backend-secrets.yml
+          kubectl apply -f k8s/backend.yml
+          kubectl apply -f k8s/frontend.yml
 
-          # Apply các file manifest theo đường dẫn tuyệt đối
-          kubectl apply -f "$env:GITHUB_WORKSPACE\k8s\backend-secrets.yaml"
-          kubectl apply -f "$env:GITHUB_WORKSPACE\k8s\backend.yaml"
-          kubectl apply -f "$env:GITHUB_WORKSPACE\k8s\frontend.yaml"
-
-          # Tiến hành restart các Deployment sau khi đã apply thành công
           kubectl rollout restart deployment/course-service
           kubectl rollout restart deployment/learning-progress-service
           kubectl rollout restart deployment/quiz-exam-service
