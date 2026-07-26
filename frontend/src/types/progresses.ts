@@ -2,13 +2,11 @@ import { LessonStatus } from "./statuses";
 import { Question } from "./quizzes";
 
 export interface UserLessonNote {
-    noteId: string;
-    userId: string;
-    courseId: string;
-    lessonId: string;
-    timestampSeconds: number;
+    note_id: string;
+    timestamp_seconds: number | null;
     content: string;
-    createdAt: string;
+    created_at: string;
+    updated_at: string;
 }
 
 export interface LessonProgress {
@@ -40,4 +38,16 @@ export interface VideoProgress {
     completion_percentage: number; // đúng tên cột trong video_progress.py
     is_finished: boolean;
     current_points: number;
+}
+
+export interface NoteCreatePayload {
+    course_id: string;
+    lesson_id: string;
+    timestamp_seconds?: number | null;
+    content: string;
+}
+
+export interface NoteUpdatePayload {
+    content?: string;
+    timestamp_seconds?: number | null;
 }

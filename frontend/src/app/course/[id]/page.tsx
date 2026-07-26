@@ -4,18 +4,18 @@ import { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import VideoTracking from '@/components/VideoTracking';
+import LessonVideoPlayer from '@/components/LessonVideoPlayer';
+import LessonNotesPanel from '@/components/LessonNotesPanel';
 import { getLearningCourse } from '@/actions/getCourse';
 import { attachStatusToLessons } from '@/actions/getLesson';
+import { getLessonNotesAction, createNoteAction } from '@/actions/getNotes';
 import { CourseLearningStructure } from '@/types/course';
 import { SubjectLearningStructure } from '@/types/subjects';
 import { ModuleLearningStructure } from '@/types/modules';
 import { LessonLearningStructure } from '@/types/lessons';
-
-// Các imports Types & Mock Data
-import { CURRENT_USER, mockNotes } from '@/data/course';
-import { UserLessonNote } from "@/types/progresses";
-import { LessonStatus } from "@/types/statuses";
-import { VideoProgress } from "@/types/video";
+import { UserLessonNote, NoteCreatePayload } from '@/types/progresses';
+import { LessonStatus } from '@/types/statuses';
+import { VideoProgress } from '@/types/video';
 
 type TabKey = 'lecture' | 'resources' | 'notes' | 'quiz';
 
@@ -46,9 +46,16 @@ export default function CourseLearningPage() {
   const [expandedModules, setExpandedModules] = useState<Record<string, boolean>>({});
   const [activeTab, setActiveTab] = useState<TabKey>('lecture');
 
-  // State Tiến độ & Ghi chú
-  const [notes, setNotes] = useState<UserLessonNote[]>(mockNotes);
-  const [noteDraft, setNoteDraft] = useState('');
+  // State Ghi chú + Video
+  const [notes, setNotes] = useState<UserLessonNote[]>([]);
+  const [notesLoading, setNotesLoading] = useState(false);
+  const [videoCurrentTime, setVideoCurrentTime] = useState(0);
+  const [seekTarget, setSeekTarget] = useState<number | null>(null);
+
+  // Ô tạo ghi chú nhanh nằm dưới video
+  const [quickNoteOpen, setQuickNoteOpen] = useState(false);
+  const [quickNoteContent, setQuickNoteContent] = useState('');
+  const [quickNoteSaving, setQuickNoteSaving] = useState(false);
 
   // Call Server Action để lấy dữ liệu khóa học và status của các bài học
   useEffect(() => {
@@ -112,6 +119,32 @@ export default function CourseLearningPage() {
     fetchLearningData();
   }, [id]);
 
+  // Lấy danh sách ghi chú mỗi khi đổi bài học + reset trạng thái liên quan video/ô nhập nhanh
+  useEffect(() => {
+    if (!currentLesson?.lesson_id) {
+      setNotes([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    (async () => {
+      setNotesLoading(true);
+      const data = await getLessonNotesAction(currentLesson.lesson_id);
+      if (!cancelled) setNotes(data);
+      setNotesLoading(false);
+    })();
+
+    setVideoCurrentTime(0);
+    setSeekTarget(null);
+    setQuickNoteOpen(false);
+    setQuickNoteContent('');
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentLesson?.lesson_id]);
+
   const flatLessons = useMemo(() => {
     if (!course) return [];
     const flat: { subject: SubjectLearningStructure; module: ModuleLearningStructure; lesson: LessonWithStatus }[] = [];
@@ -166,53 +199,36 @@ export default function CourseLearningPage() {
   const toggleModule = (moduleId: string) =>
     setExpandedModules((prev) => ({ ...prev, [moduleId]: !prev[moduleId] }));
 
-  const lessonNotes = notes
-    .filter((n) => n.lessonId === currentLesson?.lesson_id)
-    .sort((a, b) => a.timestampSeconds - b.timestampSeconds);
+  // Bài học hiện tại có video hay không (dùng để bật/tắt phần chọn mốc thời gian của note)
+  const hasVideo = Boolean(currentLesson?.video_url && currentLesson.video_url.trim() !== '');
 
-  const addNote = () => {
-    if (!noteDraft.trim() || !currentLesson || !course) return;
-    const newNote: UserLessonNote = {
-      noteId: `note-${Date.now()}`,
-      userId: CURRENT_USER.userId,
-      courseId: id,
-      lessonId: currentLesson.lesson_id,
-      timestampSeconds: 0,
-      content: noteDraft.trim(),
-      createdAt: new Date().toISOString(),
+  // Tạo ghi chú nhanh ngay dưới video, luôn gắn timestamp = thời điểm hiện tại
+  const handleQuickCreateNote = async () => {
+    if (!quickNoteContent.trim() || !currentLesson || !course) return;
+
+    setQuickNoteSaving(true);
+    const payload: NoteCreatePayload = {
+      course_id: id,
+      lesson_id: currentLesson.lesson_id,
+      timestamp_seconds: Math.floor(videoCurrentTime),
+      content: quickNoteContent.trim(),
     };
-    setNotes((prev) => [...prev, newNote]);
-    setNoteDraft('');
+    const result = await createNoteAction(payload);
+    setQuickNoteSaving(false);
+
+    if (result.success && result.data) {
+      setNotes((prev) => [...prev, result.data as UserLessonNote]);
+      setQuickNoteContent('');
+      setQuickNoteOpen(false);
+    } else {
+      alert(result.error || 'Tạo ghi chú thất bại.');
+    }
   };
 
-  // Trình phát Video hỗ trợ Youtube embed / file MP4
-  const renderVideoPlayer = (url: string) => {
-    if (url.includes('youtube.com') || url.includes('youtu.be')) {
-      const embedUrl = url.includes('embed')
-        ? url
-        : url.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/');
-
-      return (
-        <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-black shadow-sm">
-          <iframe
-            src={embedUrl}
-            title={currentLesson?.title}
-            className="w-full h-full border-0"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-          />
-        </div>
-      );
-    }
-
-    return (
-      <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-black shadow-sm">
-        <video controls className="w-full h-full object-contain">
-          <source src={url} type="video/mp4" />
-          Trình duyệt của bạn không hỗ trợ xem video trực tiếp.
-        </video>
-      </div>
-    );
+  const formatSeconds = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
   if (loading) {
@@ -406,7 +422,7 @@ export default function CourseLearningPage() {
                   [
                     ['lecture', 'Bài giảng'],
                     ['resources', 'Tài liệu'],
-                    ['notes', `Ghi chú${lessonNotes.length ? ` · ${lessonNotes.length}` : ''}`],
+                    ['notes', `Ghi chú${notes.length ? ` · ${notes.length}` : ''}`],
                   ] as [TabKey, string][]
                 ).map(([key, label]) => (
                   <button
@@ -434,8 +450,52 @@ export default function CourseLearningPage() {
                 {currentLesson ? (
                   <>
                     {/* 1. HIỂN THỊ VIDEO */}
-                    {currentLesson.video_url && currentLesson.video_url.trim() !== '' ? (
-                      renderVideoPlayer(currentLesson.video_url)
+                    {hasVideo ? (
+                      <>
+                        <LessonVideoPlayer
+                          url={currentLesson.video_url as string}
+                          title={currentLesson.title}
+                          onTimeUpdate={setVideoCurrentTime}
+                          seekToSeconds={seekTarget}
+                          onSeeked={() => setSeekTarget(null)}
+                        />
+
+                        {/* Nút tạo ghi chú nhanh ngay dưới video */}
+                        <div className="bg-white border border-[#ECEAF0] rounded-2xl p-3">
+                          {!quickNoteOpen ? (
+                            <button
+                              onClick={() => setQuickNoteOpen(true)}
+                              className="text-xs font-bold text-[#5B5FEF] flex items-center gap-1.5"
+                            >
+                              📝 Thêm ghi chú tại {formatSeconds(videoCurrentTime)}
+                            </button>
+                          ) : (
+                            <div className="flex gap-2">
+                              <input
+                                autoFocus
+                                value={quickNoteContent}
+                                onChange={(e) => setQuickNoteContent(e.target.value)}
+                                placeholder="Nhập ghi chú..."
+                                className="flex-1 text-xs bg-[#F7F8FB] border border-[#E7E9F0] rounded-full px-4 py-2.5 focus:outline-none focus:border-[#5B5FEF]"
+                                onKeyDown={(e) => e.key === 'Enter' && handleQuickCreateNote()}
+                              />
+                              <button
+                                onClick={handleQuickCreateNote}
+                                disabled={quickNoteSaving || !quickNoteContent.trim()}
+                                className="text-white text-xs font-bold px-4 rounded-full bg-[#5B5FEF] disabled:opacity-50"
+                              >
+                                {quickNoteSaving ? '...' : 'Lưu'}
+                              </button>
+                              <button
+                                onClick={() => { setQuickNoteOpen(false); setQuickNoteContent(''); }}
+                                className="text-xs font-bold px-3 text-[#565A70]"
+                              >
+                                Hủy
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </>
                     ) : currentLesson.duration_seconds > 0 ? (
                       /* Nếu có duration_seconds > 0 nhưng chưa có video_url cụ thể thì dùng VideoTracking */
                       <VideoTracking
@@ -456,7 +516,7 @@ export default function CourseLearningPage() {
                         />
                       </div>
                     ) : (
-                      !currentLesson.video_url && currentLesson.duration_seconds === 0 && (
+                      !hasVideo && currentLesson.duration_seconds === 0 && (
                         <div className="bg-white border border-[#ECEAF0] rounded-2xl p-6 text-center text-xs text-[#8A8FA3]">
                           Bài học này hiện chưa có nội dung chi tiết.
                         </div>
@@ -479,18 +539,21 @@ export default function CourseLearningPage() {
             )}
 
             {/* TAB GHI CHÚ */}
-            {activeTab === 'notes' && !currentLesson?.is_quiz && (
-              <div key="notes" className="anim-fade-up space-y-5 pb-10">
-                <div className="flex gap-2">
-                  <input
-                    value={noteDraft}
-                    onChange={(e) => setNoteDraft(e.target.value)}
-                    placeholder="Viết ghi chú cho bài học này..."
-                    className="flex-1 text-xs bg-white border border-[#E7E9F0] rounded-full px-4 py-3 focus:outline-none focus:border-[#5B5FEF]"
-                    onKeyDown={(e) => e.key === 'Enter' && addNote()}
-                  />
-                  <button onClick={addNote} className="text-white text-xs font-bold px-5 rounded-full bg-[#5B5FEF]">Lưu</button>
-                </div>
+            {activeTab === 'notes' && !currentLesson?.is_quiz && currentLesson && (
+              <div key="notes" className="anim-fade-up pb-10">
+                <LessonNotesPanel
+                  courseId={id}
+                  lessonId={currentLesson.lesson_id}
+                  hasVideo={hasVideo}
+                  videoCurrentTime={videoCurrentTime}
+                  notes={notes}
+                  loading={notesLoading}
+                  onNotesChange={setNotes}
+                  onSeekRequest={(seconds) => {
+                    setSeekTarget(seconds);
+                    setActiveTab('lecture');
+                  }}
+                />
               </div>
             )}
 
