@@ -1,7 +1,8 @@
 .env
 documents/syllabus/*
 !documents/syllabus/.gitkeep
-static/uploads/curriculum/*
+backend/service/course_service/static/uploads/curriculum/*
+!backend/service/course_service/static/uploads/curriculum/
 __pycache__/
 *.pyc
 *.pyo
