@@ -1,5 +1,6 @@
 import uuid
 from uuid import UUID
+from typing import Optional
 from datetime import datetime
 from sqlmodel import Field, SQLModel
 
@@ -11,7 +12,7 @@ class UserLessonNote(SQLModel, table=True):
     course_id: UUID = Field(nullable=False, index=True)     # Định danh khóa học từ Course Service
     lesson_id: UUID = Field(nullable=False, index=True)     # Định danh bài học từ Course Service
     
-    timestamp_seconds: int = Field(nullable=False)          # Mốc thời gian của dòng video khi học viên bấm tạo ghi chú
+    timestamp_seconds: Optional[int] = Field(nullable=True)          # Mốc thời gian của dòng video khi học viên bấm tạo ghi chú
     content: str = Field(nullable=False)                    # Nội dung văn bản ghi chú của học viên
     
     created_at: datetime = Field(default_factory=datetime.utcnow)    # Ngày tạo bản ghi chú

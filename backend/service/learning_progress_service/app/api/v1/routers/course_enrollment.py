@@ -8,6 +8,7 @@ from app.core.config import settings
 from app.core.security import get_current_user_role
 from app.crud.course_enrollment import crud_course_enrollment
 from app.crud.lesson_progress import crud_lesson_progress
+from app.crud.user_lesson_note import crud_note
 from app.api.v1.deps import SessionDep
 from app.schemas.course_enrollment import (
     CourseInProgress, 
@@ -194,6 +195,7 @@ def unenroll_course(
     # để lấy danh sách lesson_id tương ứng từ lesson_progress.
     crud_video_progress.remove_by_course(db, user_id=user_id, course_id=course_id)
     crud_lesson_progress.remove_by_course(db, user_id=user_id, course_id=course_id)
+    crud_note.delete_notes_by_user_and_course(db, user_id=user_id, course_id=course_id)
 
     # Bước 4: Tiến hành xóa bản ghi đăng ký chính
     crud_course_enrollment.delete(db, enroll.enrollment_id)

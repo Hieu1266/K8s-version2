@@ -1,0 +1,115 @@
+name: Build and Deploy to K8s
+
+on:
+  push:
+    branches:
+      - main
+    # Chỉ chạy pipeline khi có code mới ở các đường dẫn này
+    paths:
+      - 'backend/service/**'
+      - 'frontend/**'
+      - 'k8s/**'
+
+env:
+  DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+  DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+
+jobs:
+  # ==========================================
+  # JOB 1: Build & Push 4 Backend Services
+  # ==========================================
+  build-backend:
+    runs-on: ubuntu-latest
+    strategy:
+      # Chạy song song 4 service cùng lúc
+      matrix:
+        service:
+          - course_service
+          - learning_progress_service
+          - quiz_exam_service
+          - user_service
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ env.DOCKER_USERNAME }}
+          password: ${{ env.DOCKER_PASSWORD }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and Push Backend Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend/service/${{ matrix.service }}
+          file: ./backend/service/${{ matrix.service }}/Dockerfile
+          push: true
+          # Tên image đẩy lên Docker Hub đổi dấu _ thành - để khớp với file k8s/backend.yaml
+          tags: ${{ env.DOCKER_USERNAME }}/${{ matrix.service }}:latest
+          # Tận dụng cache của GitHub Actions giúp build cực nhanh
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ==========================================
+  # JOB 2: Build & Push Next.js Frontend
+  # ==========================================
+  build-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ env.DOCKER_USERNAME }}
+          password: ${{ env.DOCKER_PASSWORD }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and Push Frontend Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: true
+          tags: ${{ env.DOCKER_USERNAME }}/frontend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ==========================================
+  # JOB 3: Deploy lên Kubernetes Cluster
+  # ==========================================
+  deploy-k8s:
+    needs: [build-backend, build-frontend]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # Cấu hình kết nối tới K8s cluster bằng kubeconfig từ Secrets
+      - name: Set Kubernetes Context
+        uses: azure/k8s-set-context@v3
+        with:
+          method: kubeconfig
+          kubeconfig: ${{ secrets.KUBE_CONFIG }}
+
+      - name: Deploy Manifests
+        run: |
+          # Apply Secret trước
+          kubectl apply -f k8s/backend-secrets.yaml
+          
+          # Apply Deployment & Service
+          kubectl apply -f k8s/backend.yaml
+          kubectl apply -f k8s/frontend.yaml
+          
+          # Restart lại Deployment cho 4 Backend + 1 Frontend
+          kubectl rollout restart deployment/course-service
+          kubectl rollout restart deployment/learning-progress-service
+          kubectl rollout restart deployment/quiz-exam-service
+          kubectl rollout restart deployment/user-service
+          kubectl rollout restart deployment/frontend

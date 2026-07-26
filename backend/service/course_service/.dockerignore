@@ -1,0 +1,13 @@
+.env
+documents/syllabus/*
+!documents/syllabus/.gitkeep
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+
+**/venv/
+**/.venv/
+**/env/
+**/ENV/

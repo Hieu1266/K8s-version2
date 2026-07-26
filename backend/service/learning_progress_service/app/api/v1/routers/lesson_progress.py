@@ -1,6 +1,5 @@
 import asyncio
 from fastapi import APIRouter, HTTPException, Depends, status
-from sqlmodel import Session, select
 from app.models.lesson_progress import LessonProgress
 from typing import List
 from uuid import UUID
