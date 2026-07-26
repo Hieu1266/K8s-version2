@@ -85,7 +85,7 @@ jobs:
   # ==========================================
   deploy-k8s:
     needs: [build-backend, build-frontend]
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
