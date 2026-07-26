@@ -3,19 +3,19 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
-import { 
+import {
   Search, ArrowLeft, ChevronRight, BookOpen, Layers, FileText, Plus, X, Paperclip, ExternalLink, Info, UserCheck, UserPlus, Edit3, FolderOpen, Inbox, LayoutGrid, Download, GraduationCap, Clock
 } from "lucide-react";
 
 import { Course } from "@/types/course";
 import { getCoursesAction } from "@/actions/getCourse";
 import { getSubjectsByCourseAction, createSubjectAction } from "@/actions/getSubject";
-import { 
-  getSyllabusBySubjectAction, 
-  createSyllabusAction, 
-  uploadFileAction, 
-  getInstructorsAction, 
-  InstructorUser 
+import {
+  getSyllabusBySubjectAction,
+  createSyllabusAction,
+  uploadFileAction,
+  getInstructorsAction,
+  InstructorUser
 } from "@/actions/getSyllabus";
 import { getCurriculumsAction } from "@/actions/getCurriculum";
 
@@ -61,10 +61,10 @@ function FileCard({ filePath, label = "Tài liệu đính kèm" }: { filePath?: 
       </div>
 
       <div className="flex items-center gap-2 shrink-0">
-        <a 
-          href={fullUrl} 
-          target="_blank" 
-          rel="noreferrer" 
+        <a
+          href={fullUrl}
+          target="_blank"
+          rel="noreferrer"
           className="w-8 h-8 flex items-center justify-center bg-white border border-slate-200 hover:border-[#0066FF] hover:bg-blue-50 text-slate-500 hover:text-[#0066FF] rounded-lg transition-all shadow-sm"
           title="Mở trong tab mới / Tải về"
         >
@@ -137,7 +137,7 @@ export default function CourseContentPage() {
         console.error("Lỗi khi tải thông tin Curriculum:", error);
       }
     }
-    
+
     try {
       const res: any = await getSubjectsByCourseAction(course.course_id);
       const subjectList = Array.isArray(res) ? res : res?.data || [];
@@ -170,7 +170,7 @@ export default function CourseContentPage() {
       await createSubjectAction({
         course_id: selectedCourse.course_id,
         title: subjectForm.title.trim(),
-        description: subjectForm.description.trim() || subjectForm.title.trim(), 
+        description: subjectForm.description.trim() || subjectForm.title.trim(),
         order_index: Number(subjectForm.order_index) || 1,
       });
       alert("Tạo môn học thành công!");
@@ -195,12 +195,12 @@ export default function CourseContentPage() {
         const uploadData = new FormData();
         uploadData.append("file", selectedFile);
         const uploadRes = await uploadFileAction(uploadData);
-        filePath = uploadRes.file_path; 
+        filePath = uploadRes.file_path;
       }
       await createSyllabusAction({
         subject_id: String(selectedSubject.subject_id),
         description: syllabusForm.description.trim(),
-        syllabus_file_path: filePath, 
+        syllabus_file_path: filePath,
         instructor_id: syllabusForm.instructor_id,
       });
       alert("Tạo đề cương và phân công giảng viên thành công!");
@@ -250,7 +250,7 @@ export default function CourseContentPage() {
       </section>
 
       <main className="max-w-7xl mx-auto px-6 -mt-14 pb-20 relative z-20">
-        
+
         {/* =========================================
             VIEW 1: DANH SÁCH KHÓA HỌC (OUTER VIEW)
             ========================================= */}
@@ -262,7 +262,7 @@ export default function CourseContentPage() {
                   <LayoutGrid size={14} /> Tổng quan hệ thống
                 </div>
                 <h2 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tight">
-                  Danh Sách Khóa Học
+                  Danh Sách Môn Học
                 </h2>
                 <p className="text-slate-500 text-sm font-medium">Hiện có <strong className="text-[#0066FF] text-base">{filteredCourses.length}</strong> khóa học đang được quản lý.</p>
               </div>
@@ -292,7 +292,7 @@ export default function CourseContentPage() {
                     className="group bg-white border border-slate-200 hover:border-[#0066FF]/50 rounded-3xl p-6 cursor-pointer shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] hover:shadow-[0_15px_35px_-5px_rgba(6,81,237,0.15)] transition-all duration-300 relative overflow-hidden flex flex-col h-full hover:-translate-y-1"
                   >
                     <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-blue-50/80 to-transparent rounded-bl-full -z-10 group-hover:scale-110 transition-transform duration-500"></div>
-                    
+
                     <div className="flex justify-between items-start mb-5">
                       <div className="w-12 h-12 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-[#0066FF] group-hover:text-white transition-colors duration-300 shadow-sm">
                         <BookOpen size={24} />
@@ -301,11 +301,11 @@ export default function CourseContentPage() {
                         ID: {course.course_id}
                       </span>
                     </div>
-                    
+
                     <h3 className="font-extrabold text-lg text-slate-800 group-hover:text-[#0066FF] transition-colors line-clamp-2 mb-3 leading-snug">
                       {course.title}
                     </h3>
-                    
+
                     {course.description ? (
                       <p className="text-sm text-slate-500 font-medium line-clamp-3 leading-relaxed flex-1">
                         {course.description}
@@ -337,15 +337,15 @@ export default function CourseContentPage() {
             {/* Banner Khóa học đang chọn */}
             <div className="bg-white border border-slate-200/80 rounded-[2rem] p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative overflow-hidden">
               <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-b from-blue-50/50 to-transparent rounded-full -translate-y-1/2 translate-x-1/3 pointer-events-none"></div>
-              
+
               <div className="space-y-4 flex-1 relative z-10">
-                <button 
+                <button
                   onClick={() => setSelectedCourse(null)}
                   className="px-4 py-2 bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all w-fit shadow-sm hover:shadow"
                 >
                   <ArrowLeft size={14} /> Trở về danh sách
                 </button>
-                
+
                 <div>
                   <h2 className="text-2xl md:text-3xl font-black text-slate-800 mb-2 tracking-tight">{selectedCourse.title}</h2>
                   <p className="text-slate-500 text-sm font-medium max-w-3xl leading-relaxed">{selectedCourse.description}</p>
@@ -372,7 +372,7 @@ export default function CourseContentPage() {
 
             {/* Lưới 2 Cột: Môn Học & Đề Cương */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-auto lg:h-[800px]">
-              
+
               {/* CỘT 1: DANH SÁCH MÔN HỌC (Chiếm 5 phần) */}
               <div className="lg:col-span-5 bg-white border border-slate-200/80 rounded-[2rem] p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col h-[600px] lg:h-full">
                 <div className="flex justify-between items-center pb-5 border-b border-slate-100 mb-4">
@@ -397,7 +397,7 @@ export default function CourseContentPage() {
                   {subjects.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-20 text-slate-400 space-y-4 bg-amber-50/30 rounded-2xl border border-dashed border-amber-200 h-full">
                       <Inbox size={48} className="text-amber-200" />
-                      <p className="text-sm font-medium px-4 text-center text-slate-500">Chưa có môn học nào.<br/>Bấm <strong className="text-amber-500">"+ Thêm Môn"</strong> để bắt đầu.</p>
+                      <p className="text-sm font-medium px-4 text-center text-slate-500">Chưa có môn học nào.<br />Bấm <strong className="text-amber-500">"+ Thêm Môn"</strong> để bắt đầu.</p>
                     </div>
                   ) : (
                     subjects.map((sub: any, index: number) => {
@@ -408,17 +408,15 @@ export default function CourseContentPage() {
                         <div
                           key={sub.subject_id}
                           onClick={() => handleSelectSubject(sub)}
-                          className={`p-4 rounded-2xl cursor-pointer transition-all duration-300 group flex flex-col gap-3 ${
-                            isSelected 
-                              ? "border border-amber-400 bg-gradient-to-r from-amber-50 to-white shadow-[0_4px_20px_-5px_rgba(245,158,11,0.15)]" 
+                          className={`p-4 rounded-2xl cursor-pointer transition-all duration-300 group flex flex-col gap-3 ${isSelected
+                              ? "border border-amber-400 bg-gradient-to-r from-amber-50 to-white shadow-[0_4px_20px_-5px_rgba(245,158,11,0.15)]"
                               : "border border-slate-100 bg-white hover:border-amber-200 hover:bg-amber-50/20 hover:shadow-md"
-                          }`}
+                            }`}
                         >
                           <div className="flex justify-between items-start gap-4">
                             <div className="flex gap-3.5 flex-1 min-w-0">
-                              <div className={`w-10 h-10 shrink-0 rounded-xl flex items-center justify-center text-sm font-black shadow-sm transition-colors ${
-                                isSelected ? "bg-amber-500 text-white" : "bg-slate-50 text-slate-400 border border-slate-200 group-hover:text-amber-500"
-                              }`}>
+                              <div className={`w-10 h-10 shrink-0 rounded-xl flex items-center justify-center text-sm font-black shadow-sm transition-colors ${isSelected ? "bg-amber-500 text-white" : "bg-slate-50 text-slate-400 border border-slate-200 group-hover:text-amber-500"
+                                }`}>
                                 {sub.order_index || index + 1}
                               </div>
                               <div className="flex-1 min-w-0 pt-0.5">
@@ -484,7 +482,7 @@ export default function CourseContentPage() {
                         <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-sm mb-2 border border-emerald-100">
                           <FileText size={32} className="text-emerald-300" />
                         </div>
-                        <p className="text-sm font-medium px-4 text-center text-slate-500">Môn học này chưa có đề cương.<br/>Hãy khởi tạo để phân công Giảng viên.</p>
+                        <p className="text-sm font-medium px-4 text-center text-slate-500">Môn học này chưa có đề cương.<br />Hãy khởi tạo để phân công Giảng viên.</p>
                       </div>
                     ) : (
                       syllabuses.map((syl: any) => {
@@ -493,7 +491,7 @@ export default function CourseContentPage() {
 
                         return (
                           <div key={syl.syllabus_id || syl.id} className="p-6 lg:p-8 bg-white border border-slate-200/80 rounded-3xl space-y-6 shadow-[0_8px_30px_-5px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_-5px_rgba(0,0,0,0.08)] transition-all">
-                            
+
                             {/* Khung thông tin giảng viên xịn xò */}
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-gradient-to-r from-slate-50 to-white border border-slate-200 p-5 rounded-2xl gap-4 relative overflow-hidden">
                               <div className="absolute top-0 right-0 w-1 bg-emerald-400 h-full"></div>
@@ -516,7 +514,7 @@ export default function CourseContentPage() {
                                 </div>
                               </div>
 
-                              <button 
+                              <button
                                 onClick={() => {
                                   setSyllabusForm({
                                     description: syl.description || "",
@@ -538,7 +536,7 @@ export default function CourseContentPage() {
                                 {syl.description || <span className="italic text-slate-400">Chưa có thông tin mô tả chi tiết.</span>}
                               </p>
                             </div>
-                            
+
                             {syllabusFile && (
                               <div className="pt-4 border-t border-slate-100">
                                 <span className="text-[12px] font-extrabold text-slate-800 uppercase tracking-widest block mb-1">Tài liệu đính kèm</span>
@@ -571,20 +569,20 @@ export default function CourseContentPage() {
           <div className="bg-white rounded-[2rem] max-w-md w-full p-8 space-y-6 shadow-2xl relative">
             <div className="flex justify-between items-center pb-4 border-b border-slate-100">
               <h3 className="font-black text-xl text-slate-800 flex items-center gap-2">
-                <div className="p-2 bg-amber-100 text-amber-600 rounded-xl"><BookOpen size={20}/></div>
+                <div className="p-2 bg-amber-100 text-amber-600 rounded-xl"><BookOpen size={20} /></div>
                 Tạo Môn Học Mới
               </h3>
               <button onClick={() => setShowSubjectModal(false)} className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700 transition-colors">
                 <X size={18} />
               </button>
             </div>
-            
+
             <div className="bg-amber-50/50 border border-amber-100 p-4 rounded-2xl">
               <p className="text-xs text-amber-800 font-medium">
                 Sẽ được thêm vào: <strong className="font-bold block text-sm mt-1">{selectedCourse?.title}</strong>
               </p>
             </div>
-            
+
             <div className="space-y-4">
               <div>
                 <label className="text-xs font-bold text-slate-700 block mb-1.5 uppercase tracking-wide">Tên Môn Học <span className="text-red-500">*</span></label>
@@ -634,14 +632,14 @@ export default function CourseContentPage() {
           <div className="bg-white rounded-[2rem] max-w-md w-full p-8 space-y-6 shadow-2xl relative">
             <div className="flex justify-between items-center pb-4 border-b border-slate-100">
               <h3 className="font-black text-xl text-slate-800 flex items-center gap-2">
-                <div className="p-2 bg-emerald-100 text-emerald-600 rounded-xl"><UserPlus size={20}/></div>
+                <div className="p-2 bg-emerald-100 text-emerald-600 rounded-xl"><UserPlus size={20} /></div>
                 Thiết Lập Đề Cương
               </h3>
               <button onClick={() => setShowSyllabusModal(false)} className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700 transition-colors">
                 <X size={18} />
               </button>
             </div>
-            
+
             <div className="bg-emerald-50/50 border border-emerald-100 p-4 rounded-2xl">
               <p className="text-xs text-emerald-800 font-medium">
                 Môn học hiện tại: <strong className="font-bold block text-sm mt-1">{selectedSubject?.title}</strong>
@@ -698,7 +696,7 @@ export default function CourseContentPage() {
                 Hủy bỏ
               </button>
               <button onClick={handleCreateSyllabus} disabled={isLoading} className="px-6 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-sm font-bold shadow-[0_4px_15px_-3px_rgba(16,185,129,0.4)] transition-all disabled:opacity-70 flex items-center gap-2">
-                {isLoading ? "Đang xử lý..." : <><UserPlus size={16}/> Lưu Hệ Thống</>}
+                {isLoading ? "Đang xử lý..." : <><UserPlus size={16} /> Lưu Hệ Thống</>}
               </button>
             </div>
           </div>
