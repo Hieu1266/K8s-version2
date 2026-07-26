@@ -1,7 +1,8 @@
 .env
 documents/syllabus/*
 !documents/syllabus/.gitkeep
-__pycache__/
+static/uploads/curriculum/*
+!static/uploads/curriculum/.gitkeep
 *.pyc
 *.pyo
 *.pyd
