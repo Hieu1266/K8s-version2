@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-    # Chỉ chạy pipeline khi có code mới ở các đường dẫn này
     paths:
       - 'backend/service/**'
       - 'frontend/**'
@@ -21,7 +20,6 @@ jobs:
   build-backend:
     runs-on: ubuntu-latest
     strategy:
-      # Chạy song song 4 service cùng lúc
       matrix:
         service:
           - course_service
@@ -47,9 +45,7 @@ jobs:
           context: ./backend/service/${{ matrix.service }}
           file: ./backend/service/${{ matrix.service }}/Dockerfile
           push: true
-          # Tên image đẩy lên Docker Hub đổi dấu _ thành - để khớp với file k8s/backend.yaml
           tags: ${{ env.DOCKER_USERNAME }}/${{ matrix.service }}:latest
-          # Tận dụng cache của GitHub Actions giúp build cực nhanh
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -80,6 +76,9 @@ jobs:
           tags: ${{ env.DOCKER_USERNAME }}/frontend:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          # Truyền build-args nếu có cấu hình truyền secret lúc build
+          build-args: |
+            NEXT_PUBLIC_GOOGLE_CLIENT_ID=${{ secrets.NEXT_PUBLIC_GOOGLE_CLIENT_ID }}
 
   # ==========================================
   # JOB 3: Deploy lên Kubernetes Cluster
@@ -91,12 +90,12 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # Cấu hình kết nối tới K8s cluster bằng kubeconfig từ Secrets
+      # Đã cập nhật v4 và kiểm tra đúng tên secret KUBECONFIG
       - name: Set Kubernetes Context
-        uses: azure/k8s-set-context@v3
+        uses: azure/k8s-set-context@v4
         with:
           method: kubeconfig
-          kubeconfig: ${{ secrets.KUBE_CONFIG }}
+          kubeconfig: ${{ secrets.KUBECONFIG }}
 
       - name: Deploy Manifests
         run: |
