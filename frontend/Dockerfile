@@ -7,7 +7,8 @@ WORKDIR /app
 
 # Copy package management files
 COPY package.json package-lock.json ./
-RUN npm ci
+# Đổi npm ci thành npm install để tránh lỗi hụt package-lock
+RUN npm install
 
 # ==========================================
 # Stage 2: Biên dịch ứng dụng (Build)
@@ -22,7 +23,7 @@ COPY . .
 # Tắt Telemetry của Next.js
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# --- BỔ SUNG: Khai báo ARG để nhận biến môi trường lúc build ---
+# --- Khai báo ARG để nhận biến môi trường lúc build ---
 ARG NEXT_PUBLIC_FRONTEND
 ARG NEXT_PUBLIC_USER_BACKEND_URL
 ARG NEXT_PUBLIC_COURSE_BACKEND_URL
@@ -30,7 +31,7 @@ ARG NEXT_PUBLIC_EXAM_BACKEND_URL
 ARG NEXT_PUBLIC_PROGRESS_BACKEND_URL
 ARG NEXT_PUBLIC_GOOGLE_CLIENT_ID
 
-# --- BỔ SUNG: Chuyển ARG thành ENV để Next.js nhúng vào bundle JS ---
+# --- Chuyển ARG thành ENV để Next.js nhúng vào bundle JS ---
 ENV NEXT_PUBLIC_FRONTEND=$NEXT_PUBLIC_FRONTEND
 ENV NEXT_PUBLIC_USER_BACKEND_URL=$NEXT_PUBLIC_USER_BACKEND_URL
 ENV NEXT_PUBLIC_COURSE_BACKEND_URL=$NEXT_PUBLIC_COURSE_BACKEND_URL
