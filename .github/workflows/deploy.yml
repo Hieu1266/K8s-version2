@@ -77,12 +77,11 @@ jobs:
           tags: ${{ env.DOCKER_USERNAME }}/frontend:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          # Truyền build-args nếu có cấu hình truyền secret lúc build
           build-args: |
             NEXT_PUBLIC_GOOGLE_CLIENT_ID=${{ secrets.NEXT_PUBLIC_GOOGLE_CLIENT_ID }}
 
   # ==========================================
-  # JOB 3: Deploy lên Kubernetes Cluster
+  # JOB 3: Deploy lên Kubernetes Cluster (Local)
   # ==========================================
   deploy-k8s:
     needs: [build-backend, build-frontend]
@@ -91,23 +90,12 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # Đã cập nhật v4 và kiểm tra đúng tên secret KUBECONFIG
-      - name: Set Kubernetes Context
-        uses: azure/k8s-set-context@v4
-        with:
-          method: kubeconfig
-          kubeconfig: ${{ secrets.KUBE_CONFIG }}
-
       - name: Deploy Manifests
         run: |
-          # Apply Secret trước
           kubectl apply -f k8s/backend-secrets.yaml
-          
-          # Apply Deployment & Service
           kubectl apply -f k8s/backend.yaml
           kubectl apply -f k8s/frontend.yaml
           
-          # Restart lại Deployment cho 4 Backend + 1 Frontend
           kubectl rollout restart deployment/course-service
           kubectl rollout restart deployment/learning-progress-service
           kubectl rollout restart deployment/quiz-exam-service
