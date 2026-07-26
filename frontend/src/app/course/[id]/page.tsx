@@ -3,12 +3,12 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
-import VideoTracking from '@/components/VideoTracking';
 import LessonVideoPlayer from '@/components/LessonVideoPlayer';
 import LessonNotesPanel from '@/components/LessonNotesPanel';
 import { getLearningCourse } from '@/actions/getCourse';
 import { attachStatusToLessons } from '@/actions/getLesson';
 import { getLessonNotesAction, createNoteAction } from '@/actions/getNotes';
+import { getOrCreateVideoProgressAction, updateVideoProgressAction } from '@/actions/getVideoProgress';
 import { CourseLearningStructure } from '@/types/course';
 import { SubjectLearningStructure } from '@/types/subjects';
 import { ModuleLearningStructure } from '@/types/modules';
@@ -51,6 +51,10 @@ export default function CourseLearningPage() {
   const [notesLoading, setNotesLoading] = useState(false);
   const [videoCurrentTime, setVideoCurrentTime] = useState(0);
   const [seekTarget, setSeekTarget] = useState<number | null>(null);
+
+  // Tiến độ video THẬT lấy từ Backend (chứa video_progress_id thật, không phải lesson_id)
+  const [videoProgress, setVideoProgress] = useState<VideoProgress | null>(null);
+  const [videoProgressLoading, setVideoProgressLoading] = useState(false);
 
   // Ô tạo ghi chú nhanh nằm dưới video
   const [quickNoteOpen, setQuickNoteOpen] = useState(false);
@@ -169,16 +173,22 @@ export default function CourseLearningPage() {
     return SUBJECT_ACCENTS[idx < 0 ? 0 : idx];
   };
 
-  const handleProgressUpdate = (updatedProgress: Partial<VideoProgress>) => {
-    console.log('Video Progress Updated:', updatedProgress);
-  };
+  // Đồng bộ tiến độ xem video về Backend qua video_progress_id THẬT (không phải lesson_id).
+  // LessonVideoPlayer đã tự lưu sessionStorage để hiển thị mượt trong phiên hiện tại;
+  // hàm này lo phần gọi API PATCH lưu vĩnh viễn.
+  const handleProgressUpdate = async (updatedProgress: VideoProgress) => {
+    if (!updatedProgress.video_progress_id) return;
 
-  const currentVideoProgress: VideoProgress = {
-    video_progress_id: currentLesson?.lesson_id ?? '',
-    last_watched_second: 0,
-    max_watched_second: 0,
-    complete_percentage: 0,
-    is_finished: false,
+    const result = await updateVideoProgressAction(updatedProgress.video_progress_id, {
+      last_watched_second: updatedProgress.last_watched_second,
+      max_watched_second: updatedProgress.max_watched_second,
+      completion_percentage: updatedProgress.completion_percentage,
+      is_finished: updatedProgress.is_finished,
+    });
+
+    if (!result.success) {
+      console.error('Đồng bộ tiến độ video thất bại:', result.error);
+    }
   };
 
   // Chọn bài học từ sidebar
@@ -201,6 +211,29 @@ export default function CourseLearningPage() {
 
   // Bài học hiện tại có video hay không (dùng để bật/tắt phần chọn mốc thời gian của note)
   const hasVideo = Boolean(currentLesson?.video_url && currentLesson.video_url.trim() !== '');
+
+  // Lấy (hoặc tự tạo nếu chưa có) video_progress_id thật cho bài học hiện tại
+  useEffect(() => {
+    if (!currentLesson?.lesson_id || !hasVideo) {
+      setVideoProgress(null);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      setVideoProgressLoading(true);
+      const data = await getOrCreateVideoProgressAction(
+        currentLesson.lesson_id,
+        currentLesson.duration_seconds ?? 0
+      );
+      if (!cancelled) setVideoProgress(data);
+      setVideoProgressLoading(false);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentLesson?.lesson_id, hasVideo]);
 
   // Tạo ghi chú nhanh ngay dưới video, luôn gắn timestamp = thời điểm hiện tại
   const handleQuickCreateNote = async () => {
@@ -451,57 +484,65 @@ export default function CourseLearningPage() {
                   <>
                     {/* 1. HIỂN THỊ VIDEO */}
                     {hasVideo ? (
-                      <>
-                        <LessonVideoPlayer
-                          url={currentLesson.video_url as string}
-                          title={currentLesson.title}
-                          onTimeUpdate={setVideoCurrentTime}
-                          seekToSeconds={seekTarget}
-                          onSeeked={() => setSeekTarget(null)}
-                        />
-
-                        {/* Nút tạo ghi chú nhanh ngay dưới video */}
-                        <div className="bg-white border border-[#ECEAF0] rounded-2xl p-3">
-                          {!quickNoteOpen ? (
-                            <button
-                              onClick={() => setQuickNoteOpen(true)}
-                              className="text-xs font-bold text-[#5B5FEF] flex items-center gap-1.5"
-                            >
-                              📝 Thêm ghi chú tại {formatSeconds(videoCurrentTime)}
-                            </button>
-                          ) : (
-                            <div className="flex gap-2">
-                              <input
-                                autoFocus
-                                value={quickNoteContent}
-                                onChange={(e) => setQuickNoteContent(e.target.value)}
-                                placeholder="Nhập ghi chú..."
-                                className="flex-1 text-xs bg-[#F7F8FB] border border-[#E7E9F0] rounded-full px-4 py-2.5 focus:outline-none focus:border-[#5B5FEF]"
-                                onKeyDown={(e) => e.key === 'Enter' && handleQuickCreateNote()}
-                              />
-                              <button
-                                onClick={handleQuickCreateNote}
-                                disabled={quickNoteSaving || !quickNoteContent.trim()}
-                                className="text-white text-xs font-bold px-4 rounded-full bg-[#5B5FEF] disabled:opacity-50"
-                              >
-                                {quickNoteSaving ? '...' : 'Lưu'}
-                              </button>
-                              <button
-                                onClick={() => { setQuickNoteOpen(false); setQuickNoteContent(''); }}
-                                className="text-xs font-bold px-3 text-[#565A70]"
-                              >
-                                Hủy
-                              </button>
-                            </div>
-                          )}
+                      videoProgressLoading || !videoProgress ? (
+                        <div className="w-full aspect-video rounded-2xl bg-[#12141C] flex items-center justify-center">
+                          <div className="flex items-center gap-2 text-xs text-white/60">
+                            <div className="w-4 h-4 rounded-full border-2 border-white/20 border-t-white/70 animate-spin" />
+                            Đang tải tiến độ video...
+                          </div>
                         </div>
-                      </>
-                    ) : currentLesson.duration_seconds > 0 ? (
-                      /* Nếu có duration_seconds > 0 nhưng chưa có video_url cụ thể thì dùng VideoTracking */
-                      <VideoTracking
-                        progressData={currentVideoProgress}
-                        onProgressUpdate={handleProgressUpdate}
-                      />
+                      ) : (
+                        <>
+                          <LessonVideoPlayer
+                            key={currentLesson.lesson_id}
+                            lessonId={currentLesson.lesson_id}
+                            videoProgressId={videoProgress.video_progress_id}
+                            url={currentLesson.video_url as string}
+                            title={currentLesson.title}
+                            initialProgress={videoProgress}
+                            onProgressUpdate={handleProgressUpdate}
+                            onTimeUpdate={setVideoCurrentTime}
+                            seekToSeconds={seekTarget}
+                            onSeeked={() => setSeekTarget(null)}
+                          />
+
+                          {/* Nút tạo ghi chú nhanh ngay dưới video */}
+                          <div className="bg-white border border-[#ECEAF0] rounded-2xl p-3">
+                            {!quickNoteOpen ? (
+                              <button
+                                onClick={() => setQuickNoteOpen(true)}
+                                className="text-xs font-bold text-[#5B5FEF] flex items-center gap-1.5"
+                              >
+                                📝 Thêm ghi chú tại {formatSeconds(videoCurrentTime)}
+                              </button>
+                            ) : (
+                              <div className="flex gap-2">
+                                <input
+                                  autoFocus
+                                  value={quickNoteContent}
+                                  onChange={(e) => setQuickNoteContent(e.target.value)}
+                                  placeholder="Nhập ghi chú..."
+                                  className="flex-1 text-xs bg-[#F7F8FB] border border-[#E7E9F0] rounded-full px-4 py-2.5 focus:outline-none focus:border-[#5B5FEF]"
+                                  onKeyDown={(e) => e.key === 'Enter' && handleQuickCreateNote()}
+                                />
+                                <button
+                                  onClick={handleQuickCreateNote}
+                                  disabled={quickNoteSaving || !quickNoteContent.trim()}
+                                  className="text-white text-xs font-bold px-4 rounded-full bg-[#5B5FEF] disabled:opacity-50"
+                                >
+                                  {quickNoteSaving ? '...' : 'Lưu'}
+                                </button>
+                                <button
+                                  onClick={() => { setQuickNoteOpen(false); setQuickNoteContent(''); }}
+                                  className="text-xs font-bold px-3 text-[#565A70]"
+                                >
+                                  Hủy
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </>
+                      )
                     ) : null}
 
                     {/* 2. HIỂN THỊ NỘI DUNG VĂN BẢN (content_body) */}
@@ -516,7 +557,7 @@ export default function CourseLearningPage() {
                         />
                       </div>
                     ) : (
-                      !hasVideo && currentLesson.duration_seconds === 0 && (
+                      !hasVideo && (
                         <div className="bg-white border border-[#ECEAF0] rounded-2xl p-6 text-center text-xs text-[#8A8FA3]">
                           Bài học này hiện chưa có nội dung chi tiết.
                         </div>

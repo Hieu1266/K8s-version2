@@ -34,4 +34,7 @@ class Subject(SQLModel, table=True):
     # Một môn học có một đề cương môn học
     syllabus: Optional["Syllabus"] = Relationship(back_populates="subject")
     # Một môn học có 1 hoặc nhiều module
-    modules: List["Module"] = Relationship(back_populates="subject")
+    modules: List["Module"] = Relationship(
+        back_populates="subject",
+        sa_relationship_kwargs={"order_by": "Module.order_index"}
+    )

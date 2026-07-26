@@ -8,6 +8,7 @@ if TYPE_CHECKING:
     from app.models.lesson import Lesson
 
 class Module(SQLModel, table=True):
+    __tablename__ = "module"
     module_id: UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     subject_id: UUID = Field(foreign_key="subject.subject_id", nullable=False)
     title: str = Field(nullable=False, max_length=255)
@@ -16,4 +17,7 @@ class Module(SQLModel, table=True):
     # Quan hệ
     # Một module thuộc về một môn học
     subject: Optional["Subject"] = Relationship(back_populates="modules")
-    lessons: List["Lesson"] = Relationship(back_populates="module")
+    lessons: List["Lesson"] = Relationship(
+        back_populates="module",
+        sa_relationship_kwargs={"order_by": "Lesson.order_index"}
+    )

@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from uuid import UUID
 from typing import Optional
 
@@ -17,3 +17,20 @@ class VideoProgressUpdate(BaseModel):
     completion_percentage: Optional[float] = None
     is_finished: Optional[bool] = None
     current_points: Optional[float] = None
+
+class VideoProgressLookupIn(BaseModel):
+    lesson_id: UUID
+    duration_seconds: int = Field(..., ge=0)
+
+class VideoProgressResponse(BaseModel):
+    video_progress_id: UUID
+    lesson_id: UUID
+    duration_seconds: int
+    last_watched_second: int
+    max_watched_second: int
+    completion_percentage: float
+    is_finished: bool
+    current_points: float
+
+    class Config:
+        from_attributes = True

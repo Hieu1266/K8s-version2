@@ -52,7 +52,7 @@ class CRUDCourse(CRUDBase[Course, CourseCreate, CourseUpdate, UUID]):
             .join(Module, Lesson.module_id == Module.module_id)
             .join(Subject, Module.subject_id == Subject.subject_id)
             .where(Subject.course_id == course_id)
-            .order_by(Subject.order_index, Module.order_index, Lesson.order_index)
+            # .order_by(Subject.order_index, Module.order_index, Lesson.order_index)
         )
         results = db.exec(statement).all()
         

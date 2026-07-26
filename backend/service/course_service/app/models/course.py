@@ -48,5 +48,8 @@ class Course(SQLModel, table=True):
     # Một khóa học có một hoặc nhiều tag
     tags: List["Tag"] = Relationship(back_populates="courses", link_model=CourseTagLink)
     # Một khóa học có một hoặc nhiều môn học
-    subjects: List["Subject"] = Relationship(back_populates="course")
+    subjects: List["Subject"] = Relationship(
+        back_populates="course",
+        sa_relationship_kwargs={"order_by": "Subject.order_index"}
+    )
     

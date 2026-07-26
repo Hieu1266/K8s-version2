@@ -409,8 +409,8 @@ export default function CourseContentPage() {
                           key={sub.subject_id}
                           onClick={() => handleSelectSubject(sub)}
                           className={`p-4 rounded-2xl cursor-pointer transition-all duration-300 group flex flex-col gap-3 ${isSelected
-                              ? "border border-amber-400 bg-gradient-to-r from-amber-50 to-white shadow-[0_4px_20px_-5px_rgba(245,158,11,0.15)]"
-                              : "border border-slate-100 bg-white hover:border-amber-200 hover:bg-amber-50/20 hover:shadow-md"
+                            ? "border border-amber-400 bg-gradient-to-r from-amber-50 to-white shadow-[0_4px_20px_-5px_rgba(245,158,11,0.15)]"
+                            : "border border-slate-100 bg-white hover:border-amber-200 hover:bg-amber-50/20 hover:shadow-md"
                             }`}
                         >
                           <div className="flex justify-between items-start gap-4">
