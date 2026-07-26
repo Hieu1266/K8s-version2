@@ -8,6 +8,7 @@ on:
       - 'backend/service/**'
       - 'frontend/**'
       - 'k8s/**'
+      - '.github/workflows/**'
 
 env:
   DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
