@@ -35,6 +35,18 @@ export default function FacultyDashboard() {
       icon: "📖",
       path: "/training-management/course-content",
     },
+    {
+      title: "Quản lý nhãn khóa học",
+      desc: "Thêm, sửa, xóa các nhãn phân loại cho khóa học",
+      icon: "🏷️",
+      path: "/training-management/tag-management",
+    },
+    {
+      title: "Gán nhãn cho khóa học",
+      desc: "Phân loại và liên kết các nhãn vào từng khóa học",
+      icon: "🔖",
+      path: "/training-management/course-tag",
+    },
   ];
 
   return (
@@ -68,7 +80,9 @@ export default function FacultyDashboard() {
               onClick={(e) => {
                 if (item.path === "#") {
                   e.preventDefault();
-                  alert(`Tính năng "${item.title}" sẽ được kết nối cơ sở dữ liệu sau.`);
+                  alert(
+                    `Tính năng "${item.title}" sẽ được kết nối cơ sở dữ liệu sau.`,
+                  );
                 }
               }}
               className="bg-white p-6 rounded-2xl border border-gray-100 shadow-xs hover:shadow-md transition cursor-pointer flex flex-col justify-between text-inherit no-underline"
