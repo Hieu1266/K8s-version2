@@ -235,8 +235,8 @@ export default function DashboardPage() {
                   key={tab}
                   onClick={() => setActiveTab(tab)}
                   className={`pb-3 font-medium transition ${activeTab === tab
-                      ? "border-b-2 border-[#0056D2] text-[#0056D2]"
-                      : "text-slate-500 hover:text-[#0056D2]"
+                    ? "border-b-2 border-[#0056D2] text-[#0056D2]"
+                    : "text-slate-500 hover:text-[#0056D2]"
                     }`}
                 >
                   {tabLabels[tab]}
@@ -281,8 +281,10 @@ export default function DashboardPage() {
                 {completedCourses.length > 0 ? (
                   completedCourses.map((course, index) => (
                     <CompletedCourse
-                      key={index}
+                      key={course.course_id || index}
+                      courseId={course.course_id}
                       title={course.course_title}
+                      onReview={handleContinueLearning}
                     />
                   ))
                 ) : (
@@ -542,11 +544,23 @@ function CourseProgressCard({ title, progress, courseId, onContinue }: CoursePro
   );
 }
 
-function CompletedCourse({ title }: { title: string }) {
+interface CompletedCourseProps {
+  courseId: string | number;
+  title: string;
+  onReview: (id: string | number) => void;
+}
+
+function CompletedCourse({ courseId, title, onReview }: CompletedCourseProps) {
   return (
-    <div className="flex justify-between items-center border border-slate-200 rounded-lg p-4">
-      <span>{title}</span>
-      <span className="text-green-600 font-semibold">✓ Hoàn thành</span>
+    <div className="flex justify-between items-center border border-slate-200 rounded-lg p-4 hover:shadow-sm transition">
+      <span className="font-semibold text-slate-900">{title}</span>
+      <button
+        type="button"
+        onClick={() => onReview(courseId)}
+        className="bg-slate-100 hover:bg-slate-200 text-[#0056D2] font-medium px-4 py-2 rounded-lg text-sm transition cursor-pointer"
+      >
+        Xem lại
+      </button>
     </div>
   );
 }
