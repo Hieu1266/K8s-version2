@@ -77,3 +77,35 @@ export async function attachStatusToLessons<T extends { lesson_id?: string; less
 
     return lessonsWithStatus;
 }
+export async function completeLessonAction(progressId: string) {
+    try {
+        const token = await getServerToken()
+
+        const response = await fetch(
+            `${process.env.NEXT_PUBLIC_PROGRESS_BACKEND_URL}/lesson_progress/lesson/${progressId}/complete`,
+            {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                },
+            }
+        );
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            return {
+                success: false,
+                error: errorData.detail || 'Không thể đánh dấu hoàn thành bài học.',
+            };
+        }
+
+        const data = await response.json();
+        return { success: true, data };
+    } catch (error: any) {
+        return {
+            success: false,
+            error: error.message || 'Lỗi kết nối tới hệ thống.',
+        };
+    }
+}

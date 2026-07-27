@@ -6,7 +6,7 @@ import Navbar from '@/components/Navbar';
 import LessonVideoPlayer from '@/components/LessonVideoPlayer';
 import LessonNotesPanel from '@/components/LessonNotesPanel';
 import { getLearningCourse } from '@/actions/getCourse';
-import { attachStatusToLessons } from '@/actions/getLesson';
+import { attachStatusToLessons, completeLessonAction } from '@/actions/getLesson';
 import { getLessonNotesAction, createNoteAction } from '@/actions/getNotes';
 import { getOrCreateVideoProgressAction, updateVideoProgressAction } from '@/actions/getVideoProgress';
 import { CourseLearningStructure } from '@/types/course';
@@ -21,9 +21,10 @@ type TabKey = 'lecture' | 'resources' | 'notes' | 'quiz';
 
 const SUBJECT_ACCENTS = ['#5B5FEF', '#12B886', '#F2A93B', '#E5484D', '#0EA5E9'];
 
-// Kiểu dữ liệu Lesson bao gồm các thuộc tính mới và field status từ API
+// Kiểu dữ liệu Lesson bổ sung progress_id và status
 type LessonWithStatus = LessonLearningStructure & {
   status?: LessonStatus;
+  progress_id?: string;
   video_url?: string | null;
   content_body?: string | null;
 };
@@ -52,16 +53,19 @@ export default function CourseLearningPage() {
   const [videoCurrentTime, setVideoCurrentTime] = useState(0);
   const [seekTarget, setSeekTarget] = useState<number | null>(null);
 
-  // Tiến độ video THẬT lấy từ Backend (chứa video_progress_id thật, không phải lesson_id)
+  // Tiến độ video THẬT
   const [videoProgress, setVideoProgress] = useState<VideoProgress | null>(null);
   const [videoProgressLoading, setVideoProgressLoading] = useState(false);
 
-  // Ô tạo ghi chú nhanh nằm dưới video
+  // Ô tạo ghi chú nhanh
   const [quickNoteOpen, setQuickNoteOpen] = useState(false);
   const [quickNoteContent, setQuickNoteContent] = useState('');
   const [quickNoteSaving, setQuickNoteSaving] = useState(false);
 
-  // Call Server Action để lấy dữ liệu khóa học và status của các bài học
+  // State xử lý quá trình gửi API hoàn thành bài đọc
+  const [completing, setCompleting] = useState(false);
+
+  // Call Server Action để lấy dữ liệu khóa học và status
   useEffect(() => {
     if (!id) return;
 
@@ -123,7 +127,7 @@ export default function CourseLearningPage() {
     fetchLearningData();
   }, [id]);
 
-  // Lấy danh sách ghi chú mỗi khi đổi bài học + reset trạng thái liên quan video/ô nhập nhanh
+  // Lấy danh sách ghi chú
   useEffect(() => {
     if (!currentLesson?.lesson_id) {
       setNotes([]);
@@ -173,9 +177,6 @@ export default function CourseLearningPage() {
     return SUBJECT_ACCENTS[idx < 0 ? 0 : idx];
   };
 
-  // Đồng bộ tiến độ xem video về Backend qua video_progress_id THẬT (không phải lesson_id).
-  // LessonVideoPlayer đã tự lưu sessionStorage để hiển thị mượt trong phiên hiện tại;
-  // hàm này lo phần gọi API PATCH lưu vĩnh viễn.
   const handleProgressUpdate = async (updatedProgress: VideoProgress) => {
     if (!updatedProgress.video_progress_id) return;
 
@@ -204,15 +205,104 @@ export default function CourseLearningPage() {
     }
   };
 
+  // Hàm xử lý hoàn thành bài đọc & Tự động chuyển bài tiếp theo
+  const handleCompleteAndNext = async () => {
+    if (!currentLesson || !course) return;
+
+    // Dùng lesson_id vì Backend đã hỗ trợ Endpoint complete theo lesson_id
+    const targetLessonId = currentLesson.lesson_id;
+
+    setCompleting(true);
+    try {
+      // 1. Gọi API Backend để complete & unlock
+      const result = await completeLessonAction(targetLessonId);
+
+      if (result.success) {
+        // 2. Tìm vị trí (index) của bài học hiện tại trong danh sách phẳng
+        const currentIndex = flatLessons.findIndex(
+          (f) => f.lesson.lesson_id === currentLesson.lesson_id
+        );
+
+        // Xác định thông tin bài học tiếp theo (nếu có)
+        const nextItem =
+          currentIndex !== -1 && currentIndex + 1 < flatLessons.length
+            ? flatLessons[currentIndex + 1]
+            : null;
+
+        // 3. Cập nhật State `course`: Bài hiện tại -> COMPLETED, Bài tiếp theo -> UNLOCKED
+        setCourse((prevCourse) => {
+          if (!prevCourse) return prevCourse;
+          return {
+            ...prevCourse,
+            subjects: prevCourse.subjects.map((sub) => ({
+              ...sub,
+              modules: sub.modules.map((mod) => ({
+                ...mod,
+                lessons: mod.lessons.map((les: any) => {
+                  // Đánh dấu bài hiện tại thành COMPLETED
+                  if (les.lesson_id === currentLesson.lesson_id) {
+                    return { ...les, status: LessonStatus.COMPLETED };
+                  }
+                  // Đánh dấu bài tiếp theo thành UNLOCKED (nếu trước đó bị LOCKED)
+                  if (nextItem && les.lesson_id === nextItem.lesson.lesson_id) {
+                    return {
+                      ...les,
+                      status:
+                        les.status === LessonStatus.LOCKED
+                          ? LessonStatus.UNLOCKED
+                          : les.status,
+                    };
+                  }
+                  return les;
+                }),
+              })),
+            })),
+          };
+        });
+
+        // 4. Chuyển view sang bài học tiếp theo
+        if (nextItem) {
+          // Tạo object bài học mới với trạng thái UNLOCKED để active ngay
+          const nextLessonUpdated: LessonWithStatus = {
+            ...nextItem.lesson,
+            status:
+              nextItem.lesson.status === LessonStatus.LOCKED
+                ? LessonStatus.UNLOCKED
+                : nextItem.lesson.status,
+          };
+
+          // Chọn bài tiếp theo
+          selectLesson(nextItem.subject, nextLessonUpdated);
+
+          // Tự động xòe (expand) Module và Subject chứa bài học tiếp theo trên Sidebar
+          setExpandedSubjects((prev) => ({
+            ...prev,
+            [nextItem.subject.subject_id]: true,
+          }));
+          setExpandedModules((prev) => ({
+            ...prev,
+            [nextItem.module.module_id]: true,
+          }));
+        } else {
+          alert('Chúc mừng! Bạn đã hoàn thành bài học cuối cùng trong khóa học.');
+        }
+      } else {
+        alert(result.error || 'Có lỗi xảy ra khi xác nhận hoàn thành bài học.');
+      }
+    } catch (err) {
+      console.error('Lỗi khi bấm hoàn thành:', err);
+    } finally {
+      setCompleting(false);
+    }
+  };
+
   const toggleSubject = (subjectId: string) =>
     setExpandedSubjects((prev) => ({ ...prev, [subjectId]: !prev[subjectId] }));
   const toggleModule = (moduleId: string) =>
     setExpandedModules((prev) => ({ ...prev, [moduleId]: !prev[moduleId] }));
 
-  // Bài học hiện tại có video hay không (dùng để bật/tắt phần chọn mốc thời gian của note)
   const hasVideo = Boolean(currentLesson?.video_url && currentLesson.video_url.trim() !== '');
 
-  // Lấy (hoặc tự tạo nếu chưa có) video_progress_id thật cho bài học hiện tại
   useEffect(() => {
     if (!currentLesson?.lesson_id || !hasVideo) {
       setVideoProgress(null);
@@ -235,7 +325,6 @@ export default function CourseLearningPage() {
     };
   }, [currentLesson?.lesson_id, hasVideo]);
 
-  // Tạo ghi chú nhanh ngay dưới video, luôn gắn timestamp = thời điểm hiện tại
   const handleQuickCreateNote = async () => {
     if (!quickNoteContent.trim() || !currentLesson || !course) return;
 
@@ -317,7 +406,7 @@ export default function CourseLearningPage() {
           </div>
           <button
             type="button"
-            onClick={() => router.push('/home')}
+            onClick={() => router.push('/dashboard-student')}
             className="text-[11px] font-bold px-3.5 py-1.5 rounded-full transition-all duration-200 cursor-pointer"
             style={{ backgroundColor: 'rgba(229,72,77,0.12)', color: '#F17075', border: '1px solid rgba(229,72,77,0.25)' }}
           >
@@ -448,7 +537,7 @@ export default function CourseLearningPage() {
               </h1>
             </div>
 
-            {/* THANH MỤC / TAB (Ẩn nếu bài học là Quiz) */}
+            {/* THANH MỤC / TAB */}
             {!currentLesson?.is_quiz && (
               <div className="flex gap-1 relative">
                 {(
@@ -563,6 +652,31 @@ export default function CourseLearningPage() {
                         </div>
                       )
                     )}
+
+                    {/* 3. NÚT HOÀN THÀNH VÀ SANG BÀI TIẾP THEO (Dành cho bài không có video) */}
+                    {!hasVideo && (
+                      <div className="flex justify-end pt-4 border-t border-[#ECEAF0]">
+                        <button
+                          type="button"
+                          onClick={handleCompleteAndNext}
+                          disabled={completing}
+                          className="flex items-center gap-2 bg-[#5B5FEF] hover:bg-[#4B4FEF] text-white text-xs font-bold px-6 py-3 rounded-full shadow-sm transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+                        >
+                          {completing ? (
+                            <span>Đang lưu...</span>
+                          ) : (
+                            <>
+                              <span>
+                                {currentLesson.status === LessonStatus.COMPLETED
+                                  ? 'Bài tiếp theo'
+                                  : 'Xác nhận hoàn thành & Bài tiếp theo'}
+                              </span>
+                              <span className="text-sm">→</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    )}
                   </>
                 ) : (
                   <div className="w-full aspect-video rounded-[28px] flex flex-col items-center justify-center bg-[#12141C] text-white">
@@ -598,7 +712,7 @@ export default function CourseLearningPage() {
               </div>
             )}
 
-            {/* BÀI KIỂM TRA (Tự động hiển thị khi chọn bài quiz) */}
+            {/* BÀI KIỂM TRA */}
             {(activeTab === 'quiz' || currentLesson?.is_quiz) && (
               <div key="quiz" className="anim-fade-up space-y-7 pb-10">
                 <div className="bg-white border border-[#ECEAF0] rounded-2xl p-6">

@@ -84,3 +84,4 @@ export async function fetchCompletedCourses(): Promise<CourseInProgress[]> {
     }
     return res.json();
 }
+

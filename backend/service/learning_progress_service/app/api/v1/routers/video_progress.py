@@ -3,6 +3,7 @@ import asyncio
 from typing import List
 from uuid import UUID
 from app.schemas.video_progress import VideoProgressUpdate, VideoProgressLookupIn, VideoProgressResponse
+from app.models.enum import LessonStatus
 from app.api.v1.deps import SessionDep
 from app.core.security import get_current_user_role
 from app.crud.video_progress import crud_video_progress
@@ -55,10 +56,13 @@ async def update_video_progress(
             detail="Bạn không có quyền thay đổi tiến độ video trên"
         )
     new_progress = crud_video_progress.update(db, v_progress, obj_in)
-    if new_progress.completion_percentage == 100 or new_progress.is_finished == True:
+    if new_progress.completion_percentage == 100 or new_progress.is_finished:
         progress = crud_lesson_progress.get_by_lesson(db, user_id, new_progress.lesson_id)
-        ordered_lessons = await fetch_ordered_lessons(progress.course_id)
-        crud_lesson_progress.complete_and_unlock_next(db, user_id, progress.progress_id, ordered_lessons)
+        
+        # CHỈ MỞ KHÓA nếu bài học này chưa COMPLETED
+        if progress and progress.status != LessonStatus.COMPLETED:
+            ordered_lessons = await fetch_ordered_lessons(progress.course_id)
+            crud_lesson_progress.complete_and_unlock_next_by_lesson(db, user_id, progress.lesson_id, ordered_lessons)
     return {
         "success": True,
         "message": "Đã cập nhật tiến độ thành công"

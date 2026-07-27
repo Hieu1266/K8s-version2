@@ -42,33 +42,36 @@ async def fetch_total_lessons(course_id: UUID) -> int:
         except httpx.RequestError:
             return 0
 
-@router.put("/lesson/{progress_id}/complete", response_model=LessonProgressResponse)
+@router.put("/lesson/{lesson_id}/complete", response_model=LessonProgressResponse)
 async def complete_lesson(
+    lesson_id: UUID,
     db: SessionDep, 
-    progress_id: UUID, 
     current_user: dict = Depends(get_current_user_role)
 ):
     user_id = UUID(current_user["user_id"])
     
-    # 1. Kiểm tra tiến độ bài học hiện tại
-    progress = crud_lesson_progress.get_by_id(db, progress_id)
+    # 1. Lấy thông tin tiến độ của user để kiểm tra tính hợp lệ
+    progress = crud_lesson_progress.get_by_lesson(db, user_id=user_id, lesson_id=lesson_id)
     if not progress: 
-        raise HTTPException(status_code=404, detail="Không tìm thấy tiến độ bài học.")
+        raise HTTPException(status_code=404, detail="Không tìm thấy tiến độ bài học của học viên.")
     if progress.status == LessonStatus.LOCKED:
         raise HTTPException(status_code=400, detail="Bài học đang bị khóa.")
 
-    # 2. Lấy lộ trình từ Course Service
+    # 2. Lấy lộ trình các bài học từ Course Service
     ordered_lessons = await fetch_ordered_lessons(progress.course_id)
     
-    # SỬA LỖI Ở ĐÂY: Truyền đúng tham số mà CRUD complete_and_unlock_next yêu cầu
-    updated_progress = crud_lesson_progress.complete_and_unlock_next(
+    # 3. Cập nhật trạng thái bài học thành COMPLETED và mở khóa bài tiếp theo
+    updated_progress = crud_lesson_progress.complete_and_unlock_next_by_lesson(
         db=db, 
         user_id=user_id, 
-        progress_id=progress_id,  # Lấy trực tiếp progress_id từ tham số route
+        lesson_id=lesson_id,
         ordered_lessons=ordered_lessons
     )
     
-    # 3. Tính toán tiến độ chung...
+    if not updated_progress:
+        raise HTTPException(status_code=500, detail="Cập nhật tiến độ không thành công.")
+
+    # 4. Tính toán tiến độ tổng thể của toàn khóa học
     total_lessons = await fetch_total_lessons(progress.course_id)
     completed_lessons = crud_lesson_progress.count_completed_lessons(db, user_id=user_id, course_id=progress.course_id)
     

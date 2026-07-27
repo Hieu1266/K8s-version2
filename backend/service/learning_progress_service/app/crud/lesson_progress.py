@@ -83,46 +83,47 @@ class CRUDLessonProgress(CRUDBase[LessonProgress, LessonProgressCreate, LessonPr
         results = db.exec(statement).all()
         return len(results)
 
-    def complete_and_unlock_next(
-        self, db: Session, user_id: UUID, progress_id: UUID, ordered_lessons: list[dict]
-    ) -> LessonProgress:
-        # 1. Đánh dấu bài hiện tại thành COMPLETED
-        current_progress = self.get_by_id(db, progress_id)
-        if current_progress:
-            current_progress.status = LessonStatus.COMPLETED
-            current_progress.updated_at = datetime.now(timezone.utc)
-            db.add(current_progress)
+    def complete_and_unlock_next_by_lesson(
+        self, db: Session, user_id: UUID, lesson_id: UUID, ordered_lessons: list[dict]
+    ) -> LessonProgress | None:
+        # 1. Tìm bản ghi tiến độ thông qua user_id và lesson_id
+        current_progress = self.get_by_lesson(db, user_id=user_id, lesson_id=lesson_id)
+        if not current_progress:
+            return None
 
-        # Ép kiểu toàn bộ ID trong dict về dạng UUID Object để so sánh chính xác
+        # Đánh dấu bài hiện tại thành COMPLETED
+        current_progress.status = LessonStatus.COMPLETED
+        current_progress.updated_at = datetime.now(timezone.utc)
+        db.add(current_progress)
+
         lesson_ids = [UUID(str(l["lesson_id"])) for l in ordered_lessons]
         
         try:
-            # So sánh UUID vs UUID sẽ tìm được index chính xác
             current_index = lesson_ids.index(current_progress.lesson_id)
+            current_lesson_info = ordered_lessons[current_index]
             
-            # Thuật toán tìm bài tiếp theo cần mở khóa
+            # Nếu là bài học không bắt buộc (is_optional = True), dừng lại và không mở bài tiếp theo
+            if current_lesson_info.get("is_optional", False):
+                db.commit()
+                db.refresh(current_progress)
+                return current_progress
+
+            # 2. Mở khóa bài bắt buộc tiếp theo đang ở trạng thái LOCKED
             for next_index in range(current_index + 1, len(lesson_ids)):
                 next_lesson_id = lesson_ids[next_index]
                 next_progress = self.get_by_lesson(db, user_id=user_id, lesson_id=next_lesson_id)
                 
-                if next_progress:
-                    # Nếu bài tiếp theo đang bị LOCKED, tiến hành mở khóa và DỪNG VÒNG LẶP
-                    if next_progress.status == LessonStatus.LOCKED:
-                        next_progress.status = LessonStatus.UNLOCKED
-                        next_progress.updated_at = datetime.now(timezone.utc)
-                        db.add(next_progress)
-                        break
-                    # Nếu bài tiếp theo là bài optional (đã UNLOCKED sẵn) hoặc đã COMPLETED từ trước,
-                    # vòng lặp sẽ tự động bỏ qua để quét bài tiếp nữa.
+                if next_progress and next_progress.status == LessonStatus.LOCKED:
+                    next_progress.status = LessonStatus.UNLOCKED
+                    next_progress.updated_at = datetime.now(timezone.utc)
+                    db.add(next_progress)
+                    break
                     
         except ValueError:
-            # In ra log để debug nếu sau này lộ trình lấy về bị lỗi cấu trúc dữ liệu
             print(f"DEBUG: Không tìm thấy lesson_id {current_progress.lesson_id} trong mảng lộ trình.")
-            pass
 
         db.commit()
-        if current_progress:
-            db.refresh(current_progress)
+        db.refresh(current_progress)
         return current_progress
     
     def get_lesson_progress_status(self, db: Session, lesson_id: UUID) -> LessonStatus:

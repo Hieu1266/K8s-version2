@@ -40,7 +40,8 @@ class CRUDCourse(CRUDBase[Course, CourseCreate, CourseUpdate, UUID]):
     
     def get_lesson_ids_by_course(self, db: Session, course_id: UUID) -> list[LessonOrderInfo]:
         """
-        Lấy danh sách thông tin bài học sắp xếp theo lộ trình tuyến tính
+        Lấy danh sách thông tin bài học sắp xếp theo lộ trình tuyến tính:
+        Subject.order_index ASC -> Module.order_index ASC -> Lesson.order_index ASC
         """
         statement = (
             select(
@@ -52,8 +53,13 @@ class CRUDCourse(CRUDBase[Course, CourseCreate, CourseUpdate, UUID]):
             .join(Module, Lesson.module_id == Module.module_id)
             .join(Subject, Module.subject_id == Subject.subject_id)
             .where(Subject.course_id == course_id)
-            # .order_by(Subject.order_index, Module.order_index, Lesson.order_index)
+            .order_by(
+                Subject.order_index.asc(),
+                Module.order_index.asc(),
+                Lesson.order_index.asc()
+            )
         )
+        
         results = db.exec(statement).all()
         
         return [
@@ -200,6 +206,7 @@ class CRUDCourse(CRUDBase[Course, CourseCreate, CourseUpdate, UUID]):
         """
         Truy vấn cây cấu trúc học tập của Khóa học (Course -> Subject -> Module -> Lesson).
         Tối ưu hóa bằng Eager Loading (selectinload) để tránh N+1 Query Problem.
+        Lưu ý: Các danh sách quan hệ con sẽ tự động được sắp xếp nếu ở Models đã định nghĩa order_by trong Relationship.
         """
         statement = (
             select(Course)
@@ -210,5 +217,5 @@ class CRUDCourse(CRUDBase[Course, CourseCreate, CourseUpdate, UUID]):
                 .selectinload(Module.lessons)
             )
         )
-        return db.scalar(statement)
+        return db.exec(statement).first()
 crud_course = CRUDCourse(Course)
