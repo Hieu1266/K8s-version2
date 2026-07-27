@@ -53,6 +53,7 @@ class LessonOrderInfo(BaseModel):
     is_optional: bool
     is_quiz: bool
     duration_seconds: int = 0
+    first_subject_lesson: bool = False
 
 class CourseLessonsResponse(BaseModel):
     course_id: UUID

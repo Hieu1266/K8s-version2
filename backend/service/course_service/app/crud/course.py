@@ -48,7 +48,8 @@ class CRUDCourse(CRUDBase[Course, CourseCreate, CourseUpdate, UUID]):
                 Lesson.lesson_id, 
                 Lesson.is_optional, 
                 Lesson.is_quiz, 
-                Lesson.duration_seconds
+                Lesson.duration_seconds,
+                Subject.subject_id  # Lấy thêm subject_id để phân biệt các môn học
             )
             .join(Module, Lesson.module_id == Module.module_id)
             .join(Subject, Module.subject_id == Subject.subject_id)
@@ -62,15 +63,28 @@ class CRUDCourse(CRUDBase[Course, CourseCreate, CourseUpdate, UUID]):
         
         results = db.exec(statement).all()
         
-        return [
-            {
-                "lesson_id": r[0], 
-                "is_optional": r[1],
-                "is_quiz": r[2],
-                "duration_seconds": r[3]
-            } 
-            for r in results
-        ]
+        seen_subjects = set()
+        lesson_list = []
+
+        for r in results:
+            lesson_id, is_optional, is_quiz, duration_seconds, subject_id = r
+            
+            # Nếu subject_id chưa xuất hiện -> đây là lesson đầu tiên của subject này
+            is_first = subject_id not in seen_subjects
+            if is_first:
+                seen_subjects.add(subject_id)
+
+            lesson_list.append(
+                LessonOrderInfo(
+                    lesson_id=lesson_id,
+                    is_optional=is_optional,
+                    is_quiz=is_quiz,
+                    duration_seconds=duration_seconds,
+                    first_subject_lesson=is_first
+                )
+            )
+            
+        return lesson_list
     def get_course_name(self, db: Session, course_id: UUID) -> str:
         statement = select(Course.title).where(
             Course.course_id == course_id

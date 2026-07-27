@@ -38,3 +38,48 @@ export interface LessonStatusResponse {
     lesson_id: string;
     status: LessonStatus; // LOCKED | IN_PROGRESS | COMPLETED
 }
+
+export interface LessonResource {
+    resource_id: string;
+    lesson_id: string;
+    file_name: string;
+    file_path: string;
+    file_extension: string;
+}
+
+// Khớp với LessonManagementOut ở Backend - dùng cho trang Quản lý bài học
+export interface LessonManagement {
+    lesson_id: string;
+    module_id: string;
+    title: string;
+    video_url?: string | null;
+    content_body?: string | null;
+    duration_seconds: number;
+    order_index: number;
+    is_optional: boolean;
+    is_quiz: boolean;
+    resources: LessonResource[];
+}
+
+// Payload gửi lên khi tạo bài học (khớp LessonCreate)
+export interface LessonCreatePayload {
+    module_id: string;
+    title: string;
+    video_url?: string | null;
+    content_body?: string | null;
+    duration_seconds?: number | null;
+    order_index: number;
+    is_optional?: boolean | null;
+    is_quiz?: boolean | null;
+}
+
+// Payload gửi lên khi cập nhật bài học (khớp LessonUpdate)
+// ⚠️ Không có is_quiz: Backend không cho phép đổi is_quiz sau khi tạo.
+export interface LessonUpdatePayload {
+    title?: string;
+    video_url?: string | null;
+    duration_seconds?: number | null;
+    content_body?: string | null;
+    order_index?: number;
+    is_optional?: boolean | null;
+}

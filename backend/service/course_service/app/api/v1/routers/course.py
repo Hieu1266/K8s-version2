@@ -241,7 +241,7 @@ def update_course(
 def delete_course(
     db: SessionDep,
     course_id: UUID,
-    current_user: dict = Depends(RoleChecker(["Admin"]))
+    current_user: dict = Depends(RoleChecker(["Manager"]))
 ):
     db_obj = crud_course.delete(db, course_id)
     if not db_obj:

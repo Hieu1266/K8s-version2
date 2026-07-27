@@ -210,5 +210,9 @@ class CRUDLesson(CRUDBase[Lesson, LessonCreate, LessonUpdate, UUID]):
         db.commit()
         return db_obj
 
-
+    def get_multi_by_module(self, db: Session, module_id: UUID) -> list[Lesson]:
+        statement = select(Lesson).where(
+            Lesson.module_id == module_id
+        ).order_by(Lesson.order_index)
+        return db.exec(statement).all()
 crud_lesson = CRUDLesson(Lesson)

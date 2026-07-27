@@ -43,6 +43,7 @@ export default function CourseLearningPage() {
   const [currentLesson, setCurrentLesson] = useState<LessonWithStatus | undefined>(undefined);
   const [currentSubject, setCurrentSubject] = useState<SubjectLearningStructure | undefined>(undefined);
 
+  // State quản lý thu gọn / mở rộng
   const [expandedSubjects, setExpandedSubjects] = useState<Record<string, boolean>>({});
   const [expandedModules, setExpandedModules] = useState<Record<string, boolean>>({});
   const [activeTab, setActiveTab] = useState<TabKey>('lecture');
@@ -209,27 +210,22 @@ export default function CourseLearningPage() {
   const handleCompleteAndNext = async () => {
     if (!currentLesson || !course) return;
 
-    // Dùng lesson_id vì Backend đã hỗ trợ Endpoint complete theo lesson_id
     const targetLessonId = currentLesson.lesson_id;
 
     setCompleting(true);
     try {
-      // 1. Gọi API Backend để complete & unlock
       const result = await completeLessonAction(targetLessonId);
 
       if (result.success) {
-        // 2. Tìm vị trí (index) của bài học hiện tại trong danh sách phẳng
         const currentIndex = flatLessons.findIndex(
           (f) => f.lesson.lesson_id === currentLesson.lesson_id
         );
 
-        // Xác định thông tin bài học tiếp theo (nếu có)
         const nextItem =
           currentIndex !== -1 && currentIndex + 1 < flatLessons.length
             ? flatLessons[currentIndex + 1]
             : null;
 
-        // 3. Cập nhật State `course`: Bài hiện tại -> COMPLETED, Bài tiếp theo -> UNLOCKED
         setCourse((prevCourse) => {
           if (!prevCourse) return prevCourse;
           return {
@@ -239,11 +235,9 @@ export default function CourseLearningPage() {
               modules: sub.modules.map((mod) => ({
                 ...mod,
                 lessons: mod.lessons.map((les: any) => {
-                  // Đánh dấu bài hiện tại thành COMPLETED
                   if (les.lesson_id === currentLesson.lesson_id) {
                     return { ...les, status: LessonStatus.COMPLETED };
                   }
-                  // Đánh dấu bài tiếp theo thành UNLOCKED (nếu trước đó bị LOCKED)
                   if (nextItem && les.lesson_id === nextItem.lesson.lesson_id) {
                     return {
                       ...les,
@@ -260,9 +254,7 @@ export default function CourseLearningPage() {
           };
         });
 
-        // 4. Chuyển view sang bài học tiếp theo
         if (nextItem) {
-          // Tạo object bài học mới với trạng thái UNLOCKED để active ngay
           const nextLessonUpdated: LessonWithStatus = {
             ...nextItem.lesson,
             status:
@@ -271,10 +263,8 @@ export default function CourseLearningPage() {
                 : nextItem.lesson.status,
           };
 
-          // Chọn bài tiếp theo
           selectLesson(nextItem.subject, nextLessonUpdated);
 
-          // Tự động xòe (expand) Module và Subject chứa bài học tiếp theo trên Sidebar
           setExpandedSubjects((prev) => ({
             ...prev,
             [nextItem.subject.subject_id]: true,
@@ -296,10 +286,37 @@ export default function CourseLearningPage() {
     }
   };
 
+  // Toggle mở/tắt cho Subject
   const toggleSubject = (subjectId: string) =>
     setExpandedSubjects((prev) => ({ ...prev, [subjectId]: !prev[subjectId] }));
+
+  // Toggle mở/tắt cho Module
   const toggleModule = (moduleId: string) =>
     setExpandedModules((prev) => ({ ...prev, [moduleId]: !prev[moduleId] }));
+
+  // Mở/Thu gọn toàn bộ cây thư mục
+  const isAllExpanded = useMemo(() => {
+    if (!course) return false;
+    const allSubjectIds = course.subjects.map((s) => s.subject_id);
+    return allSubjectIds.every((id) => expandedSubjects[id]);
+  }, [course, expandedSubjects]);
+
+  const toggleAll = () => {
+    if (!course) return;
+    const nextState = !isAllExpanded;
+    const newSubjects: Record<string, boolean> = {};
+    const newModules: Record<string, boolean> = {};
+
+    course.subjects.forEach((sub) => {
+      newSubjects[sub.subject_id] = nextState;
+      sub.modules.forEach((mod) => {
+        newModules[mod.module_id] = nextState;
+      });
+    });
+
+    setExpandedSubjects(newSubjects);
+    setExpandedModules(newModules);
+  };
 
   const hasVideo = Boolean(currentLesson?.video_url && currentLesson.video_url.trim() !== '');
 
@@ -419,7 +436,18 @@ export default function CourseLearningPage() {
         {/* Sidebar Cây Thư Mục Khóa Học */}
         <div className="w-[21rem] border-r border-[#ECEAF0] bg-white flex flex-col overflow-y-auto">
           <div className="p-5 border-b border-[#ECEAF0]">
-            <h2 className="font-display text-sm font-bold text-[#161826] line-clamp-2 leading-snug">{course.title}</h2>
+            <div className="flex items-start justify-between gap-2">
+              <h2 className="font-display text-sm font-bold text-[#161826] line-clamp-2 leading-snug">{course.title}</h2>
+              {/* Nút Toggle Tất Cả */}
+              <button
+                type="button"
+                onClick={toggleAll}
+                className="shrink-0 text-[10px] font-bold text-[#5B5FEF] hover:bg-[#EEF0FE] px-2 py-1 rounded-md transition-colors"
+                title={isAllExpanded ? 'Thu gọn tất cả' : 'Mở rộng tất cả'}
+              >
+                {isAllExpanded ? 'Thu gọn' : 'Mở rộng'}
+              </button>
+            </div>
             <p className="text-[10px] text-[#9195A8] font-semibold mt-1.5 tabular-nums">
               {completedCount}/{flatLessons.length} bài học đã hoàn thành
             </p>
@@ -432,13 +460,14 @@ export default function CourseLearningPage() {
 
               return (
                 <div key={subject.subject_id} className="rounded-2xl overflow-hidden bg-[#FBFBFD] border border-[#EFEFF5]">
+                  {/* TIÊU ĐỀ SUBJECT (BẤM ĐỂ THU GỌN / MỞ RỘNG) */}
                   <button
                     type="button"
                     onClick={() => toggleSubject(subject.subject_id)}
-                    className="w-full text-left pl-4 pr-3 py-3 flex justify-between items-center gap-2 hover:bg-white transition-colors duration-200 relative"
+                    className="w-full text-left pl-4 pr-3 py-3 flex justify-between items-center gap-2 hover:bg-white transition-colors duration-200 relative group cursor-pointer"
                   >
                     <span className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ backgroundColor: accent }} />
-                    <div className="space-y-0.5 min-w-0">
+                    <div className="space-y-0.5 min-w-0 flex-1">
                       <span className="text-[9px] font-bold uppercase tracking-wider block" style={{ color: accent }}>
                         Môn học {subIdx + 1}
                       </span>
@@ -446,71 +475,115 @@ export default function CourseLearningPage() {
                         {subject.title}
                       </span>
                     </div>
+
+                    {/* Mũi tên chỉ báo thu gọn / mở rộng Subject */}
+                    <div className="shrink-0 text-[#9195A8] group-hover:text-[#161826] transition-transform duration-200">
+                      <svg
+                        className={`w-3.5 h-3.5 transform transition-transform duration-200 ${subjectExpanded ? 'rotate-180' : 'rotate-0'
+                          }`}
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2.5}
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
                   </button>
 
-                  <div className="accordion-grid" style={{ gridTemplateRows: subjectExpanded ? '1fr' : '0fr' }}>
-                    <div>
-                      <div className="pb-2 px-2 space-y-1">
-                        {subject.modules.map((mod, modIdx) => {
-                          const isExpanded = !!expandedModules[mod.module_id];
-                          return (
-                            <div key={mod.module_id} className="bg-white rounded-xl border border-[#F0F0F5]">
-                              <button
-                                type="button"
-                                onClick={() => toggleModule(mod.module_id)}
-                                className="w-full text-left px-3.5 py-2.5 flex justify-between items-center transition-colors duration-200 hover:bg-[#FAFAFD] rounded-xl"
-                              >
-                                <span className="text-[11px] font-bold text-[#565A70] line-clamp-1">
-                                  Module {modIdx + 1}. {mod.title}
-                                </span>
-                              </button>
+                  {/* NỘI DUNG MÔN HỌC (CHỨA CÁC MODULE) */}
+                  <div
+                    className="transition-all duration-300 ease-in-out overflow-hidden"
+                    style={{
+                      maxHeight: subjectExpanded ? '2000px' : '0px',
+                      opacity: subjectExpanded ? 1 : 0,
+                    }}
+                  >
+                    <div className="pb-2 px-2 space-y-1 pt-1">
+                      {subject.modules.map((mod, modIdx) => {
+                        const isExpanded = !!expandedModules[mod.module_id];
+                        return (
+                          <div key={mod.module_id} className="bg-white rounded-xl border border-[#F0F0F5] overflow-hidden">
+                            {/* TIÊU ĐỀ MODULE (BẤM ĐỂ THU GỌN / MỞ RỘNG) */}
+                            <button
+                              type="button"
+                              onClick={() => toggleModule(mod.module_id)}
+                              className="w-full text-left px-3.5 py-2.5 flex justify-between items-center transition-colors duration-200 hover:bg-[#FAFAFD] rounded-xl cursor-pointer"
+                            >
+                              <span className="text-[11px] font-bold text-[#565A70] line-clamp-1">
+                                Module {modIdx + 1}. {mod.title}
+                              </span>
 
-                              <div className="accordion-grid" style={{ gridTemplateRows: isExpanded ? '1fr' : '0fr' }}>
-                                <div>
-                                  <div className="pb-1.5 px-2 space-y-1">
-                                    {mod.lessons.map((lessonItem) => {
-                                      const lesson = lessonItem as LessonWithStatus;
-                                      const isSelected = currentLesson?.lesson_id === lesson.lesson_id;
-                                      const isLocked = lesson.status === LessonStatus.LOCKED;
-                                      const isCompleted = lesson.status === LessonStatus.COMPLETED;
+                              {/* Mũi tên chỉ báo thu gọn / mở rộng Module */}
+                              <div className="shrink-0 text-[#B0B3C4]">
+                                <svg
+                                  className={`w-3 h-3 transform transition-transform duration-200 ${isExpanded ? 'rotate-180' : 'rotate-0'
+                                    }`}
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                  strokeWidth={2.5}
+                                >
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                                </svg>
+                              </div>
+                            </button>
 
-                                      return (
-                                        <button
-                                          key={lesson.lesson_id}
-                                          type="button"
-                                          disabled={isLocked}
-                                          onClick={() => selectLesson(subject, lesson)}
-                                          className={`w-full text-left px-2.5 py-2.5 rounded-lg text-xs font-medium transition-all duration-200 flex items-center gap-2.5 ${isSelected ? 'bg-[#EEF0FE]' : isLocked ? 'opacity-40 cursor-not-allowed' : 'hover:bg-[#FAFAFD] hover:translate-x-0.5'}`}
-                                        >
-                                          <span className="shrink-0 relative w-3.5 h-3.5 flex items-center justify-center">
-                                            {isCompleted ? (
-                                              <span className="w-3 h-3 rounded-full flex items-center justify-center text-[8px] text-white font-bold" style={{ backgroundColor: '#12B886' }}>✓</span>
-                                            ) : isSelected ? (
-                                              <span className="w-3 h-3 rounded-full anim-pulse-ring" style={{ backgroundColor: '#5B5FEF' }} />
-                                            ) : (
-                                              <span className="w-3 h-3 rounded-full border-2" style={{ borderColor: accent }} />
-                                            )}
-                                          </span>
+                            {/* NỘI DUNG MODULE (CHỨA CÁC BÀI HỌC) */}
+                            <div
+                              className="transition-all duration-300 ease-in-out overflow-hidden"
+                              style={{
+                                maxHeight: isExpanded ? '1000px' : '0px',
+                                opacity: isExpanded ? 1 : 0,
+                              }}
+                            >
+                              <div className="pb-1.5 px-2 space-y-1">
+                                {mod.lessons.map((lessonItem) => {
+                                  const lesson = lessonItem as LessonWithStatus;
+                                  const isSelected = currentLesson?.lesson_id === lesson.lesson_id;
+                                  const isLocked = lesson.status === LessonStatus.LOCKED;
+                                  const isCompleted = lesson.status === LessonStatus.COMPLETED;
 
-                                          <span className={`flex-1 line-clamp-2 ${isSelected ? 'text-[#3F3FC9] font-bold' : 'text-[#4B4E60]'}`}>
-                                            {lesson.title}
-                                          </span>
+                                  return (
+                                    <button
+                                      key={lesson.lesson_id}
+                                      type="button"
+                                      disabled={isLocked}
+                                      onClick={() => selectLesson(subject, lesson)}
+                                      className={`w-full text-left px-2.5 py-2.5 rounded-lg text-xs font-medium transition-all duration-200 flex items-center gap-2.5 cursor-pointer ${isSelected
+                                          ? 'bg-[#EEF0FE]'
+                                          : isLocked
+                                            ? 'opacity-40 cursor-not-allowed'
+                                            : 'hover:bg-[#FAFAFD] hover:translate-x-0.5'
+                                        }`}
+                                    >
+                                      <span className="shrink-0 relative w-3.5 h-3.5 flex items-center justify-center">
+                                        {isCompleted ? (
+                                          <span className="w-3 h-3 rounded-full flex items-center justify-center text-[8px] text-white font-bold" style={{ backgroundColor: '#12B886' }}>✓</span>
+                                        ) : isSelected ? (
+                                          <span className="w-3 h-3 rounded-full anim-pulse-ring" style={{ backgroundColor: '#5B5FEF' }} />
+                                        ) : (
+                                          <span className="w-3 h-3 rounded-full border-2" style={{ borderColor: accent }} />
+                                        )}
+                                      </span>
 
-                                          {lesson.is_quiz && (
-                                            <span className="shrink-0 text-[8px] font-bold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: '#FDF3DA', color: '#9A6B00' }}>
-                                              KT
-                                            </span>
-                                          )}
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
+                                      <span className={`flex-1 line-clamp-2 ${isSelected ? 'text-[#3F3FC9] font-bold' : 'text-[#4B4E60]'}`}>
+                                        {lesson.title}
+                                      </span>
+
+                                      {lesson.is_quiz && (
+                                        <span className="shrink-0 text-[8px] font-bold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: '#FDF3DA', color: '#9A6B00' }}>
+                                          KT
+                                        </span>
+                                      )}
+                                    </button>
+                                  );
+                                })}
                               </div>
                             </div>
-                          );
-                        })}
-                      </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
@@ -653,7 +726,7 @@ export default function CourseLearningPage() {
                       )
                     )}
 
-                    {/* 3. NÚT HOÀN THÀNH VÀ SANG BÀI TIẾP THEO (Dành cho bài không có video) */}
+                    {/* 3. NÚT HOÀN THÀNH VÀ SANG BÀI TIẾP THEO */}
                     {!hasVideo && (
                       <div className="flex justify-end pt-4 border-t border-[#ECEAF0]">
                         <button

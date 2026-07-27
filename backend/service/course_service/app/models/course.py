@@ -50,6 +50,10 @@ class Course(SQLModel, table=True):
     # Một khóa học có một hoặc nhiều môn học
     subjects: List["Subject"] = Relationship(
         back_populates="course",
-        sa_relationship_kwargs={"order_by": "Subject.order_index"}
+        sa_relationship_kwargs={
+            "cascade": "all, delete-orphan",  # Khi xóa Course -> Tự động xóa sạch các Subject liên quan
+            "passive_deletes": True,
+            "order_by": "Subject.order_index"
+        }
     )
     

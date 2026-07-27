@@ -45,8 +45,9 @@ class CRUDLessonProgress(CRUDBase[LessonProgress, LessonProgressCreate, LessonPr
             lesson_id = lesson["lesson_id"]
             is_optional = lesson["is_optional"]
             has_quiz = lesson.get("has_quiz", False)  
+            first_subject_lesson = lesson.get("first_subject_lesson", False)
             
-            if index == 0 or is_optional:
+            if first_subject_lesson or is_optional:
                 initial_status = LessonStatus.UNLOCKED
             else:
                 initial_status = LessonStatus.LOCKED

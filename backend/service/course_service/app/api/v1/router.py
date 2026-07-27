@@ -8,6 +8,7 @@ from app.api.v1.routers.syllabus import router as syllabus_router
 from app.api.v1.routers.assignment import router as course_instructor_link
 from app.api.v1.routers.tag import router as tag_router
 from app.api.v1.routers.course_tag_link import router as course_tag_link_router
+from app.api.v1.routers.lesson_resource import router as lesson_resource_router
 
 router = APIRouter()
 
@@ -20,3 +21,4 @@ router.include_router(curriculum_router)
 router.include_router(syllabus_router)
 router.include_router(course_instructor_link)
 router.include_router(course_tag_link_router)
+router.include_router(lesson_resource_router)

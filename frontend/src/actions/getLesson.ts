@@ -1,9 +1,18 @@
 "use server";
 
 import { cookies } from "next/headers";
+import { revalidatePath } from "next/cache";
 import { LessonStatus } from "@/types/statuses";
+import {
+    LessonManagement,
+    LessonCreatePayload,
+    LessonUpdatePayload,
+    LessonResource
+} from "@/types/lessons";
+
 
 const LEARNING_PROGRESS_URL = process.env.NEXT_PUBLIC_PROGRESS_BACKEND_URL;
+const COURSE_URL = process.env.NEXT_PUBLIC_COURSE_BACKEND_URL;
 
 async function getServerToken(): Promise<string> {
     const cookieStore = await cookies();
@@ -107,5 +116,179 @@ export async function completeLessonAction(progressId: string) {
             success: false,
             error: error.message || 'Lỗi kết nối tới hệ thống.',
         };
+    }
+}
+
+export async function getLessonListAction(moduleId: string): Promise<LessonManagement[]> {
+    try {
+        const token = await getServerToken();
+        const res = await fetch(`${COURSE_URL}/lessons/get-lesson-list/${moduleId}`, {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+            },
+            cache: "no-store",
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err?.detail || "Không thể tải danh sách bài học.");
+        }
+        return await res.json();
+    } catch (error: any) {
+        console.error("❌ Lỗi tại getLessonListAction:", error.message);
+        return [];
+    }
+}
+
+// 2. Tạo bài học mới
+export async function createLessonAction(
+    payload: LessonCreatePayload,
+    pathForRevalidation?: string
+): Promise<{ success: boolean; data?: LessonManagement; error?: string }> {
+    try {
+        const token = await getServerToken();
+        const res = await fetch(`${COURSE_URL}/lessons/`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(payload),
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            const detail = typeof err?.detail === "string" ? err.detail : "Tạo bài học thất bại.";
+            return { success: false, error: detail };
+        }
+
+        const data = await res.json();
+        if (pathForRevalidation) revalidatePath(pathForRevalidation);
+        return { success: true, data };
+    } catch (error: any) {
+        console.error("❌ Lỗi tại createLessonAction:", error.message);
+        return { success: false, error: error.message || "Lỗi kết nối máy chủ." };
+    }
+}
+
+// 3. Cập nhật bài học
+// ⚠️ Backend không cho phép đổi is_quiz sau khi tạo (schema LessonUpdate không có field này).
+export async function updateLessonAction(
+    lessonId: string,
+    payload: LessonUpdatePayload,
+    pathForRevalidation?: string
+): Promise<{ success: boolean; data?: LessonManagement; error?: string }> {
+    try {
+        const token = await getServerToken();
+        const res = await fetch(`${COURSE_URL}/lessons/${lessonId}`, {
+            method: "PUT",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(payload),
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            const detail = typeof err?.detail === "string" ? err.detail : "Cập nhật bài học thất bại.";
+            return { success: false, error: detail };
+        }
+
+        const data = await res.json();
+        if (pathForRevalidation) revalidatePath(pathForRevalidation);
+        return { success: true, data };
+    } catch (error: any) {
+        console.error("❌ Lỗi tại updateLessonAction:", error.message);
+        return { success: false, error: error.message || "Lỗi kết nối máy chủ." };
+    }
+}
+
+// 4. Xóa bài học
+export async function deleteLessonAction(
+    lessonId: string,
+    pathForRevalidation?: string
+): Promise<{ success: boolean; error?: string }> {
+    try {
+        const token = await getServerToken();
+        const res = await fetch(`${COURSE_URL}/lessons/${lessonId}`, {
+            method: "DELETE",
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        });
+
+        if (!res.ok && res.status !== 204) {
+            const err = await res.json().catch(() => ({}));
+            const detail = typeof err?.detail === "string" ? err.detail : "Xóa bài học thất bại.";
+            return { success: false, error: detail };
+        }
+
+        if (pathForRevalidation) revalidatePath(pathForRevalidation);
+        return { success: true };
+    } catch (error: any) {
+        console.error("❌ Lỗi tại deleteLessonAction:", error.message);
+        return { success: false, error: error.message || "Lỗi kết nối máy chủ." };
+    }
+}
+
+// 5. Upload tài nguyên (file) cho bài học - nhận FormData chứa field "file" (từ Client Component)
+export async function uploadLessonResourceAction(
+    lessonId: string,
+    formData: FormData
+): Promise<{ success: boolean; data?: LessonResource; error?: string }> {
+    try {
+        const token = await getServerToken();
+        if (!formData.has("lesson_id")) {
+            formData.append("lesson_id", lessonId);
+        }
+
+        const res = await fetch(`${COURSE_URL}/lesson-resources/`, {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${token}`,
+                // KHÔNG tự set Content-Type cho multipart/form-data -> để fetch tự sinh boundary
+            },
+            body: formData,
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            const detail = typeof err?.detail === "string" ? err.detail : "Tải file thất bại.";
+            return { success: false, error: detail };
+        }
+
+        const data = await res.json();
+        return { success: true, data };
+    } catch (error: any) {
+        console.error("❌ Lỗi tại uploadLessonResourceAction:", error.message);
+        return { success: false, error: error.message || "Lỗi kết nối máy chủ." };
+    }
+}
+
+// 6. Xóa tài nguyên (file) của bài học
+export async function deleteLessonResourceAction(
+    resourceId: string
+): Promise<{ success: boolean; error?: string }> {
+    try {
+        const token = await getServerToken();
+        const res = await fetch(`${COURSE_URL}/lesson-resources/${resourceId}`, {
+            method: "DELETE",
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        });
+
+        if (!res.ok && res.status !== 204) {
+            const err = await res.json().catch(() => ({}));
+            const detail = typeof err?.detail === "string" ? err.detail : "Xóa tài nguyên thất bại.";
+            return { success: false, error: detail };
+        }
+        return { success: true };
+    } catch (error: any) {
+        console.error("❌ Lỗi tại deleteLessonResourceAction:", error.message);
+        return { success: false, error: error.message || "Lỗi kết nối máy chủ." };
     }
 }

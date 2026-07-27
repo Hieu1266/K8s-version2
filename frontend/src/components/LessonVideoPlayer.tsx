@@ -2,13 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { VideoProgress } from "@/types/video";
-
-declare global {
-    interface Window {
-        YT: any;
-        onYouTubeIframeAPIReady: () => void;
-    }
-}
+import { extractYoutubeId, loadYoutubeApi } from "@/lib/youtube";
 
 interface LessonVideoPlayerProps {
     lessonId: string; // Dùng làm khóa lưu trữ sessionStorage (không phải ID thật để gọi API)
@@ -25,29 +19,6 @@ interface LessonVideoPlayerProps {
 const SESSION_KEY_PREFIX = "lesson_video_progress:";
 const MAX_FORWARD_JUMP = 2; // giây - chênh lệch tối đa được coi là phát tự nhiên, không phải hành vi tua
 const YOUTUBE_POLL_MS = 1000;
-
-function extractYoutubeId(url: string): string | null {
-    const match = url.match(
-        /(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/
-    );
-    return match ? match[1] : null;
-}
-
-let youtubeApiPromise: Promise<void> | null = null;
-function loadYoutubeApi(): Promise<void> {
-    if (typeof window === "undefined") return Promise.resolve();
-    if (window.YT && window.YT.Player) return Promise.resolve();
-    if (youtubeApiPromise) return youtubeApiPromise;
-
-    youtubeApiPromise = new Promise((resolve) => {
-        const tag = document.createElement("script");
-        tag.src = "https://www.youtube.com/iframe_api";
-        const firstScript = document.getElementsByTagName("script")[0];
-        firstScript.parentNode?.insertBefore(tag, firstScript);
-        window.onYouTubeIframeAPIReady = () => resolve();
-    });
-    return youtubeApiPromise;
-}
 
 function readSessionProgress(lessonId: string): VideoProgress | null {
     if (typeof window === "undefined") return null;
