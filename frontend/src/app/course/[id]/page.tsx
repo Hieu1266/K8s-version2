@@ -9,6 +9,9 @@ import { getLearningCourse } from '@/actions/getCourse';
 import { attachStatusToLessons, completeLessonAction } from '@/actions/getLesson';
 import { getLessonNotesAction, createNoteAction } from '@/actions/getNotes';
 import { getOrCreateVideoProgressAction, updateVideoProgressAction } from '@/actions/getVideoProgress';
+// 1. IMPORT THÊM ACTION VÀ TYPE TÀI LIỆU
+import { getLessonResourcesAction, getLessonResourceDownloadUrl } from '@/actions/getLessonResource';
+import { LessonResourceItem } from '@/types/lessons';
 import { CourseLearningStructure } from '@/types/course';
 import { SubjectLearningStructure } from '@/types/subjects';
 import { ModuleLearningStructure } from '@/types/modules';
@@ -20,8 +23,8 @@ import { VideoProgress } from '@/types/video';
 type TabKey = 'lecture' | 'resources' | 'notes' | 'quiz';
 
 const SUBJECT_ACCENTS = ['#5B5FEF', '#12B886', '#F2A93B', '#E5484D', '#0EA5E9'];
+const COURSE_URL = process.env.NEXT_PUBLIC_COURSE_BACKEND_URL;
 
-// Kiểu dữ liệu Lesson bổ sung progress_id và status
 type LessonWithStatus = LessonLearningStructure & {
   status?: LessonStatus;
   progress_id?: string;
@@ -57,6 +60,10 @@ export default function CourseLearningPage() {
   // Tiến độ video THẬT
   const [videoProgress, setVideoProgress] = useState<VideoProgress | null>(null);
   const [videoProgressLoading, setVideoProgressLoading] = useState(false);
+
+  // 2. STATE TÀI LIỆU ĐÍNH KÈM (RESOURCES)
+  const [resources, setResources] = useState<LessonResourceItem[]>([]);
+  const [resourcesLoading, setResourcesLoading] = useState(false);
 
   // Ô tạo ghi chú nhanh
   const [quickNoteOpen, setQuickNoteOpen] = useState(false);
@@ -102,7 +109,6 @@ export default function CourseLearningPage() {
 
         setCourse(courseWithStatus);
 
-        // Khởi tạo bài học mặc định
         const firstSubject = courseWithStatus.subjects[0];
         const firstModule = firstSubject?.modules[0];
         const firstLesson = firstModule?.lessons[0] as LessonWithStatus | undefined;
@@ -154,6 +160,30 @@ export default function CourseLearningPage() {
     };
   }, [currentLesson?.lesson_id]);
 
+  // 3. EFFECT TẢI DANH SÁCH TÀI LIỆU KHI CHỌN BÀI HỌC
+  useEffect(() => {
+    if (!currentLesson?.lesson_id) {
+      setResources([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    (async () => {
+      setResourcesLoading(true);
+      // Thêm console.log để debug xem lesson_id thực tế truyền sang là gì
+      console.log("Fetching resources for lessonId:", currentLesson.lesson_id);
+
+      const data = await getLessonResourcesAction(currentLesson.lesson_id);
+      if (!cancelled) setResources(data);
+      setResourcesLoading(false);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentLesson?.lesson_id]);
+
   const flatLessons = useMemo(() => {
     if (!course) return [];
     const flat: { subject: SubjectLearningStructure; module: ModuleLearningStructure; lesson: LessonWithStatus }[] = [];
@@ -193,7 +223,6 @@ export default function CourseLearningPage() {
     }
   };
 
-  // Chọn bài học từ sidebar
   const selectLesson = (subject: SubjectLearningStructure, lesson: LessonWithStatus) => {
     if (lesson.status === LessonStatus.LOCKED) return;
     setCurrentSubject(subject);
@@ -206,7 +235,6 @@ export default function CourseLearningPage() {
     }
   };
 
-  // Hàm xử lý hoàn thành bài đọc & Tự động chuyển bài tiếp theo
   const handleCompleteAndNext = async () => {
     if (!currentLesson || !course) return;
 
@@ -286,15 +314,12 @@ export default function CourseLearningPage() {
     }
   };
 
-  // Toggle mở/tắt cho Subject
   const toggleSubject = (subjectId: string) =>
     setExpandedSubjects((prev) => ({ ...prev, [subjectId]: !prev[subjectId] }));
 
-  // Toggle mở/tắt cho Module
   const toggleModule = (moduleId: string) =>
     setExpandedModules((prev) => ({ ...prev, [moduleId]: !prev[moduleId] }));
 
-  // Mở/Thu gọn toàn bộ cây thư mục
   const isAllExpanded = useMemo(() => {
     if (!course) return false;
     const allSubjectIds = course.subjects.map((s) => s.subject_id);
@@ -438,7 +463,6 @@ export default function CourseLearningPage() {
           <div className="p-5 border-b border-[#ECEAF0]">
             <div className="flex items-start justify-between gap-2">
               <h2 className="font-display text-sm font-bold text-[#161826] line-clamp-2 leading-snug">{course.title}</h2>
-              {/* Nút Toggle Tất Cả */}
               <button
                 type="button"
                 onClick={toggleAll}
@@ -460,7 +484,6 @@ export default function CourseLearningPage() {
 
               return (
                 <div key={subject.subject_id} className="rounded-2xl overflow-hidden bg-[#FBFBFD] border border-[#EFEFF5]">
-                  {/* TIÊU ĐỀ SUBJECT (BẤM ĐỂ THU GỌN / MỞ RỘNG) */}
                   <button
                     type="button"
                     onClick={() => toggleSubject(subject.subject_id)}
@@ -476,11 +499,9 @@ export default function CourseLearningPage() {
                       </span>
                     </div>
 
-                    {/* Mũi tên chỉ báo thu gọn / mở rộng Subject */}
                     <div className="shrink-0 text-[#9195A8] group-hover:text-[#161826] transition-transform duration-200">
                       <svg
-                        className={`w-3.5 h-3.5 transform transition-transform duration-200 ${subjectExpanded ? 'rotate-180' : 'rotate-0'
-                          }`}
+                        className={`w-3.5 h-3.5 transform transition-transform duration-200 ${subjectExpanded ? 'rotate-180' : 'rotate-0'}`}
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"
@@ -491,7 +512,6 @@ export default function CourseLearningPage() {
                     </div>
                   </button>
 
-                  {/* NỘI DUNG MÔN HỌC (CHỨA CÁC MODULE) */}
                   <div
                     className="transition-all duration-300 ease-in-out overflow-hidden"
                     style={{
@@ -504,7 +524,6 @@ export default function CourseLearningPage() {
                         const isExpanded = !!expandedModules[mod.module_id];
                         return (
                           <div key={mod.module_id} className="bg-white rounded-xl border border-[#F0F0F5] overflow-hidden">
-                            {/* TIÊU ĐỀ MODULE (BẤM ĐỂ THU GỌN / MỞ RỘNG) */}
                             <button
                               type="button"
                               onClick={() => toggleModule(mod.module_id)}
@@ -514,11 +533,9 @@ export default function CourseLearningPage() {
                                 Module {modIdx + 1}. {mod.title}
                               </span>
 
-                              {/* Mũi tên chỉ báo thu gọn / mở rộng Module */}
                               <div className="shrink-0 text-[#B0B3C4]">
                                 <svg
-                                  className={`w-3 h-3 transform transition-transform duration-200 ${isExpanded ? 'rotate-180' : 'rotate-0'
-                                    }`}
+                                  className={`w-3 h-3 transform transition-transform duration-200 ${isExpanded ? 'rotate-180' : 'rotate-0'}`}
                                   fill="none"
                                   viewBox="0 0 24 24"
                                   stroke="currentColor"
@@ -529,7 +546,6 @@ export default function CourseLearningPage() {
                               </div>
                             </button>
 
-                            {/* NỘI DUNG MODULE (CHỨA CÁC BÀI HỌC) */}
                             <div
                               className="transition-all duration-300 ease-in-out overflow-hidden"
                               style={{
@@ -551,10 +567,10 @@ export default function CourseLearningPage() {
                                       disabled={isLocked}
                                       onClick={() => selectLesson(subject, lesson)}
                                       className={`w-full text-left px-2.5 py-2.5 rounded-lg text-xs font-medium transition-all duration-200 flex items-center gap-2.5 cursor-pointer ${isSelected
-                                          ? 'bg-[#EEF0FE]'
-                                          : isLocked
-                                            ? 'opacity-40 cursor-not-allowed'
-                                            : 'hover:bg-[#FAFAFD] hover:translate-x-0.5'
+                                        ? 'bg-[#EEF0FE]'
+                                        : isLocked
+                                          ? 'opacity-40 cursor-not-allowed'
+                                          : 'hover:bg-[#FAFAFD] hover:translate-x-0.5'
                                         }`}
                                     >
                                       <span className="shrink-0 relative w-3.5 h-3.5 flex items-center justify-center">
@@ -616,7 +632,7 @@ export default function CourseLearningPage() {
                 {(
                   [
                     ['lecture', 'Bài giảng'],
-                    ['resources', 'Tài liệu'],
+                    ['resources', `Tài liệu${resources.length ? ` · ${resources.length}` : ''}`], // 4. HIỂN THỊ SỐ LƯỢNG TÀI LIỆU
                     ['notes', `Ghi chú${notes.length ? ` · ${notes.length}` : ''}`],
                   ] as [TabKey, string][]
                 ).map(([key, label]) => (
@@ -644,7 +660,6 @@ export default function CourseLearningPage() {
               <div key="lecture" className="anim-fade-up space-y-6 pb-10">
                 {currentLesson ? (
                   <>
-                    {/* 1. HIỂN THỊ VIDEO */}
                     {hasVideo ? (
                       videoProgressLoading || !videoProgress ? (
                         <div className="w-full aspect-video rounded-2xl bg-[#12141C] flex items-center justify-center">
@@ -668,7 +683,6 @@ export default function CourseLearningPage() {
                             onSeeked={() => setSeekTarget(null)}
                           />
 
-                          {/* Nút tạo ghi chú nhanh ngay dưới video */}
                           <div className="bg-white border border-[#ECEAF0] rounded-2xl p-3">
                             {!quickNoteOpen ? (
                               <button
@@ -707,7 +721,6 @@ export default function CourseLearningPage() {
                       )
                     ) : null}
 
-                    {/* 2. HIỂN THỊ NỘI DUNG VĂN BẢN (content_body) */}
                     {currentLesson.content_body && currentLesson.content_body.trim() !== '' ? (
                       <div className="bg-white border border-[#ECEAF0] rounded-2xl p-6 space-y-4 shadow-sm">
                         <div className="flex items-center gap-2 text-[#5B5FEF] font-bold text-xs uppercase tracking-wider">
@@ -726,7 +739,6 @@ export default function CourseLearningPage() {
                       )
                     )}
 
-                    {/* 3. NÚT HOÀN THÀNH VÀ SANG BÀI TIẾP THEO */}
                     {!hasVideo && (
                       <div className="flex justify-end pt-4 border-t border-[#ECEAF0]">
                         <button
@@ -759,10 +771,60 @@ export default function CourseLearningPage() {
               </div>
             )}
 
-            {/* TAB TÀI LIỆU */}
+            {/* 5. TAB TÀI LIỆU CẬP NHẬT HIỂN THỊ VÀ TẢI XUỐNG */}
             {activeTab === 'resources' && !currentLesson?.is_quiz && (
-              <div key="resources" className="anim-fade-up space-y-2 pb-10">
-                <p className="text-xs text-[#B0B3C4] font-medium py-8 text-center">Bài học này chưa có tài liệu đính kèm.</p>
+              <div key="resources" className="anim-fade-up space-y-3 pb-10">
+                {resourcesLoading ? (
+                  <div className="flex items-center justify-center gap-2 text-xs text-[#8A8FA3] py-12">
+                    <div className="w-4 h-4 rounded-full border-2 border-[#E7E9F0] border-t-[#5B5FEF] animate-spin" />
+                    Đang tải danh sách tài liệu...
+                  </div>
+                ) : resources.length > 0 ? (
+                  <div className="space-y-2.5">
+                    {resources.map((item) => {
+                      // Nối chuỗi trực tiếp, không gọi hàm/Server Action trong lúc render:
+                      const downloadUrl = `${COURSE_URL}/lesson-resources/download/${item.resource_id}`;
+
+                      return (
+                        <div
+                          key={item.resource_id}
+                          className="bg-white border border-[#ECEAF0] rounded-2xl p-4 flex items-center justify-between shadow-sm hover:border-[#D0D4F7] transition-all"
+                        >
+                          <div className="flex items-center gap-3.5 min-w-0 pr-4">
+                            <div className="w-10 h-10 rounded-xl bg-[#EEF0FE] text-[#5B5FEF] flex items-center justify-center font-bold text-xs uppercase shrink-0">
+                              {item.file_extension || 'FILE'}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold text-[#161826] truncate" title={item.file_name}>
+                                {item.file_name}
+                              </p>
+                              <span className="text-[10px] text-[#8A8FA3] font-medium uppercase">
+                                Định dạng: .{item.file_extension}
+                              </span>
+                            </div>
+                          </div>
+
+                          <a
+                            href={downloadUrl}
+                            download={item.file_name}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="shrink-0 flex items-center gap-1.5 bg-[#F7F8FB] hover:bg-[#EEF0FE] text-[#5B5FEF] border border-[#ECEAF0] text-xs font-bold px-4 py-2 rounded-full transition-all"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                            Tải về
+                          </a>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-xs text-[#B0B3C4] font-medium py-12 text-center bg-white border border-[#ECEAF0] rounded-2xl">
+                    Bài học này chưa có tài liệu đính kèm.
+                  </p>
+                )}
               </div>
             )}
 

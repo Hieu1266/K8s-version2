@@ -20,6 +20,7 @@ import {
   Download,
   Paperclip,
   GripVertical,
+  AlertTriangle,
 } from "lucide-react";
 import {
   getLessonListAction,
@@ -36,16 +37,11 @@ import {
 } from "@/types/lessons";
 import { extractYoutubeId, probeYoutubeDuration } from "@/lib/youtube";
 
-// NEXT_PUBLIC_* được inline sẵn vào client bundle -> có thể build URL trực tiếp,
-// KHÔNG cần qua Server Action (Server Action là async, không gọi đồng bộ được trong href JSX)
 function buildLessonResourceDownloadUrl(resourceId: string): string {
   const base = process.env.NEXT_PUBLIC_COURSE_BACKEND_URL || "";
   return `${base}/lesson-resources/download/${resourceId}`;
 }
 
-// Tự động lấy thời lượng (giây) từ link video, hỗ trợ cả 2 trường hợp:
-// 1. Link YouTube -> dùng YT.Player ẩn (xem lib/youtube.ts), không cần API key.
-// 2. Link file video trực tiếp (mp4/webm...) -> đo qua thẻ <video> tạm.
 async function probeVideoDuration(url: string): Promise<number | null> {
   const trimmed = url.trim();
   if (!trimmed) return null;
@@ -75,7 +71,6 @@ async function probeVideoDuration(url: string): Promise<number | null> {
     };
     videoEl.onerror = () => finish(null);
 
-    // An toàn: tránh treo mãi nếu URL không phải file video trực tiếp
     setTimeout(() => finish(null), 8000);
 
     videoEl.src = trimmed;
@@ -114,11 +109,18 @@ export default function ModuleDetailPage() {
   const [detectingDuration, setDetectingDuration] = useState(false);
   const [durationAutoDetected, setDurationAutoDetected] = useState<boolean | null>(null);
 
-  // Resource upload states (chỉ dùng khi đang sửa 1 lesson đã tồn tại)
+  // Resource upload states
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingResource, setUploadingResource] = useState(false);
+
+  // --- CONFIRM MODAL STATES ---
   const [deletingResourceId, setDeletingResourceId] = useState<string | null>(null);
-  // --- DRAG & DROP STATES & HANDLERS ---
+  const [confirmDeleteResourceId, setConfirmDeleteResourceId] = useState<string | null>(null);
+
+  const [deletingLessonId, setDeletingLessonId] = useState<string | null>(null);
+  const [confirmDeleteLesson, setConfirmDeleteLesson] = useState<LessonManagement | null>(null);
+
+  // Drag & Drop
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [isReordering, setIsReordering] = useState(false);
 
@@ -127,7 +129,7 @@ export default function ModuleDetailPage() {
   };
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault(); // Cần thiết để cho phép Drop
+    e.preventDefault();
   };
 
   const handleDrop = async (dropIndex: number) => {
@@ -136,15 +138,12 @@ export default function ModuleDetailPage() {
       return;
     }
 
-    // 1. Sao chép mảng lessons hiện tại
     const updatedLessons = [...lessons];
     const [movedLesson] = updatedLessons.splice(draggedIndex, 1);
     updatedLessons.splice(dropIndex, 0, movedLesson);
 
-    // 2. Tính order_index mới (index bắt đầu từ 1)
     const newOrderIndex = dropIndex + 1;
 
-    // 3. Cập nhật UI ngay lập tức (Optimistic Update)
     const reindexedLessons = updatedLessons.map((item, idx) => ({
       ...item,
       order_index: idx + 1,
@@ -152,7 +151,6 @@ export default function ModuleDetailPage() {
     setLessons(reindexedLessons);
     setDraggedIndex(null);
 
-    // 4. Gọi API cập nhật duy nhất bài học được kéo
     setIsReordering(true);
     const result = await updateLessonAction(movedLesson.lesson_id, {
       order_index: newOrderIndex,
@@ -162,10 +160,10 @@ export default function ModuleDetailPage() {
 
     if (!result.success) {
       alert(result.error || "Không thể cập nhật thứ tự bài học.");
-      // Tải lại dữ liệu chuẩn từ server nếu có lỗi
       fetchLessons();
     }
   };
+
   const fetchLessons = useCallback(async () => {
     if (!moduleId) return;
     setLoading(true);
@@ -197,7 +195,7 @@ export default function ModuleDetailPage() {
   };
 
   const handleOpenEditModal = (lesson: LessonManagement) => {
-    if (lesson.is_quiz) return; // Bài thi: không cho mở form sửa
+    if (lesson.is_quiz) return;
     setEditingLesson(lesson);
     setTitle(lesson.title);
     setVideoUrl(lesson.video_url || "");
@@ -205,13 +203,11 @@ export default function ModuleDetailPage() {
     setContent(lesson.content_body || "");
     setIsOptional(lesson.is_optional);
     setIsQuiz(lesson.is_quiz);
-    // Nếu bài học đã có sẵn video + duration hợp lệ từ trước, hiển thị luôn thay vì bắt dò lại ngay khi vừa mở form
     setDurationAutoDetected(lesson.video_url && lesson.duration_seconds > 0 ? true : null);
     setFormError(null);
     setShowModal(true);
   };
 
-  // Khi rời khỏi ô nhập link video -> thử tự động lấy thời lượng
   const handleVideoUrlBlur = async () => {
     if (!videoUrl.trim()) return;
     setDetectingDuration(true);
@@ -256,8 +252,8 @@ export default function ModuleDetailPage() {
         video_url: videoUrl.trim() || null,
         duration_seconds: isQuiz ? 0 : durationSeconds || 0,
         content_body: isQuiz ? null : content || null,
-        order_index: lessons.length + 1, // Thêm vào cuối danh sách; sắp xếp lại thứ tự có thể bổ sung sau
-        is_optional: isQuiz ? false : isOptional, // Backend cũng tự ép is_optional=false nếu is_quiz
+        order_index: lessons.length + 1,
+        is_optional: isQuiz ? false : isOptional,
         is_quiz: isQuiz,
       };
       const result = await createLessonAction(payload);
@@ -273,18 +269,28 @@ export default function ModuleDetailPage() {
     resetForm();
   };
 
-  const handleDeleteLesson = async (lesson: LessonManagement) => {
-    if (lesson.is_quiz) return; // Bài thi: không cho xóa qua giao diện này
-    if (!confirm(`Bạn có chắc chắn muốn xóa bài học "${lesson.title}"? Toàn bộ tài nguyên đính kèm cũng sẽ bị xóa.`)) return;
+  // --- XỬ LÝ XÓA LESSON ---
+  const handleConfirmDeleteLesson = async () => {
+    if (!confirmDeleteLesson) return;
 
-    const result = await deleteLessonAction(lesson.lesson_id);
-    if (!result.success) {
-      alert(result.error || "Xóa bài học thất bại.");
-      return;
+    setDeletingLessonId(confirmDeleteLesson.lesson_id);
+    try {
+      const result = await deleteLessonAction(confirmDeleteLesson.lesson_id);
+      if (!result.success) {
+        alert(result.error || "Xóa bài học thất bại.");
+        return;
+      }
+      setLessons((prev) => prev.filter((l) => l.lesson_id !== confirmDeleteLesson.lesson_id));
+      setConfirmDeleteLesson(null);
+    } catch (err) {
+      console.error("Lỗi xóa bài học:", err);
+      alert("Đã xảy ra lỗi khi xóa bài học.");
+    } finally {
+      setDeletingLessonId(null);
     }
-    setLessons((prev) => prev.filter((l) => l.lesson_id !== lesson.lesson_id));
   };
 
+  // --- XỬ LÝ UPLOAD/XÓA RESOURCE ---
   const handleUploadResource = async (file: File) => {
     if (!editingLesson) return;
     setUploadingResource(true);
@@ -310,29 +316,36 @@ export default function ModuleDetailPage() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const handleDeleteResource = async (resourceId: string) => {
-    if (!editingLesson) return;
-    if (!confirm("Xóa tài nguyên này?")) return;
+  const handleConfirmDeleteResource = async () => {
+    if (!confirmDeleteResourceId || !editingLesson) return;
 
-    setDeletingResourceId(resourceId);
-    const result = await deleteLessonResourceAction(resourceId);
-    setDeletingResourceId(null);
+    setDeletingResourceId(confirmDeleteResourceId);
+    try {
+      const result = await deleteLessonResourceAction(confirmDeleteResourceId);
 
-    if (!result.success) {
-      alert(result.error || "Xóa tài nguyên thất bại.");
-      return;
+      if (!result.success) {
+        alert(result.error || "Xóa tài nguyên thất bại.");
+        return;
+      }
+
+      setEditingLesson((prev) =>
+        prev ? { ...prev, resources: prev.resources.filter((r) => r.resource_id !== confirmDeleteResourceId) } : prev
+      );
+
+      setLessons((prev) =>
+        prev.map((l) =>
+          l.lesson_id === editingLesson.lesson_id
+            ? { ...l, resources: l.resources.filter((r) => r.resource_id !== confirmDeleteResourceId) }
+            : l
+        )
+      );
+      setConfirmDeleteResourceId(null);
+    } catch (err) {
+      console.error("Lỗi xóa resource:", err);
+      alert("Đã xảy ra lỗi khi kết nối máy chủ.");
+    } finally {
+      setDeletingResourceId(null);
     }
-
-    setEditingLesson((prev) =>
-      prev ? { ...prev, resources: prev.resources.filter((r) => r.resource_id !== resourceId) } : prev
-    );
-    setLessons((prev) =>
-      prev.map((l) =>
-        l.lesson_id === editingLesson.lesson_id
-          ? { ...l, resources: l.resources.filter((r) => r.resource_id !== resourceId) }
-          : l
-      )
-    );
   };
 
   if (loading) {
@@ -412,7 +425,6 @@ export default function ModuleDetailPage() {
               >
                 <div className="flex items-center justify-between gap-4 hover:bg-slate-50/80 p-2 rounded-xl transition">
                   <div className="flex items-center gap-3 min-w-0">
-                    {/* Nút nắm kéo thả */}
                     <div
                       className="cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600 p-1 rounded transition"
                       title="Kéo để sắp xếp lại vị trí"
@@ -472,19 +484,19 @@ export default function ModuleDetailPage() {
                       disabled={lesson.is_quiz}
                       title={lesson.is_quiz ? "Bài thi không thể chỉnh sửa qua giao diện này" : "Sửa bài học"}
                       className={`p-2 rounded-lg transition ${lesson.is_quiz
-                        ? "text-slate-300 cursor-not-allowed"
-                        : "text-slate-400 hover:text-blue-600 hover:bg-blue-50"
+                          ? "text-slate-300 cursor-not-allowed"
+                          : "text-slate-400 hover:text-blue-600 hover:bg-blue-50"
                         }`}
                     >
                       <Edit3 size={18} />
                     </button>
                     <button
-                      onClick={() => handleDeleteLesson(lesson)}
+                      onClick={() => setConfirmDeleteLesson(lesson)}
                       disabled={lesson.is_quiz}
                       title={lesson.is_quiz ? "Bài thi không thể xóa qua giao diện này" : "Xóa bài học"}
                       className={`p-2 rounded-lg transition ${lesson.is_quiz
-                        ? "text-slate-300 cursor-not-allowed"
-                        : "text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                          ? "text-slate-300 cursor-not-allowed"
+                          : "text-slate-400 hover:text-rose-600 hover:bg-rose-50"
                         }`}
                     >
                       <Trash2 size={18} />
@@ -532,17 +544,14 @@ export default function ModuleDetailPage() {
               </div>
             ))}
           </div>
-
         </div>
       </main>
 
       {/* Modal Tạo/Chỉnh sửa Lesson */}
       {showModal && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          {/* Giới hạn max-h và dùng flex-col để chia khung cố định */}
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl max-w-2xl w-full max-h-[85vh] shadow-xl flex flex-col overflow-hidden my-auto">
-
-            {/* Header: Cố định ở trên cùng */}
+            {/* Header */}
             <div className="flex justify-between items-center border-b border-slate-100 p-4 shrink-0 bg-white">
               <h3 className="text-base font-bold text-slate-900">
                 {editingLesson ? "Chỉnh Sửa Lesson" : "Tạo Lesson Mới"}
@@ -556,7 +565,7 @@ export default function ModuleDetailPage() {
               </button>
             </div>
 
-            {/* Form: Thêm overflow-y-auto để chỉ cuộn phần nội dung bên trong */}
+            {/* Form Body */}
             <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
               <div className="p-4 space-y-4 overflow-y-auto flex-1">
                 <div>
@@ -573,7 +582,6 @@ export default function ModuleDetailPage() {
                   />
                 </div>
 
-                {/* Checkbox is_optional / is_quiz */}
                 <div className="flex flex-wrap gap-5">
                   <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
                     <input
@@ -600,12 +608,10 @@ export default function ModuleDetailPage() {
                 </div>
                 {isQuiz && (
                   <p className="text-[11px] text-amber-600 -mt-2">
-                    Sau khi tạo, bài thi sẽ chỉ hiển thị thông tin cơ bản và không thể chỉnh sửa/xóa qua giao diện này
-                    (video, nội dung, tài nguyên không áp dụng cho bài thi).
+                    Sau khi tạo, bài thi sẽ chỉ hiển thị thông tin cơ bản và không thể chỉnh sửa/xóa qua giao diện này.
                   </p>
                 )}
 
-                {/* Video + Nội dung + Tài nguyên */}
                 {!isQuiz && (
                   <>
                     <div>
@@ -637,7 +643,7 @@ export default function ModuleDetailPage() {
                           </span>
                         ) : durationAutoDetected === false ? (
                           <span className="text-amber-600 flex items-center gap-1">
-                            Không thể tự động lấy thời lượng (video riêng tư, đã tắt tính năng nhúng, hoặc link không hợp lệ).
+                            Không thể tự động lấy thời lượng.
                             <button
                               type="button"
                               onClick={handleVideoUrlBlur}
@@ -652,7 +658,6 @@ export default function ModuleDetailPage() {
                       </div>
                     )}
 
-                    {/* RichTextEditor: Giới hạn max height cho phần soạn thảo văn bản */}
                     <div className="space-y-1">
                       <label className="block text-xs font-semibold text-slate-700">
                         Nội dung chi tiết bài học (không bắt buộc)
@@ -685,11 +690,20 @@ export default function ModuleDetailPage() {
                               </a>
                               <button
                                 type="button"
-                                onClick={() => handleDeleteResource(res.resource_id)}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setConfirmDeleteResourceId(res.resource_id);
+                                }}
                                 disabled={deletingResourceId === res.resource_id}
-                                className="text-rose-500 hover:text-rose-700 disabled:opacity-40"
+                                className="text-rose-500 hover:text-rose-700 disabled:opacity-40 p-0.5 rounded hover:bg-rose-50"
+                                title="Xóa tài nguyên"
                               >
-                                <X size={12} />
+                                {deletingResourceId === res.resource_id ? (
+                                  <Loader2 size={12} className="animate-spin" />
+                                ) : (
+                                  <X size={12} />
+                                )}
                               </button>
                             </div>
                           ))}
@@ -736,7 +750,7 @@ export default function ModuleDetailPage() {
                 {formError && <p className="text-xs text-rose-600">{formError}</p>}
               </div>
 
-              {/* Footer: Cố định dưới đáy modal */}
+              {/* Footer */}
               <div className="flex justify-end gap-2 p-4 border-t border-slate-100 shrink-0 bg-white">
                 <button
                   type="button"
@@ -754,6 +768,78 @@ export default function ModuleDetailPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL CUSTOM: XÁC NHẬN XÓA TÀI NGUYÊN (RESOURCE) --- */}
+      {confirmDeleteResourceId && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-[70]">
+          <div className="bg-white rounded-xl max-w-sm w-full p-5 shadow-2xl border border-slate-100 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3 text-rose-600">
+              <div className="p-2 bg-rose-50 rounded-lg">
+                <AlertTriangle size={20} />
+              </div>
+              <h4 className="text-base font-bold text-slate-900">Xóa tài nguyên?</h4>
+            </div>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Bạn có chắc chắn muốn xóa tệp tài nguyên này khỏi bài học không? Thao tác này không thể hoàn tác.
+            </p>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setConfirmDeleteResourceId(null)}
+                disabled={deletingResourceId !== null}
+                className="px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteResource}
+                disabled={deletingResourceId !== null}
+                className="px-3.5 py-1.5 text-xs font-semibold bg-rose-600 text-white hover:bg-rose-700 rounded-lg transition shadow-sm inline-flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {deletingResourceId ? <Loader2 size={13} className="animate-spin" /> : null}
+                {deletingResourceId ? "Đang xóa..." : "Xóa vĩnh viễn"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL CUSTOM: XÁC NHẬN XÓA BÀI HỌC (LESSON) --- */}
+      {confirmDeleteLesson && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-[70]">
+          <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3 text-rose-600">
+              <div className="p-2.5 bg-rose-50 rounded-xl">
+                <AlertTriangle size={22} />
+              </div>
+              <h4 className="text-base font-bold text-slate-900">Xác nhận xóa bài học</h4>
+            </div>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Bạn có chắc chắn muốn xóa bài học <span className="font-bold text-slate-900">&quot;{confirmDeleteLesson.title}&quot;</span>? Toàn bộ nội dung và tài nguyên đính kèm thuộc bài học này cũng sẽ bị xóa vĩnh viễn.
+            </p>
+            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setConfirmDeleteLesson(null)}
+                disabled={deletingLessonId !== null}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteLesson}
+                disabled={deletingLessonId !== null}
+                className="px-4 py-2 text-xs font-semibold bg-rose-600 text-white hover:bg-rose-700 rounded-lg transition shadow-sm inline-flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {deletingLessonId ? <Loader2 size={13} className="animate-spin" /> : null}
+                {deletingLessonId ? "Đang xóa..." : "Xóa bài học"}
+              </button>
+            </div>
           </div>
         </div>
       )}

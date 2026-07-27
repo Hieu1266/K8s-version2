@@ -83,3 +83,12 @@ export interface LessonUpdatePayload {
     order_index?: number;
     is_optional?: boolean | null;
 }
+
+export interface LessonResourceItem {
+    resource_id: string;
+    lesson_id: string;
+    file_name: string;
+    file_path: string;
+    file_extension: string;
+    created_at?: string;
+}

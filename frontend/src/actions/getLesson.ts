@@ -7,7 +7,7 @@ import {
     LessonManagement,
     LessonCreatePayload,
     LessonUpdatePayload,
-    LessonResource
+    LessonResource,
 } from "@/types/lessons";
 
 
@@ -292,3 +292,4 @@ export async function deleteLessonResourceAction(
         return { success: false, error: error.message || "Lỗi kết nối máy chủ." };
     }
 }
+
