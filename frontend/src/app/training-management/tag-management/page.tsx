@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import type { TagItem, TagCreate, TagUpdate } from "@/types/tag";
+import { createTag, deleteTag, getTags, updateTag } from "@/actions/tag";
 import Navbar from "@/components/Navbar";
 import {
   Search,
@@ -18,44 +20,37 @@ import {
   AlertCircle,
 } from "lucide-react";
 
-interface TagItem {
-  tag_id: string;
-  tag_name: string;
-  description?: string;
-  created_at?: string;
-}
-
 export default function TagManagementPage() {
-  const [tags, setTags] = useState<TagItem[]>([
-    {
-      tag_id: "TAG001",
-      tag_name: "Lập trình Web",
-      description:
-        "Các khóa học bao gồm Frontend, Backend và Fullstack Development.",
-    },
-    {
-      tag_id: "TAG002",
-      tag_name: "Python",
-      description: "Các môn học liên quan đến ngôn ngữ lập trình Python.",
-    },
-    {
-      tag_id: "TAG003",
-      tag_name: "AI & Data Science",
-      description: "Trí tuệ nhân tạo, Học máy và Phân tích dữ liệu.",
-    },
-    {
-      tag_id: "TAG004",
-      tag_name: "Cơ bản",
-      description: "Kiến thức nền tảng dành cho người mới bắt đầu.",
-    },
-    {
-      tag_id: "TAG005",
-      tag_name: "Nâng cao",
-      description:
-        "Kiến thức chuyên sâu dành cho lập trình viên đã có kinh nghiệm.",
-    },
-  ]);
-
+  // const [tags, setTags] = useState<TagItem[]>([
+  //   {
+  //     tag_id: "TAG001",
+  //     tag_name: "Lập trình Web",
+  //     description:
+  //       "Các khóa học bao gồm Frontend, Backend và Fullstack Development.",
+  //   },
+  //   {
+  //     tag_id: "TAG002",
+  //     tag_name: "Python",
+  //     description: "Các môn học liên quan đến ngôn ngữ lập trình Python.",
+  //   },
+  //   {
+  //     tag_id: "TAG003",
+  //     tag_name: "AI & Data Science",
+  //     description: "Trí tuệ nhân tạo, Học máy và Phân tích dữ liệu.",
+  //   },
+  //   {
+  //     tag_id: "TAG004",
+  //     tag_name: "Cơ bản",
+  //     description: "Kiến thức nền tảng dành cho người mới bắt đầu.",
+  //   },
+  //   {
+  //     tag_id: "TAG005",
+  //     tag_name: "Nâng cao",
+  //     description:
+  //       "Kiến thức chuyên sâu dành cho lập trình viên đã có kinh nghiệm.",
+  //   },
+  // ]);
+  const [tags, setTags] = useState<TagItem[]>([]);
   const [keyword, setKeyword] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
@@ -74,20 +69,43 @@ export default function TagManagementPage() {
     setSelectedTag(null);
   };
 
-  // Handler: Create
-  const handleCreateTag = () => {
-    if (!formData.tag_name.trim()) {
-      alert("Vui lòng nhập tên Tag!");
-      return;
+  const loadTags = async () => {
+    try {
+      setIsLoading(true);
+
+      const data = await getTags(0, 100);
+
+      setTags(data);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Không thể tải danh sách Tag";
+
+      alert(message);
+    } finally {
+      setIsLoading(false);
     }
-    const newTag: TagItem = {
-      tag_id: `TAG${String(tags.length + 1).padStart(3, "0")}`,
-      tag_name: formData.tag_name.trim(),
-      description: formData.description.trim(),
-    };
-    setTags([newTag, ...tags]);
-    setShowCreateModal(false);
-    resetForm();
+  };
+
+  useEffect(() => {
+    loadTags();
+  }, []);
+
+  const handleCreateTag = async () => {
+    try {
+      const newTag: TagCreate = {
+        tag_name: formData.tag_name,
+        description: formData.description || null,
+      };
+
+      await createTag(newTag);
+
+      await loadTags();
+
+      setShowCreateModal(false);
+      resetForm();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Không thể tạo Tag");
+    }
   };
 
   // Handler: Edit
@@ -97,25 +115,25 @@ export default function TagManagementPage() {
     setShowEditModal(true);
   };
 
-  const handleUpdateTag = () => {
+  const handleUpdateTag = async () => {
     if (!selectedTag) return;
-    if (!formData.tag_name.trim()) {
-      alert("Vui lòng nhập tên Tag!");
-      return;
+
+    try {
+      const updatedTag: TagUpdate = {
+        tag_id: selectedTag.tag_id,
+        tag_name: formData.tag_name,
+        description: formData.description || null,
+      };
+
+      await updateTag(updatedTag);
+
+      await loadTags();
+
+      setShowEditModal(false);
+      resetForm();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Không thể cập nhật Tag");
     }
-    setTags(
-      tags.map((t) =>
-        t.tag_id === selectedTag.tag_id
-          ? {
-              ...t,
-              tag_name: formData.tag_name.trim(),
-              description: formData.description.trim(),
-            }
-          : t,
-      ),
-    );
-    setShowEditModal(false);
-    resetForm();
   };
 
   // Handler: Delete
@@ -124,11 +142,19 @@ export default function TagManagementPage() {
     setShowDeleteModal(true);
   };
 
-  const handleDeleteTag = () => {
+  const handleDeleteTag = async () => {
     if (!selectedTag) return;
-    setTags(tags.filter((t) => t.tag_id !== selectedTag.tag_id));
-    setShowDeleteModal(false);
-    resetForm();
+
+    try {
+      await deleteTag(selectedTag.tag_id);
+
+      await loadTags();
+
+      setShowDeleteModal(false);
+      resetForm();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Không thể xóa Tag");
+    }
   };
 
   const filteredTags = tags.filter(

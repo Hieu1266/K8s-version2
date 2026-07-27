@@ -59,17 +59,44 @@ def update_tag(
     updated_tag: TagUpdate,
     current_user: dict = Depends(RoleChecker(["Manager"]))
 ):
-    check_name = crud_tag.is_tag_name_existed(db, updated_tag.tag_name)
-    if check_name:
+    # Kiểm tra Tag có tồn tại không
+    db_tag = crud_tag.get_by_id(
+        db,
+        updated_tag.tag_id
+    )
+
+    if db_tag is None:
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Tên tag đã được sử dụng"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tag không tồn tại"
         )
-    db_tag = crud_tag.get_by_id(db, updated_tag.tag_id)
-    crud_tag.update(db, db_tag, updated_tag)
+
+    # Chỉ kiểm tra trùng khi có gửi tên Tag
+    if updated_tag.tag_name is not None:
+        is_existed = crud_tag.is_tag_name_existed(
+            db=db,
+            tag_name=updated_tag.tag_name,
+            exclude_tag_id=updated_tag.tag_id,
+        )
+
+        if is_existed:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Tên tag đã được sử dụng"
+            )
+
+    crud_tag.update(
+        db,
+        db_tag,
+        updated_tag
+    )
+
     return {
-        "status": "succcess",
-        "message": f"Đã cập nhật tag có id {updated_tag.tag_id} thành công!"
+        "status": "success",
+        "message": (
+            f"Đã cập nhật tag có id "
+            f"{updated_tag.tag_id} thành công!"
+        )
     }
 
 @router.get("/top-5", response_model=List[TagName])
