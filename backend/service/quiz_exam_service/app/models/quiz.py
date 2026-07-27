@@ -37,5 +37,5 @@ class Quiz(SQLModel, table=True):
     pool_rules: List["QuizPoolRule"] = Relationship(back_populates="quiz")     # RANDOM_QUESTION
     
     submissions: List["QuizSubmission"] = Relationship(back_populates="quiz")
-    rubric_criterias: List["RubricCriteria"] = Relationship(back_populates="quiz")
+    
     peer_assignments: List["PeerReviewAssignment"] = Relationship(back_populates="quiz")

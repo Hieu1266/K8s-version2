@@ -6,6 +6,7 @@ from app.models.enum import QuestionType
 from app.models.question_pool_link import QuestionPoolLink 
 
 if TYPE_CHECKING:
+    from app.models.rubric_criteria import RubricCriteria
     from app.models.question_option import QuestionOption
     from app.models.submission_detail import SubmissionDetail
     from app.models.quiz_question import QuizQuestion
@@ -25,7 +26,7 @@ class Question(SQLModel, table=True):
     quiz_questions: List["QuizQuestion"] = Relationship(back_populates="question")
     options: List["QuestionOption"] = Relationship(back_populates="question")
     submission_details: List["SubmissionDetail"] = Relationship(back_populates="question")
-
+    rubric_criterias: List["RubricCriteria"] = Relationship(back_populates="question")
     pools: List["QuestionPool"] = Relationship(
         back_populates="questions", 
         link_model=QuestionPoolLink  
