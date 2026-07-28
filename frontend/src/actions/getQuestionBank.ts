@@ -5,7 +5,7 @@ import { cookies } from "next/headers";
 
 const COURSE_API_URL = process.env.NEXT_PUBLIC_COURSE_BACKEND_URL;
 
-const PROGRESS_API_URL = process.env.NEXT_PUBLIC_PROGRESS_BACKEND_URL;
+const EXAM_QUIZ_URL = process.env.NEXT_PUBLIC_EXAM_BACKEND_URL;
 
 // Lấy Header xác thực bằng Cookie
 async function getAuthHeaders(customToken?: string) {
@@ -64,7 +64,7 @@ export async function getSubjectDetailAction(
         const modules = await modRes.json();
         if (Array.isArray(modules)) totalModules = modules.length;
       }
-    } catch (e) {}
+    } catch (e) { }
 
     return {
       subject_id: data.subject_id,
@@ -89,7 +89,7 @@ export async function getQuestionsBySubjectAction(
 ): Promise<Question[] | null> {
   try {
     const headers = await getAuthHeaders(token);
-    const res = await fetch(`${PROGRESS_API_URL}/questions/get-list/${subjectId}`, {
+    const res = await fetch(`${EXAM_QUIZ_URL}/questions/get-list/${subjectId}`, {
       method: "GET",
       headers,
       cache: "no-store",
@@ -113,8 +113,8 @@ export async function saveQuestionAction(
   try {
     const isUpdate = Boolean(question.question_id);
     const url = isUpdate
-      ? `${PROGRESS_API_URL}/questions/${question.question_id}`
-      : `${PROGRESS_API_URL}/questions/`;
+      ? `${EXAM_QUIZ_URL}/questions/${question.question_id}`
+      : `${EXAM_QUIZ_URL}/questions/`;
 
     const method = isUpdate ? "PATCH" : "POST";
 

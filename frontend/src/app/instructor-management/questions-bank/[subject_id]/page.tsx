@@ -10,14 +10,14 @@ import QuestionCard from "@/components/QuestionCard";
 import Pagination from "@/components/Pagination";
 import AddQuestionModal from "@/components/AddQuestionModal";
 import { Question, SubjectInfo } from "@/types/questions-bank";
-import { 
-  Layers, 
-  HelpCircle, 
-  Plus, 
-  SearchX, 
-  Sparkles, 
-  Loader2, 
-  BookOpenCheck 
+import {
+  Layers,
+  HelpCircle,
+  Plus,
+  SearchX,
+  Sparkles,
+  Loader2,
+  BookOpenCheck
 } from "lucide-react";
 
 import {
@@ -28,7 +28,7 @@ import {
 
 export default function QuestionBankDetailPage() {
   const params = useParams();
-  
+
   // Lấy mã môn học từ URL
   const subjectId = (params?.subject_id as string) || (params?.id as string) || "";
 
@@ -41,10 +41,7 @@ export default function QuestionBankDetailPage() {
 
   // State bộ lọc
   const [keyword, setKeyword] = useState<string>("");
-  const [selectedModule, setSelectedModule] = useState<string>("Tất cả Module");
   const [selectedType, setSelectedType] = useState<string>("Tất cả loại");
-  const [selectedDifficulty, setSelectedDifficulty] = useState<string>("Tất cả mức độ");
-  const [selectedTopic, setSelectedTopic] = useState<string>("Tất cả chủ đề");
 
   // State phân trang
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -88,7 +85,7 @@ export default function QuestionBankDetailPage() {
   // RESET VỀ TRANG 1 KHI BỘ LỌC THAY ĐỔI
   useEffect(() => {
     setCurrentPage(1);
-  }, [keyword, selectedType, selectedModule, selectedDifficulty, selectedTopic]);
+  }, [keyword, selectedType]);
 
   // Xử lý Thêm / Sửa câu hỏi
   const handleSave = async (question: Question) => {
@@ -103,7 +100,7 @@ export default function QuestionBankDetailPage() {
 
       if (result.success) {
         alert("Lưu câu hỏi thành công!");
-        await fetchData(); 
+        await fetchData();
         setEditingQuestion(undefined);
         setOpenModal(false);
       } else {
@@ -133,9 +130,9 @@ export default function QuestionBankDetailPage() {
       // 2. Lọc theo Loại câu hỏi
       let matchType = true;
       if (
-        selectedType && 
-        selectedType !== "Tất cả loại" && 
-        selectedType !== "Tất cả" && 
+        selectedType &&
+        selectedType !== "Tất cả loại" &&
+        selectedType !== "Tất cả" &&
         selectedType !== "ALL"
       ) {
         const typeMap: Record<string, string[]> = {
@@ -151,30 +148,10 @@ export default function QuestionBankDetailPage() {
         matchType = validTypes.includes(q.question_type);
       }
 
-      // 3. Lọc theo Module
-      const matchModule =
-        selectedModule === "Tất cả Module" ||
-        selectedModule === "Tất cả" ||
-        qAny.module_id === selectedModule ||
-        qAny.module_name === selectedModule;
 
-      // 4. Lọc theo Mức độ
-      const matchDifficulty =
-        selectedDifficulty === "Tất cả mức độ" ||
-        selectedDifficulty === "Tất cả" ||
-        qAny.difficulty === selectedDifficulty ||
-        qAny.level === selectedDifficulty;
-
-      // 5. Lọc theo Chủ đề
-      const matchTopic =
-        selectedTopic === "Tất cả chủ đề" ||
-        selectedTopic === "Tất cả" ||
-        qAny.topic_id === selectedTopic ||
-        qAny.topic_name === selectedTopic;
-
-      return matchKeyword && matchType && matchModule && matchDifficulty && matchTopic;
+      return matchKeyword && matchType;
     });
-  }, [questions, keyword, selectedType, selectedModule, selectedDifficulty, selectedTopic]);
+  }, [questions, keyword, selectedType]);
 
   // Phân trang
   const totalPages = Math.ceil(filteredQuestions.length / pageSize) || 1;
@@ -212,7 +189,7 @@ export default function QuestionBankDetailPage() {
       <SubjectHeader subject={currentSubject} />
 
       <main className="mx-auto max-w-7xl px-4 sm:px-6 py-8 space-y-8">
-        
+
         {/* 1. THÔNG TIN MÔN HỌC & THỐNG KÊ */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
           <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm hover:shadow-md transition-all duration-300">
@@ -221,7 +198,7 @@ export default function QuestionBankDetailPage() {
 
           <div className="bg-gradient-to-br from-emerald-950 via-slate-900 to-emerald-900 text-white rounded-2xl p-6 shadow-md flex flex-col justify-between relative overflow-hidden border border-emerald-800/40">
             <div className="absolute top-0 right-0 w-36 h-36 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
-            
+
             <div className="space-y-3 relative z-10">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold uppercase tracking-wider">
                 <Sparkles size={14} /> Bảng Tổng Quan
@@ -261,16 +238,8 @@ export default function QuestionBankDetailPage() {
           <QuestionFilter
             keyword={keyword}
             setKeyword={setKeyword}
-            selectedModule={selectedModule}
-            setSelectedModule={setSelectedModule}
-            selectedDifficulty={selectedDifficulty}
-            setSelectedDifficulty={setSelectedDifficulty}
             selectedType={selectedType}
             setSelectedType={setSelectedType}
-            selectedTopic={selectedTopic}
-            setSelectedTopic={setSelectedTopic}
-            modules={[]}
-            topics={[]}
             onAddQuestion={() => {
               setEditingQuestion(undefined);
               setOpenModal(true);

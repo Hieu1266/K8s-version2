@@ -26,20 +26,8 @@ export default function QuestionFilter({
   keyword,
   setKeyword,
 
-  selectedModule,
-  setSelectedModule,
-
   selectedType,
   setSelectedType,
-
-  selectedDifficulty,
-  setSelectedDifficulty,
-
-  selectedTopic,
-  setSelectedTopic,
-
-  modules,
-  topics,
 
   onAddQuestion,
 }: Props) {
@@ -55,29 +43,7 @@ export default function QuestionFilter({
           />
 
           <div className="flex flex-wrap gap-2">
-            <select
-              value={selectedModule}
-              onChange={(e) => setSelectedModule(e.target.value)}
-              className="px-3 py-2 rounded-xl border border-slate-300 text-sm"
-            >
-              <option>Tất cả Module</option>
 
-              {modules.map((m) => (
-                <option key={m}>{m}</option>
-              ))}
-            </select>
-
-            <select
-              value={selectedTopic}
-              onChange={(e) => setSelectedTopic(e.target.value)}
-              className="px-3 py-2 rounded-xl border border-slate-300 text-sm"
-            >
-              <option>Tất cả chủ đề</option>
-
-              {topics.map((t) => (
-                <option key={t}>{t}</option>
-              ))}
-            </select>
 
             {/* BỘ LỌC LOẠI CÂU HỎI (ĐÃ THÊM ĐÚNG / SAI) */}
             <select
@@ -91,16 +57,6 @@ export default function QuestionFilter({
               <option>Tự luận</option>
             </select>
 
-            <select
-              value={selectedDifficulty}
-              onChange={(e) => setSelectedDifficulty(e.target.value)}
-              className="px-3 py-2 rounded-xl border border-slate-300 text-sm"
-            >
-              <option>Tất cả mức độ</option>
-              <option>Dễ</option>
-              <option>Trung bình</option>
-              <option>Khó</option>
-            </select>
 
             <button
               onClick={onAddQuestion}
