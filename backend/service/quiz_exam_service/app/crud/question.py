@@ -1,4 +1,4 @@
-from sqlmodel import Session, select, update
+from sqlmodel import Session, select, update, func
 from app.crud.base import CRUDBase
 from uuid import UUID
 from app.models.question import Question
@@ -27,4 +27,9 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate, UUID]):
             Question.question_id == question_id
         )
         return db.exec(statement).first()
+    def total_questions_in_subject(self, db: Session, subject_id: UUID) -> int:
+        statement = select(func.count(Question.question_id)).where(
+            Question.subject_id == subject_id
+        )
+        return db.exec(statement).first() or 0
 crud_question = CRUDQuestion(Question)

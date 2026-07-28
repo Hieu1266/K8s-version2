@@ -1,6 +1,6 @@
 "use server";
 import { cookies } from "next/headers";
-import { GeneralInfoInstructorSubject } from "@/types/subject";
+import { GeneralInfoInstructorSubject, SubjectInfoWithQuestions } from "@/types/subject";
 import { SubjectData, SubjectUpdateInput } from "@/types/subjects";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_COURSE_BACKEND_URL;
@@ -184,6 +184,44 @@ export async function getSubjectsAction(): Promise<any[]> {
   }
 }
 
+export const getInstructorSubjectsWithQuestionsAction = async (
+  search: string = ""
+): Promise<SubjectInfoWithQuestions[]> => {
+  try {
+    const queryParam = search ? `?search=${encodeURIComponent(search)}` : "";
+    const url = `${BACKEND_URL}/subjects/instructor-subjects-questions${queryParam}`;
+
+    // 1. Lấy token từ cookies. 
+    const token = await getServerToken()
+
+    // 2. Gắn token vào header
+    const headers: HeadersInit = {
+      "Content-Type": "application/json",
+    };
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
+    const res = await fetch(url, {
+      method: "GET",
+      headers: headers,
+    });
+
+    if (!res.ok) {
+      // Bắt riêng lỗi 401 để dễ debug
+      if (res.status === 401) {
+        throw new Error("Phiên đăng nhập hết hạn hoặc bạn không có quyền truy cập (401).");
+      }
+      throw new Error(`Lỗi gọi API: ${res.status}`);
+    }
+
+    const data: SubjectInfoWithQuestions[] = await res.json();
+    return data;
+  } catch (error) {
+    console.error("Fetch Error:", error);
+    throw error;
+  }
+};
 // 7. Cập nhật môn học
 export async function updateSubjectAction(
   subjectId: string,
@@ -239,6 +277,7 @@ export async function getSubjectByIdAction(
     );
   }
 }
+
 
 // Tùy chọn: Export alias để bạn thích dùng tên getSubjectAction hay getSubjectByIdAction đều được
 export { getSubjectByIdAction as getSubjectAction };

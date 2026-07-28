@@ -3,7 +3,7 @@ from enum import Enum
 class QuestionType(str, Enum):
     MULTIPLE_CHOICE = "MULTIPLE_CHOICE" # Trắc nghiệm (Một hoặc nhiều đáp án)
     ESSAY = "ESSAY"                     # Tự luận (Hỗ trợ text, LaTeX, đồ thị)
-
+    TRUE_FALSE = "TRUE_FALSE"
 class QuizPlacementType(str, Enum):
     STANDALONE_LESSON = "STANDALONE_LESSON"  # Là một bài học độc lập trong module
     INSIDE_LESSON = "INSIDE_LESSON"          # Đính kèm hiển thị bên trong một bài đọc

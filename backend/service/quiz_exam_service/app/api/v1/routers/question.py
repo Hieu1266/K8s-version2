@@ -107,3 +107,10 @@ def update_question(
         "message": "Update thành công câu hỏi!"
     }
 # @router.path
+
+@router.get("/total-lessons/{subject_id}")
+def total_lessons_in_subject(
+    db: SessionDep,
+    subject_id: UUID
+):
+    return crud_question.total_questions_in_subject(db, subject_id)

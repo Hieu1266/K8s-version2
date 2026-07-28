@@ -151,11 +151,10 @@ export default function InstructorSubjectsPage() {
                 <button
                   key={status}
                   onClick={() => setSelectedStatus(status)}
-                  className={`px-3.5 py-2 rounded-xl text-xs font-bold transition ${
-                    selectedStatus === status
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold transition ${selectedStatus === status
                       ? "bg-[#0066FF] text-white shadow-sm"
                       : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                  }`}
+                    }`}
                 >
                   {status === "ALL" ? "Tất cả" : status}
                 </button>

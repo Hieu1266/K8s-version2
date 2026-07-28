@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
@@ -12,71 +12,68 @@ import {
   X,
   Layers,
   FileQuestion,
+  Loader2,
+  AlertCircle
 } from "lucide-react";
+import { SubjectInfoWithQuestions } from "@/types/subject";
+import { getInstructorSubjectsWithQuestionsAction } from "@/actions/getSubject";
 
-interface Subject {
-  id: string;
-  code: string;
-  title: string;
-  description: string;
-  image: string;
-  totalQuestions: number;
-  totalModules: number;
-}
+// Helper render badge trạng thái môn học
+const getStatusBadge = (statusId: string) => {
+  switch (statusId) {
+    case "SUBJECT_ACTIVE":
+      return {
+        text: "Đang giảng dạy",
+        className: "bg-emerald-50 text-emerald-700 border-emerald-200/80",
+        dotColor: "bg-emerald-500",
+      };
+    case "SUBJECT_DEVELOPING":
+      return {
+        text: "Đang biên soạn",
+        className: "bg-amber-50 text-amber-700 border-amber-200/80",
+        dotColor: "bg-amber-500",
+      };
+    case "SUBJECT_SUSPENDED":
+      return {
+        text: "Tạm dừng",
+        className: "bg-rose-50 text-rose-700 border-rose-200/80",
+        dotColor: "bg-rose-500",
+      };
+    default:
+      return {
+        text: "Khác",
+        className: "bg-slate-100 text-slate-700 border-slate-200",
+        dotColor: "bg-slate-400",
+      };
+  }
+};
 
 export default function QuestionBankPage() {
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
 
-  const subjects: Subject[] = [
-    {
-      id: "sub001",
-      code: "CNTT301",
-      title: "Python Programming",
-      description:
-        "Lập trình Python từ cơ bản đến nâng cao, xử lý dữ liệu và cấu trúc giải thuật.",
-      image: "https://picsum.photos/400/200?1",
-      totalQuestions: 124,
-      totalModules: 8,
-    },
-    {
-      id: "sub002",
-      code: "CNTT302",
-      title: "ReactJS & Next.js",
-      description:
-        "Xây dựng ứng dụng Web Single Page và Server-Side Rendering hiện đại.",
-      image: "https://picsum.photos/400/200?2",
-      totalQuestions: 96,
-      totalModules: 10,
-    },
-    {
-      id: "sub003",
-      code: "CNTT401",
-      title: "Java Spring Boot",
-      description:
-        "Phát triển hệ thống Backend doanh nghiệp với Spring Framework và RESTful API.",
-      image: "https://picsum.photos/400/200?3",
-      totalQuestions: 158,
-      totalModules: 12,
-    },
-    {
-      id: "sub004",
-      code: "CNTT210",
-      title: "Database Systems",
-      description:
-        "Cơ sở dữ liệu quan hệ, thiết kế ERD và truy vấn SQL tối ưu hiệu năng.",
-      image: "https://picsum.photos/400/200?4",
-      totalQuestions: 84,
-      totalModules: 7,
-    },
-  ];
+  // States quản lý dữ liệu từ API
+  const [subjects, setSubjects] = useState<SubjectInfoWithQuestions[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Lọc môn học theo từ khóa
-  const filteredSubjects = subjects.filter(
-    (item) =>
-      item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.code.toLowerCase().includes(searchTerm.toLowerCase()),
-  );
+  // Fetch dữ liệu API có tích hợp debounce 400ms
+  useEffect(() => {
+    setLoading(true);
+    setError(null);
+
+    const timer = setTimeout(() => {
+      getInstructorSubjectsWithQuestionsAction(searchTerm)
+        .then((data) => setSubjects(data || []))
+        .catch((err) => {
+          console.error("Lỗi tải danh sách ngân hàng câu hỏi:", err?.message || err);
+          setError("Không thể tải danh sách môn học. Vui lòng thử lại sau.");
+        })
+        .finally(() => setLoading(false));
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-800 font-sans">
@@ -106,8 +103,7 @@ export default function QuestionBankPage() {
                 Ngân Hàng Câu Hỏi
               </h1>
               <p className="text-blue-100 mt-2 text-sm md:text-base max-w-2xl leading-relaxed">
-                Chọn môn học để biên soạn, phân loại độ khó và quản lý bộ câu
-                hỏi trắc nghiệm/tự luận.
+                Chọn môn học để biên soạn, phân loại độ khó và quản lý bộ câu hỏi trắc nghiệm/tự luận.
               </p>
             </div>
           </div>
@@ -115,7 +111,7 @@ export default function QuestionBankPage() {
       </section>
 
       <main className="max-w-7xl mx-auto px-6 py-8 space-y-8">
-        {/* Thanh Tìm kiếm & Lọc */}
+        {/* Thanh Tìm kiếm */}
         <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="relative w-full">
             <Search
@@ -124,7 +120,7 @@ export default function QuestionBankPage() {
             />
             <input
               type="text"
-              placeholder="Tìm kiếm môn học theo tên môn hoặc mã môn..."
+              placeholder="Tìm kiếm ngân hàng câu hỏi theo tên môn học..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full rounded-xl bg-slate-50 border border-slate-200 py-2.5 pl-11 pr-10 text-sm text-slate-800 placeholder-slate-400 outline-none focus:bg-white focus:border-[#0066FF] focus:ring-2 focus:ring-[#0066FF]/20 transition"
@@ -140,105 +136,125 @@ export default function QuestionBankPage() {
           </div>
         </div>
 
-        {/* Danh sách Môn học dạng Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredSubjects.map((subject) => (
-            <div
-              key={subject.id}
-              className="group bg-white rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-xl hover:border-blue-300 transition-all duration-200 flex flex-col justify-between overflow-hidden relative"
-            >
-              <div className="absolute top-0 left-0 right-0 h-1 bg-[#0066FF] opacity-0 group-hover:opacity-100 transition-opacity z-10" />
+        {/* Trạng thái Loading */}
+        {loading && (
+          <div className="flex flex-col items-center justify-center py-20 gap-3 text-slate-500 bg-white rounded-2xl border border-slate-200/80 shadow-sm">
+            <Loader2 size={32} className="animate-spin text-[#0066FF]" />
+            <p className="text-sm font-semibold">Đang tải danh sách ngân hàng câu hỏi...</p>
+          </div>
+        )}
 
-              <div className="relative h-40 w-full overflow-hidden bg-slate-100">
-                <img
-                  src={subject.image}
-                  alt={subject.title}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                />
-                <div className="absolute top-3 left-3 bg-slate-900/80 backdrop-blur-md text-white text-[11px] font-bold px-2.5 py-1 rounded-lg uppercase tracking-wider">
-                  {subject.code}
-                </div>
-              </div>
+        {/* Trạng thái Error */}
+        {!loading && error && (
+          <div className="bg-rose-50 border border-rose-200 rounded-2xl p-6 text-center text-rose-700 text-sm flex items-center justify-center gap-2 shadow-sm">
+            <AlertCircle size={20} />
+            <span className="font-medium">{error}</span>
+          </div>
+        )}
 
-              <div className="p-5 space-y-3 flex-1 flex flex-col justify-between">
-                <div>
-                  <h3
-                    onClick={() =>
-                      router.push(
-                        `/instructor-management/questions-bank/${subject.id}`,
-                      )
-                    }
-                    className="text-lg font-bold text-slate-900 group-hover:text-[#0066FF] transition cursor-pointer line-clamp-1"
-                  >
-                    {subject.title}
-                  </h3>
+        {/* Danh sách Môn học (Render theo dữ liệu API) */}
+        {!loading && !error && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {subjects.map((subject) => {
+              const statusConfig = getStatusBadge(subject.status_id);
 
-                  <p className="text-slate-500 text-xs sm:text-sm mt-1.5 leading-relaxed line-clamp-2">
-                    {subject.description}
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 pt-2">
-                  <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-100 flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-lg bg-blue-100/70 text-[#0066FF] flex items-center justify-center shrink-0">
-                      <HelpCircle size={16} />
-                    </div>
-                    <div>
-                      <span className="text-xs text-slate-500 font-medium block">
-                        Câu hỏi
-                      </span>
-                      <span className="text-sm font-bold text-slate-900">
-                        {subject.totalQuestions}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-100 flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-lg bg-emerald-100/70 text-emerald-600 flex items-center justify-center shrink-0">
-                      <Layers size={16} />
-                    </div>
-                    <div>
-                      <span className="text-xs text-slate-500 font-medium block">
-                        Module
-                      </span>
-                      <span className="text-sm font-bold text-slate-900">
-                        {subject.totalModules}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-4 pt-0">
-                <button
-                  onClick={() =>
-                    router.push(
-                      `/instructor-management/questions-bank/${subject.id}`,
-                    )
-                  }
-                  className="w-full bg-[#0066FF] hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded-xl text-xs sm:text-sm transition flex items-center justify-center gap-2 shadow-sm group-hover:shadow-md"
+              return (
+                <div
+                  key={subject.subject_id}
+                  className="group bg-white rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-xl hover:border-blue-300 transition-all duration-200 flex flex-col justify-between overflow-hidden relative"
                 >
-                  Quản lý câu hỏi
-                  <ArrowRight
-                    size={16}
-                    className="group-hover:translate-x-1 transition-transform"
-                  />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+                  <div className="absolute top-0 left-0 right-0 h-1 bg-[#0066FF] opacity-0 group-hover:opacity-100 transition-opacity z-10" />
 
-        {filteredSubjects.length === 0 && (
+                  <div className="p-6 space-y-4 flex-1 flex flex-col">
+                    {/* Header: Title & Status */}
+                    <div className="flex justify-between items-start gap-3">
+                      <h3
+                        onClick={() =>
+                          router.push(
+                            `/instructor-management/questions-bank/${subject.subject_id}`
+                          )
+                        }
+                        className="text-lg font-bold text-slate-900 group-hover:text-[#0066FF] transition cursor-pointer line-clamp-2 leading-snug"
+                      >
+                        {subject.title}
+                      </h3>
+                    </div>
+
+                    {/* Status Badge */}
+                    <div>
+                      <span
+                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold border whitespace-nowrap shrink-0 ${statusConfig.className}`}
+                      >
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full ${statusConfig.dotColor}`}
+                        />
+                        {statusConfig.text}
+                      </span>
+                    </div>
+
+                    <p className="text-slate-500 text-xs sm:text-sm leading-relaxed line-clamp-2 flex-1">
+                      {subject.description || "Chưa có mô tả chi tiết cho môn học này."}
+                    </p>
+
+                    {/* Stats */}
+                    <div className="grid grid-cols-2 gap-3 pt-3 border-t border-slate-100">
+                      <div className="bg-blue-50/50 rounded-xl p-3 border border-blue-100/50 flex flex-col gap-1">
+                        <div className="flex items-center gap-1.5 text-blue-600">
+                          <HelpCircle size={15} />
+                          <span className="text-xs font-semibold">Câu hỏi</span>
+                        </div>
+                        <span className="text-lg font-bold text-slate-900">
+                          {subject.total_questions || 0}
+                        </span>
+                      </div>
+
+                      <div className="bg-slate-50/80 rounded-xl p-3 border border-slate-100 flex flex-col gap-1">
+                        <div className="flex items-center gap-1.5 text-slate-600">
+                          <Layers size={15} />
+                          <span className="text-xs font-semibold">Modules</span>
+                        </div>
+                        <span className="text-lg font-bold text-slate-900">
+                          {subject.total_modules || 0}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-4 pt-0">
+                    <button
+                      onClick={() =>
+                        router.push(
+                          `/instructor-management/questions-bank/${subject.subject_id}`
+                        )
+                      }
+                      className="w-full bg-[#0066FF] hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded-xl text-xs sm:text-sm transition flex items-center justify-center gap-2 shadow-sm group-hover:shadow-md"
+                    >
+                      Quản lý câu hỏi
+                      <ArrowRight
+                        size={16}
+                        className="group-hover:translate-x-1 transition-transform"
+                      />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Empty State */}
+        {!loading && !error && subjects.length === 0 && (
           <div className="bg-white rounded-2xl border border-slate-200/80 p-12 text-center text-slate-500 flex flex-col items-center justify-center gap-3 shadow-sm">
             <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400">
               <FileQuestion size={28} />
             </div>
             <p className="text-sm font-semibold text-slate-700">
-              Không tìm thấy môn học nào khớp với từ khóa "{searchTerm}".
+              {searchTerm
+                ? `Không tìm thấy môn học nào khớp với từ khóa "${searchTerm}".`
+                : "Bạn hiện chưa được phân công đảm nhận môn học nào."}
             </p>
             <p className="text-xs text-slate-400 max-w-sm">
-              Vui lòng thử lại với tên môn học hoặc mã môn học khác.
+              Vui lòng thử lại với tên môn học khác.
             </p>
           </div>
         )}

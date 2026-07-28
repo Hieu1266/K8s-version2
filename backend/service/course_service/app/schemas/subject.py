@@ -43,6 +43,14 @@ class GeneralInfoInstructorSubject(BaseModel):
     total_modules: int
     total_lessons: int
 
+class SubjectInfoWithQuestions(BaseModel):
+    subject_id: UUID
+    title: str
+    description: str
+    status_id: str
+    total_modules: int
+    total_questions: Optional[int] = None    
+
 class SubjectRead(BaseModel):
     subject_id: UUID
     course_id: UUID

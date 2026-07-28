@@ -5,14 +5,19 @@ from app.api.v1.deps import SessionDep
 from app.core.security import RoleChecker, get_current_user_role
 from app.schemas.enums import SubjectStatus
 from app.models.subject import Subject
-from app.schemas.subject import SubjectCreate, SubjectUpdate, SubjectRead, InstructorStatictisSubject, GeneralInfoInstructorSubject
+from app.schemas.subject import SubjectCreate, SubjectUpdate, SubjectRead, InstructorStatictisSubject, GeneralInfoInstructorSubject, SubjectInfoWithQuestions
 from app.crud.subject import crud_subject
 from app.crud.module import crud_module
 from app.crud.syllabus import crud_syllabus
 from app.crud.course import crud_course
+import asyncio
+import httpx
+from app.core.config import settings
+
 
 router = APIRouter(prefix="/subjects", tags=["subjects"])
 
+QUIZ_EXAM_URL = settings.BACKEND_QUIZ_EXAM_URL
 
 @router.get("/instructor-general-info", response_model=List[GeneralInfoInstructorSubject])
 def get_subject_general_info_instructor(
@@ -37,6 +42,54 @@ def get_subject_general_info_instructor(
         subject_dict["total_lessons"] = crud_subject.get_total_lessons(db, subject.subject_id)
         
         response_data.append(subject_dict)
+        
+    return response_data
+
+@router.get("/instructor-subjects-questions", response_model=List[SubjectInfoWithQuestions])
+async def get_instructor_subjects_with_questions(
+    db: SessionDep,
+    search: Optional[str] = Query(None, description="Từ khóa tìm kiếm tên hoặc mô tả môn học"), 
+    current_user: dict = Depends(get_current_user_role)
+):
+    instructor_id = current_user["user_id"]
+
+    if current_user["role_name"] != "Instructor":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Bạn không phải là giảng viên"
+        )
+
+    # Lấy danh sách môn học của giảng viên
+    subjects = crud_subject.get_instructor_subject_list(db, instructor_id, search=search)
+    
+    response_data = []
+    
+    # Sử dụng Asynchronous client để không block luồng khi gọi HTTP
+    async with httpx.AsyncClient() as client:
+        for subject in subjects:
+            subject_dict = subject.model_dump() 
+            
+            # Chỉ lấy total_modules, bỏ qua total_lessons
+            subject_dict["total_modules"] = crud_module.get_total_module_by_subject(db, subject.subject_id)
+            
+            # Gọi API sang service khác để lấy total_questions
+            try:
+                # Gọi tới endpoint lấy tổng số câu hỏi từ Question Service
+                quiz_service_endpoint = f"{QUIZ_EXAM_URL}/questions/total-lessons/{subject.subject_id}"
+                
+                # Gọi HTTP GET
+                response = await client.get(quiz_service_endpoint)
+                
+                if response.status_code == 200:
+                    # Gán dữ liệu trả về
+                    subject_dict["total_questions"] = response.json() 
+                else:
+                    subject_dict["total_questions"] = 0
+            except httpx.RequestError:
+                # Xử lý an toàn nếu service Question không phản hồi
+                subject_dict["total_questions"] = 0
+            
+            response_data.append(subject_dict)
         
     return response_data
    
