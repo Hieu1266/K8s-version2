@@ -1,110 +1,147 @@
 "use client";
-import React from "react";
+
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
+import {
+  ArrowRight,
+  ChevronRight,
+  GraduationCap,
+  LayoutDashboard,
+} from "lucide-react";
+
+const menuItems = [
+  {
+    title: "Chương trình đào tạo mẫu",
+    desc: "Xây dựng và quản lý cấu trúc chi tiết của khung chương trình đào tạo.",
+    path: "/training-management/curriculum",
+  },
+  {
+    title: "Duyệt khóa học",
+    desc: "Kiểm tra nội dung, đánh giá chất lượng và phê duyệt khóa học mới.",
+    path: "/training-management/course-approval",
+  },
+  {
+    title: "Quản lý khóa học",
+    desc: "Theo dõi, chỉnh sửa thông tin và cập nhật tài nguyên của khóa học.",
+    path: "/training-management/course-management",
+  },
+  {
+    title: "Quản lý môn học",
+    desc: "Quản lý nội dung môn học, module, bài học và tài liệu giảng dạy.",
+    path: "/training-management/course-content",
+  },
+  {
+    title: "Quản lý nhãn khóa học",
+    desc: "Thêm, chỉnh sửa và xóa các nhãn dùng để phân loại khóa học.",
+    path: "/training-management/tag-management",
+  },
+  {
+    title: "Gán nhãn cho khóa học",
+    desc: "Liên kết nhãn phù hợp với từng khóa học để hỗ trợ tìm kiếm và phân loại.",
+    path: "/training-management/course-tag",
+  },
+];
 
 export default function FacultyDashboard() {
-  const menuItems = [
-    {
-      title: "Chương trình đào tạo mẫu",
-      desc: "Quản lý và cấu trúc chi tiết khung chương trình",
-      icon: "📋",
-      path: "/training-management/curriculum",
-    },
-    // {
-    //   title: "Phân công giảng dạy",
-    //   desc: "Lịch dạy chi tiết và điều phối công việc giảng viên",
-    //   icon: "👥",
-    //   path: "/training-management/course-assignment",
-    // },
-    {
-      title: "Duyệt khóa học",
-      desc: "Kiểm tra, đánh giá chất lượng và phê duyệt các khóa học mới",
-      icon: "✅",
-      path: "/training-management/course-approval",
-    },
-    {
-      title: "Quản lý khóa học",
-      desc: "Chỉnh sửa, cập nhật nội dung bài học và học liệu",
-      icon: "📚",
-      path: "/training-management/course-management",
-    },
-    {
-      title: "Quản lý môn học",
-      desc: "Chỉnh sửa, cập nhật nội dung bài học và học liệu",
-      icon: "📖",
-      path: "/training-management/course-content",
-    },
-    {
-      title: "Quản lý nhãn khóa học",
-      desc: "Thêm, sửa, xóa các nhãn phân loại cho khóa học",
-      icon: "🏷️",
-      path: "/training-management/tag-management",
-    },
-    {
-      title: "Gán nhãn cho khóa học",
-      desc: "Phân loại và liên kết các nhãn vào từng khóa học",
-      icon: "🔖",
-      path: "/training-management/course-tag",
-    },
-  ];
-
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-gray-900 flex flex-col">
+    <div className="min-h-screen bg-[#F8FAFC] text-slate-800 antialiased">
       <Navbar />
 
-      {/* Banner */}
-      <div className="bg-gradient-to-r from-[#1E88E5] to-[#0066FF] text-white px-8 py-12 md:px-16 relative">
-        <h1 className="text-3xl font-bold tracking-wide mb-2">
-          Quản LÝ ĐÀO TẠO
-        </h1>
-        <p className="text-blue-100 text-sm mb-6">
-          Quản lý toàn bộ hệ thống chương trình và giảng dạy
-        </p>
+      {/* HEADER SECTION */}
+      <section className="relative overflow-hidden bg-gradient-to-r from-[#0066FF] to-[#0052cc] px-6 pb-24 pt-10 text-white">
+        <div className="pointer-events-none absolute inset-0 overflow-hidden opacity-20">
+          <div className="absolute -right-24 -top-24 h-96 w-96 rounded-full bg-white blur-3xl" />
+          <div className="absolute -bottom-40 left-1/3 h-80 w-80 rounded-full bg-cyan-300 blur-3xl" />
+        </div>
 
-        <div className="flex items-center space-x-3 mt-4">
-          <div className="w-10 h-10 rounded-full bg-white text-blue-600 flex items-center justify-center font-bold text-lg border-2 border-white/50">
-            GV
+        <div className="relative z-10 mx-auto max-w-7xl space-y-4">
+          <div className="flex items-center gap-2 text-xs font-medium text-white/80">
+            <span className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/10 px-3 py-1.5 shadow-sm backdrop-blur-md">
+              <LayoutDashboard size={14} /> Trang quản trị
+            </span>
+            <ChevronRight size={12} className="opacity-50" />
+            <span className="flex items-center gap-1.5 font-semibold tracking-wide text-white">
+              <GraduationCap size={15} /> Quản lý đào tạo
+            </span>
           </div>
-          <span className="font-medium text-sm">Xin chào, Nguyen Van A</span>
-        </div>
-      </div>
 
-      {/* Grid 4 mục hiển thị rõ nét, không làm mờ */}
-      <div className="max-w-7xl w-full mx-auto px-6 py-10">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
-          {menuItems.map((item, index) => (
-            <Link
-              key={index}
-              href={item.path}
-              onClick={(e) => {
-                if (item.path === "#") {
-                  e.preventDefault();
-                  alert(
-                    `Tính năng "${item.title}" sẽ được kết nối cơ sở dữ liệu sau.`,
-                  );
-                }
-              }}
-              className="bg-white p-6 rounded-2xl border border-gray-100 shadow-xs hover:shadow-md transition cursor-pointer flex flex-col justify-between text-inherit no-underline"
-            >
-              <div>
-                <div className="text-3xl mb-4 bg-blue-50 w-12 h-12 rounded-xl flex items-center justify-center text-[#0066FF]">
-                  {item.icon}
-                </div>
-                <h3 className="text-base font-bold text-gray-900 mb-1">
-                  {item.title}
-                </h3>
-                <p className="text-xs text-gray-500 leading-relaxed">
-                  {item.desc}
-                </p>
-              </div>
-              <div className="text-right mt-4 text-xs font-bold text-[#0066FF] hover:underline">
-                Truy cập →
-              </div>
-            </Link>
-          ))}
+          <h1 className="text-3xl font-black uppercase tracking-tight drop-shadow-md md:text-4xl">
+            QUẢN LÝ ĐÀO TẠO
+          </h1>
+
+          <p className="max-w-2xl text-sm font-medium leading-relaxed text-blue-100">
+            Quản lý tập trung chương trình đào tạo, khóa học, môn học và hệ
+            thống nhãn trên một giao diện thống nhất.
+          </p>
         </div>
-      </div>
+      </section>
+
+      {/* MAIN CONTENT AREA */}
+      <main className="relative z-20 mx-auto -mt-14 max-w-7xl px-6 pb-20">
+        <div className="rounded-[2rem] border border-white bg-white/80 p-6 shadow-[0_10px_40px_-10px_rgba(0,0,0,0.08)] backdrop-blur-xl md:p-8">
+          <div className="mb-8 flex flex-col gap-3 border-b border-slate-100 pb-6 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#0066FF]">
+                Danh mục chức năng
+              </p>
+              <h2 className="mt-1 text-2xl font-black tracking-tight text-slate-800">
+                Chọn chức năng quản lý
+              </h2>
+              <p className="mt-1 text-sm font-medium text-slate-500">
+                Có {menuItems.length} chức năng quản lý đang được hiển thị.
+              </p>
+            </div>
+
+            <div className="inline-flex w-fit items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-700">
+              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              Hệ thống đang hoạt động
+            </div>
+          </div>
+
+          <section className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+            {menuItems.map((item, index) => (
+              <Link
+                key={item.path}
+                href={item.path}
+                className="group relative flex min-h-[210px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl hover:shadow-blue-100/60"
+              >
+                <div className="absolute right-0 top-0 h-24 w-24 translate-x-10 -translate-y-10 rounded-full bg-blue-50 transition-transform duration-300 group-hover:scale-150" />
+
+                <div className="relative z-10 flex h-full flex-col">
+                  <div className="mb-5 flex items-center justify-between">
+                    <span className="font-mono text-[11px] font-bold text-slate-400">
+                      {String(index + 1).padStart(2, "0")}
+                    </span>
+
+                    <div className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-400 transition-all duration-300 group-hover:border-[#0066FF] group-hover:bg-[#0066FF] group-hover:text-white">
+                      <ArrowRight
+                        size={17}
+                        className="transition-transform duration-300 group-hover:translate-x-0.5"
+                      />
+                    </div>
+                  </div>
+
+                  <h3 className="text-lg font-extrabold text-slate-800 transition-colors group-hover:text-[#0066FF]">
+                    {item.title}
+                  </h3>
+
+                  <p className="mt-2 flex-1 text-sm font-medium leading-6 text-slate-500">
+                    {item.desc}
+                  </p>
+
+                  <div className="mt-5 flex items-center gap-2 border-t border-slate-100 pt-4 text-xs font-bold text-[#0066FF]">
+                    Truy cập chức năng
+                    <ArrowRight
+                      size={15}
+                      className="transition-transform duration-300 group-hover:translate-x-1"
+                    />
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </section>
+        </div>
+      </main>
     </div>
   );
 }
