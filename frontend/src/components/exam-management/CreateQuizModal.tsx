@@ -257,11 +257,10 @@ export default function CreateQuizModal({
               <button
                 type="button"
                 onClick={() => setQuizType("FIXED_QUESTION")}
-                className={`p-4 rounded-xl border text-left transition ${
-                  quizType === "FIXED_QUESTION"
+                className={`p-4 rounded-xl border text-left transition ${quizType === "FIXED_QUESTION"
                     ? "border-[#0066FF] bg-blue-50/50 ring-2 ring-[#0066FF]/20"
                     : "border-slate-200 hover:bg-slate-50"
-                }`}
+                  }`}
               >
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-sm font-bold text-slate-800">
@@ -270,7 +269,7 @@ export default function CreateQuizModal({
                   <input
                     type="radio"
                     checked={quizType === "FIXED_QUESTION"}
-                    onChange={() => {}}
+                    onChange={() => { }}
                     className="text-[#0066FF]"
                   />
                 </div>
@@ -283,11 +282,10 @@ export default function CreateQuizModal({
               <button
                 type="button"
                 onClick={() => setQuizType("RANDOM_QUESTION")}
-                className={`p-4 rounded-xl border text-left transition ${
-                  quizType === "RANDOM_QUESTION"
+                className={`p-4 rounded-xl border text-left transition ${quizType === "RANDOM_QUESTION"
                     ? "border-purple-600 bg-purple-50/50 ring-2 ring-purple-600/20"
                     : "border-slate-200 hover:bg-slate-50"
-                }`}
+                  }`}
               >
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-sm font-bold text-slate-800">
@@ -296,7 +294,7 @@ export default function CreateQuizModal({
                   <input
                     type="radio"
                     checked={quizType === "RANDOM_QUESTION"}
-                    onChange={() => {}}
+                    onChange={() => { }}
                     className="text-purple-600"
                   />
                 </div>
@@ -328,16 +326,15 @@ export default function CreateQuizModal({
                       <div
                         key={q.question_id}
                         onClick={() => handleToggleFixedQuestion(q.question_id)}
-                        className={`p-3 rounded-xl border cursor-pointer transition flex items-start gap-3 ${
-                          isSelected
+                        className={`p-3 rounded-xl border cursor-pointer transition flex items-start gap-3 ${isSelected
                             ? "bg-white border-[#0066FF] shadow-sm"
                             : "bg-white border-slate-200 hover:border-slate-300"
-                        }`}
+                          }`}
                       >
                         <input
                           type="checkbox"
                           checked={isSelected}
-                          onChange={() => {}}
+                          onChange={() => { }}
                           className="mt-0.5 h-4 w-4 rounded border-slate-300 text-[#0066FF]"
                         />
                         <div className="flex-1">

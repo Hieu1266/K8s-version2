@@ -1,9 +1,9 @@
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, HTTPException, status, Depends, Query
 from app.core.db import settings
 from app.api.v1.deps import SessionDep
 from app.core.security import get_current_user_role
 from app.crud.quiz import crud_quiz
-from app.schemas.quiz import QuizCreate
+from app.schemas.quiz import QuizCreate, QuizItem
 from app.models.enum import QuizType
 from app.schemas.quiz_question import QuizQuestionCreate
 from app.schemas.quiz_pool_rule import QuizPoolRuleCreate
@@ -12,9 +12,39 @@ import httpx
 from app.crud.quiz_question import crud_quiz_question
 from app.crud.quiz_pool_rule import crud_quiz_pool_rule
 
-router = APIRouter(tags=["quizzes"])
+router = APIRouter(prefix="/quizzes" ,tags=["quizzes"])
 
 COURSE_SERVICE_URL = settings.BACKEND_COURSE_URL
+
+async def get_owner(subject_id: UUID) -> UUID:
+    async with httpx.AsyncClient() as client:
+        try:
+            # Sửa cú pháp URL: bỏ dấu $ và dùng {subject_id}
+            url = f"{COURSE_SERVICE_URL}/subjects/get-owner/{subject_id}"
+            response = await client.get(url, timeout=5.0)
+            
+            if response.status_code != 200:
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail="Không thể xác thực thông tin bài học do lỗi từ Course Service."
+                )
+            
+            owner_id_str = response.json()
+            
+            if not owner_id_str:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Môn học không tồn tại"
+                )
+            
+            # Trả về giá trị đã chuyển đổi sang UUID
+            return UUID(owner_id_str)
+                
+        except httpx.RequestError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"Kết nối tới Course Service thất bại: {exc}"
+            )
 
 @router.get("/{lesson_id}/had-quiz")
 def is_lesson_had_quiz(
@@ -24,7 +54,7 @@ def is_lesson_had_quiz(
     return crud_quiz.is_lesson_had_quiz(db, lesson_id)
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
-def create_initial_quiz(
+async def create_initial_quiz(
     db: SessionDep, 
     obj_in: QuizCreate,
     current_user: dict = Depends(get_current_user_role)
@@ -32,6 +62,14 @@ def create_initial_quiz(
     """
     API khởi tạo đề thi (Quiz) ban đầu.
     """
+    # 🐛 SỬA BUG: trước đây dùng `db_quiz.subject_id` khi `db_quiz` CHƯA được gán
+    # (chỉ được tạo ở bước bên dưới) -> luôn crash NameError. Phải dùng `obj_in.subject_id`.
+    owner_id = await get_owner(obj_in.subject_id)
+    if UUID(current_user["user_id"]) != owner_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail ="Bạn không có quyền tạo câu hỏi cho môn học"
+    )
     # Nếu client có truyền bài học để gắn đề thi vào
     if obj_in.target_lesson_id:
         try:
@@ -82,8 +120,37 @@ def create_initial_quiz(
         }
     }
 
+@router.delete("/{quiz_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_quiz(
+    db: SessionDep,
+    quiz_id: UUID,
+    current_user: dict = Depends(get_current_user_role)
+):
+    """
+    🆕 API xóa đề thi.
+    Lưu ý: nếu DB có ràng buộc khóa ngoại từ quiz_question/quiz_pool_rule/submission trỏ về
+    quiz_id mà CHƯA cấu hình cascade delete, thao tác xóa 1 quiz đã có câu hỏi/pool/lượt làm bài
+    sẽ báo lỗi vi phạm khóa ngoại. Cần cấu hình cascade ở model nếu muốn cho xóa trong mọi trường hợp.
+    """
+    db_quiz = crud_quiz.get_by_id(db, id=quiz_id)
+    if not db_quiz:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Không tìm thấy đề thi."
+        )
+
+    owner_id = await get_owner(db_quiz.subject_id)
+    if UUID(current_user["user_id"]) != owner_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Bạn không có quyền xóa đề thi này"
+        )
+
+    crud_quiz.delete(db, id=quiz_id)
+    return None
+
 @router.post("/{quiz_id}/questions", status_code=status.HTTP_200_OK)
-def add_fixed_questions(
+async def add_fixed_questions(
     db: SessionDep, 
     quiz_id: UUID, 
     obj_in: list[QuizQuestionCreate],
@@ -96,7 +163,13 @@ def add_fixed_questions(
     db_quiz = crud_quiz.get_by_id(db, id=quiz_id)
     if not db_quiz:
         raise HTTPException(status_code=404, detail="Không tìm thấy thông tin đề thi.")
-        
+    owner_id = await get_owner(db_quiz.subject_id)
+    if UUID(current_user["user_id"]) != owner_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail ="Bạn không có quyền tạo câu hỏi cho môn học"
+        )
+    
     # Bảo vệ logic: Đề thi ngẫu nhiên thì không được gán câu hỏi cố định
     if db_quiz.quiz_type != QuizType.FIXED_QUESTION:
         raise HTTPException(
@@ -112,14 +185,26 @@ def add_fixed_questions(
 
 
 @router.post("/{quiz_id}/pool-rules", status_code=status.HTTP_200_OK)
-def add_pool_rules(db: SessionDep, quiz_id: UUID, obj_in: list[QuizPoolRuleCreate]):
+async def add_pool_rules(
+    db: SessionDep, 
+    quiz_id: UUID, 
+    obj_in: list[QuizPoolRuleCreate],
+    current_user: dict = Depends(get_current_user_role)
+):
     """
     API bổ sung luật bốc ngân hàng câu hỏi (Dành cho RANDOM_QUESTION).
     """
     db_quiz = crud_quiz.get_by_id(db, id=quiz_id)
     if not db_quiz:
         raise HTTPException(status_code=404, detail="Không tìm thấy thông tin đề thi.")
-        
+
+    owner_id = await get_owner(db_quiz.subject_id)
+    if UUID(current_user["user_id"]) != owner_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail ="Bạn không có quyền tạo câu hỏi cho môn học"
+        )
+    
     # Bảo vệ logic: Đề thi cố định thì không được gắn luật bốc ngẫu nhiên
     if db_quiz.quiz_type != QuizType.RANDOM_QUESTION:
         raise HTTPException(
@@ -138,3 +223,22 @@ def get_total_quizzes(
     subject_id: UUID
 ):
     return crud_quiz.get_total_quiz_by_subject(db, subject_id)
+
+@router.get("/get-quizzes-list/{subject_id}", response_model=list[QuizItem])
+async def get_quizzes_list(
+    db: SessionDep,
+    subject_id: UUID,
+    search: str | None = Query(None, description="Từ khóa tìm kiếm theo tiêu đề bài thi"),
+    current_user: dict = Depends(get_current_user_role)
+):
+    # Logic kiểm tra quyền sở hữu vẫn giữ nguyên
+    owner_id = await get_owner(subject_id)
+    if UUID(current_user["user_id"]) != owner_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Bạn không có quyền xem danh sách bài thi của môn học này"
+        )  
+
+    # Truyền thêm tham số search vào hàm CRUD đã cập nhật
+    result = crud_quiz.get_multi_by_subject(db, subject_id, search=search)
+    return result
