@@ -60,23 +60,6 @@ export default function TeacherDashboard() {
               </p>
             </div>
 
-            {/* Profile Card */}
-            <div className="flex items-center gap-4 bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/20 shadow-xl shrink-0">
-              <img
-                src="https://i.pravatar.cc/150?img=68"
-                alt="Avatar Giảng viên"
-                className="w-14 h-14 rounded-xl object-cover ring-2 ring-white/50"
-              />
-              <div>
-                <h2 className="text-base font-bold text-white">Trần Minh Tú</h2>
-                <p className="text-xs text-cyan-200 font-medium">
-                  Khoa Công nghệ Thông tin
-                </p>
-                <span className="inline-block mt-1 text-[10px] bg-black/20 text-blue-100 px-2 py-0.5 rounded font-mono">
-                  ID: GV-2026
-                </span>
-              </div>
-            </div>
           </div>
         </div>
       </section>
