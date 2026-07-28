@@ -2,10 +2,10 @@
 
 import { Question, SubjectInfo, QuestionTypeEnum } from "@/types/questions-bank";
 import { cookies } from "next/headers";
+import { revalidatePath } from "next/cache"; // 🎯 Import thêm revalidatePath
 
 const COURSE_API_URL = process.env.NEXT_PUBLIC_COURSE_BACKEND_URL;
-
-const EXAM_QUIZ_URL = process.env.NEXT_PUBLIC_EXAM_BACKEND_URL;
+const EXAM_QUIZ_URL = process.env.NEXT_PUBLIC_PROGRESS_BACKEND_URL;
 
 // Lấy Header xác thực bằng Cookie
 async function getAuthHeaders(customToken?: string) {
@@ -17,7 +17,7 @@ async function getAuthHeaders(customToken?: string) {
   }
 
   if (token) {
-    token = token.replace(/^"|"/g, '').trim();
+    token = token.replace(/^"|"/g, "").trim();
   }
 
   return {
@@ -26,16 +26,40 @@ async function getAuthHeaders(customToken?: string) {
   };
 }
 
+/**
+ * Hàm Map dữ liệu từ Backend/DB trả về sang định dạng Question Chuẩn
+ */
 function mapQuestion(raw: any): Question {
+  const maxPoints = Number(raw.max_points ?? 0);
+
   return {
     question_id: raw.question_id,
     subject_id: raw.subject_id,
     question_type: raw.question_type as QuestionTypeEnum,
     question_title: raw.question_title ?? "",
     content: raw.content ?? raw.body_content ?? "",
-    max_points: raw.max_points ?? 0,
-    options: raw.options ?? [],
-  };
+    max_points: maxPoints,
+    options: Array.isArray(raw.options)
+      ? raw.options
+      : Array.isArray(raw.question_options)
+      ? raw.question_options
+      : [],
+    rubrics: (
+      Array.isArray(raw.rubrics)
+        ? raw.rubrics
+        : Array.isArray(raw.rubric_criterias)
+        ? raw.rubric_criterias
+        : Array.isArray(raw.rubric_criteria)
+        ? raw.rubric_criteria
+        : []
+    ).map((r: any) => ({
+      criteria_id: r.criteria_id,
+      title: r.title ?? "",
+      description: r.description ?? "",
+      percentage: Number(r.percentage ?? 0),
+      max_score: Number(r.max_score ?? (((Number(r.percentage) || 0) * maxPoints) / 100).toFixed(2)),
+    })),
+  } as any;
 }
 
 export async function getSubjectDetailAction(
@@ -64,7 +88,7 @@ export async function getSubjectDetailAction(
         const modules = await modRes.json();
         if (Array.isArray(modules)) totalModules = modules.length;
       }
-    } catch (e) { }
+    } catch (e) {}
 
     return {
       subject_id: data.subject_id,
@@ -83,6 +107,9 @@ export async function getSubjectDetailAction(
   }
 }
 
+/**
+ * Lấy danh sách câu hỏi theo Môn học (Kèm Options & Rubrics)
+ */
 export async function getQuestionsBySubjectAction(
   subjectId: string,
   token?: string
@@ -106,51 +133,143 @@ export async function getQuestionsBySubjectAction(
   }
 }
 
+/**
+ * Lưu câu hỏi (Thêm mới hoặc Cập nhật)
+ */
 export async function saveQuestionAction(
-  question: Question,
+  question: Question | any,
   token?: string
 ): Promise<{ success: boolean; error?: string; data?: Question }> {
   try {
-    const isUpdate = Boolean(question.question_id);
+    const isUpdate = Boolean(question.question_id && question.question_id !== "");
     const url = isUpdate
       ? `${EXAM_QUIZ_URL}/questions/${question.question_id}`
       : `${EXAM_QUIZ_URL}/questions/`;
 
     const method = isUpdate ? "PATCH" : "POST";
 
-    // Build Body chuẩn theo Swagger
+    // 1. Build Body dữ liệu
     const body: Record<string, any> = {
       question_title: question.question_title ?? "",
-      body_content: question.content,
-      max_points: question.max_points,
+      body_content: question.content || question.body_content || "",
+      max_points: Number(question.max_points) || 10,
+      question_type: question.question_type,
     };
 
     if (!isUpdate) {
       body.subject_id = question.subject_id;
-      body.question_type = question.question_type;
+    }
+
+    // 2. Làm sạch mảng Rubrics / Options
+    if (question.question_type === "ESSAY") {
+      body.rubrics = (question.rubrics || []).map((r: any) => {
+        const item: any = {
+          title: r.title,
+          description: r.description || "",
+          percentage: Number(r.percentage) || 0,
+        };
+        if (r.criteria_id && String(r.criteria_id).trim() !== "") {
+          item.criteria_id = r.criteria_id;
+        }
+        return item;
+      });
+    } else {
+      body.options = (question.options || []).map((o: any) => {
+        const item: any = {
+          option_text: o.option_text,
+          is_correct: Boolean(o.is_correct),
+        };
+        if (o.option_id && String(o.option_id).trim() !== "") {
+          item.option_id = o.option_id;
+        }
+        return item;
+      });
     }
 
     const headers = await getAuthHeaders(token);
 
+    // 🎯 FIX CHÍNH TẠI ĐÂY: Luôn bọc key { question: body } cho cả POST và PATCH
+    const fullPayload: Record<string, any> = {
+      question: body,
+    };
+
+    if (!isUpdate && body.options && body.options.length > 0) {
+      fullPayload.question_opts = body.options;
+    }
+
+    console.log("==========================================");
+    console.log(`🚀 [NEXT.JS SERVER] GỬI REQUEST: ${method} -> ${url}`);
+    console.log("📦 [NEXT.JS SERVER] PAYLOAD:", JSON.stringify(fullPayload, null, 2));
+
     const res = await fetch(url, {
       method,
       headers,
-      // CHÚ Ý CHỖ NÀY: Bọc toàn bộ vào object { question: ... }
-      body: JSON.stringify({ question: body }),
+      body: JSON.stringify(fullPayload),
       cache: "no-store",
     });
 
+    console.log(`📥 [NEXT.JS SERVER] BACKEND PHẢN HỒI STATUS: ${res.status}`);
+
     if (!res.ok) {
       const errText = await res.text().catch(() => "");
+      console.error("❌ [NEXT.JS SERVER] LỖI BACKEND:", errText);
       return { success: false, error: errText || `Lỗi ${res.status}` };
     }
 
     const data = await res.json().catch(() => null);
+
+    if (question.subject_id) {
+      revalidatePath(`/instructor-management/questions-bank/${question.subject_id}`);
+    }
+
     return {
       success: true,
       data: data && typeof data === "object" ? mapQuestion(data) : undefined,
     };
   } catch (error: any) {
+    console.error("💥 [NEXT.JS SERVER] LỖI EXCEPTION:", error);
     return { success: false, error: error?.message || "Lỗi không xác định" };
+  }
+}
+
+/**
+ * Xóa câu hỏi
+ */
+export async function deleteQuestionAction(
+  questionId: string,
+  subjectId?: string, // 🎯 Thêm tham số subjectId để refresh cache trang
+  token?: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const url = `${EXAM_QUIZ_URL}/questions/${questionId}`;
+    const headers = await getAuthHeaders(token);
+
+    console.log("==========================================");
+    console.log(`🗑️ [NEXT.JS SERVER] THỰC THI DELETE -> ${url}`);
+
+    const res = await fetch(url, {
+      method: "DELETE",
+      headers,
+      cache: "no-store",
+    });
+
+    console.log(`📥 [NEXT.JS SERVER] DELETE STATUS: ${res.status}`);
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      console.error("❌ [NEXT.JS SERVER] DELETE FAILED:", errText);
+      return { success: false, error: errText || `Xóa thất bại (${res.status})` };
+    }
+
+    // 🎯 Xóa Cache để UI cập nhật câu hỏi vừa bị biến mất lập tức
+    if (subjectId) {
+      revalidatePath(`/instructor-management/questions-bank/${subjectId}`);
+    }
+
+    console.log("✅ [NEXT.JS SERVER] XÓA CÂU HỎI THÀNH CÔNG");
+    return { success: true };
+  } catch (error: any) {
+    console.error("💥 [NEXT.JS SERVER] LỖI DELETE EXCEPTION:", error);
+    return { success: false, error: error?.message || "Lỗi khi xóa câu hỏi" };
   }
 }

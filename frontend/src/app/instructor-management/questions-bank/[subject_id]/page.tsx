@@ -24,6 +24,7 @@ import {
   getQuestionsBySubjectAction,
   getSubjectDetailAction,
   saveQuestionAction,
+  deleteQuestionAction, // 🎯 1. Đã import thêm hàm Delete Action
 } from "@/actions/getQuestionBank";
 
 export default function QuestionBankDetailPage() {
@@ -31,6 +32,13 @@ export default function QuestionBankDetailPage() {
 
   // Lấy mã môn học từ URL
   const subjectId = (params?.subject_id as string) || (params?.id as string) || "";
+
+  // State quản lý bộ lọc
+  const [selectedModule, setSelectedModule] = useState("");
+  const [selectedDifficulty, setSelectedDifficulty] = useState("");
+  const [selectedTopic, setSelectedTopic] = useState("");
+  const [modules, setModules] = useState<string[]>([]);
+  const [topics, setTopics] = useState<string[]>([]);
 
   // State quản lý dữ liệu
   const [subjectData, setSubjectData] = useState<SubjectInfo | null>(null);
@@ -112,12 +120,30 @@ export default function QuestionBankDetailPage() {
     }
   };
 
-  // LOGIC LỌC CÂU HỎI ĐỘNG (FIX TRIỆT ĐỂ LỖI BỘ LỌC & CÂU HỎI ĐÚNG/SAI)
-  // LOGIC LỌC CÂU HỎI ĐỘNG (ĐÃ FIX LỖI TYPESCRIPT BẰNG ÉP KIỂU)
+  // 🎯 2. ĐÃ FIX HÀM DELETE: GỌI SERVER ACTION ĐỂ XÓA THỰC TRONG DATABASE
+  const handleDelete = async (questionId: string) => {
+    if (!confirm("Bạn có chắc chắn muốn xóa câu hỏi này khỏi ngân hàng đề?")) return;
+
+    try {
+      const result = await deleteQuestionAction(questionId, subjectId);
+
+      if (result.success) {
+        alert("Xóa câu hỏi thành công!");
+        // Cập nhật lại UI sau khi xóa thành công
+        setQuestions((prev) => prev.filter((q) => q.question_id !== questionId));
+        await fetchData(); // Đồng bộ lại dữ liệu
+      } else {
+        alert(`Xóa thất bại: ${result.error || "Vui lòng thử lại!"}`);
+      }
+    } catch (error) {
+      console.error("Lỗi khi xóa câu hỏi:", error);
+      alert("Đã xảy ra lỗi hệ thống khi xóa câu hỏi!");
+    }
+  };
+
+  // LOGIC LỌC CÂU HỎI ĐỘNG
   const filteredQuestions = useMemo(() => {
     return questions.filter((q) => {
-      const qAny = q as any; // Ép kiểu để hết 3 lỗi gạch đỏ TypeScript
-
       // 1. Tìm kiếm theo từ khóa
       const searchKeyword = keyword?.trim().toLowerCase() || "";
       const cleanContent = (q.content || "").replace(/<[^>]*>/g, "").toLowerCase();
@@ -148,7 +174,6 @@ export default function QuestionBankDetailPage() {
         matchType = validTypes.includes(q.question_type);
       }
 
-
       return matchKeyword && matchType;
     });
   }, [questions, keyword, selectedType]);
@@ -163,12 +188,6 @@ export default function QuestionBankDetailPage() {
   const handleEdit = (question: Question) => {
     setEditingQuestion(question);
     setOpenModal(true);
-  };
-
-  const handleDelete = (questionId: string) => {
-    if (confirm("Bạn có chắc chắn muốn xóa câu hỏi này khỏi ngân hàng đề?")) {
-      setQuestions((prev) => prev.filter((q) => q.question_id !== questionId));
-    }
   };
 
   const currentSubject: SubjectInfo = subjectData || {
@@ -238,8 +257,16 @@ export default function QuestionBankDetailPage() {
           <QuestionFilter
             keyword={keyword}
             setKeyword={setKeyword}
+            selectedModule={selectedModule}
+            setSelectedModule={setSelectedModule}
             selectedType={selectedType}
             setSelectedType={setSelectedType}
+            selectedDifficulty={selectedDifficulty}
+            setSelectedDifficulty={setSelectedDifficulty}
+            selectedTopic={selectedTopic}
+            setSelectedTopic={setSelectedTopic}
+            modules={modules}
+            topics={topics}
             onAddQuestion={() => {
               setEditingQuestion(undefined);
               setOpenModal(true);
