@@ -13,6 +13,7 @@ class QuestionPool(SQLModel, table=True):
     __tablename__ = "question_pool"
 
     pool_id: UUID = Field(default_factory=uuid.uuid4, primary_key=True, index=True)
+    owner_id: UUID = Field(nullable=False)
     title: str = Field(nullable=False, max_length=255)
     description: Optional[str] = Field(default=None)
     created_at: date = Field(default_factory=date.today)
