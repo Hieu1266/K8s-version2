@@ -15,3 +15,11 @@ export interface SubjectInfoWithQuestions {
     total_modules: number;
     total_questions: number | null;
 }
+
+export interface SubjectInfoWithQuizzes {
+    subject_id: string;
+    title: string;
+    description: string;
+    status_id: string;
+    total_quizzes: number;
+}

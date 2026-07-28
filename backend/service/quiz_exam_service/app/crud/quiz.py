@@ -10,10 +10,16 @@ class CRUDQuiz(CRUDBase[Quiz, QuizCreate, QuizUpdate, UUID]):
             Quiz.target_lesson_id == lesson_id
         )
         return db.exec(statement).first() is not None
-    def get_multi_by_subject(self, db: Session, subject_id: UUID) -> list[QuizItem]:
+    def get_multi_by_subject(self, db: Session, subject_id: UUID, search: str | None = None) -> list[Quiz]:
         statement = select(Quiz).where(
             Quiz.subject_id == subject_id
         )
+        
+        # Thêm điều kiện tìm kiếm nếu có tham số search
+        if search:
+            # ilike giúp tìm kiếm không phân biệt hoa thường
+            statement = statement.where(Quiz.title.ilike(f"%{search}%"))
+            
         return db.exec(statement).all()
     def get_subject_id(self, db: Session, quiz_id: UUID) -> UUID:
         statement = select(Quiz.subject_id).where(

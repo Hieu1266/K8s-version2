@@ -51,6 +51,13 @@ class SubjectInfoWithQuestions(BaseModel):
     total_modules: int
     total_questions: Optional[int] = None    
 
+class SubjectInfoWithQuizzes(BaseModel):
+    subject_id: UUID
+    title: str
+    description: str
+    status_id: str
+    total_quizzes: int
+
 class SubjectRead(BaseModel):
     subject_id: UUID
     course_id: UUID

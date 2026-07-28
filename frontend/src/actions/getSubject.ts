@@ -1,6 +1,6 @@
 "use server";
 import { cookies } from "next/headers";
-import { GeneralInfoInstructorSubject, SubjectInfoWithQuestions } from "@/types/subject";
+import { GeneralInfoInstructorSubject, SubjectInfoWithQuestions, SubjectInfoWithQuizzes } from "@/types/subject";
 import { SubjectData, SubjectUpdateInput } from "@/types/subjects";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_COURSE_BACKEND_URL;
@@ -183,6 +183,42 @@ export async function getSubjectsAction(): Promise<any[]> {
     return [];
   }
 }
+export const getInstructorSubjectsWithQuizzesAction = async (
+  search: string = ""
+): Promise<SubjectInfoWithQuizzes[]> => {
+  try {
+    const queryParam = search ? `?search=${encodeURIComponent(search)}` : "";
+    const url = `${BACKEND_URL}/subjects/instructor-subjects-quizzes${queryParam}`;
+
+    const token = await getServerToken();
+
+    const headers: HeadersInit = {
+      "Content-Type": "application/json",
+    };
+
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
+    const res = await fetch(url, {
+      method: "GET",
+      headers: headers,
+    });
+
+    if (!res.ok) {
+      if (res.status === 401) {
+        throw new Error("Phiên đăng nhập hết hạn hoặc bạn không có quyền truy cập (401).");
+      }
+      throw new Error(`Lỗi gọi API: ${res.status}`);
+    }
+
+    const data: SubjectInfoWithQuizzes[] = await res.json();
+    return data;
+  } catch (error) {
+    console.error("Fetch Error:", error);
+    throw error;
+  }
+};
 
 export const getInstructorSubjectsWithQuestionsAction = async (
   search: string = ""
