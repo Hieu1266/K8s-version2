@@ -1,230 +1,262 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
+import { useParams } from "next/navigation";
 import Navbar from "@/components/Navbar";
-
 import SubjectHeader from "@/components/SubjectHeader";
-import SubjectInfo from "@/components/SubjectInfo";
+import SubjectInfoComponent from "@/components/SubjectInfo";
 import QuestionFilter from "@/components/QuestionFilter";
 import QuestionCard from "@/components/QuestionCard";
 import Pagination from "@/components/Pagination";
 import AddQuestionModal from "@/components/AddQuestionModal";
-
-import { CauHoi, SubjectInfo as Subject } from "@/types/questions-bank";
-import {
-  FileQuestion,
-  Layers,
-  HelpCircle,
-  Plus,
-  SearchX,
-  Sparkles,
+import { Question, SubjectInfo } from "@/types/questions-bank";
+import { 
+  Layers, 
+  HelpCircle, 
+  Plus, 
+  SearchX, 
+  Sparkles, 
+  Loader2, 
+  BookOpenCheck 
 } from "lucide-react";
 
-const subject: Subject = {
-  id: "sub001",
-  code: "CNTT301",
-  title: "Python Programming",
-  description:
-    "Learn Python from basic to advanced through hands-on exercises and real-world projects.",
-  instructor: "Nguyễn Văn A",
-  image: "https://images.unsplash.com/photo-1515879218367-8466d910aaa4",
-  totalModules: 8,
-  totalQuestions: 6,
-  status: "Active",
-};
-
-const fakeQuestions: CauHoi[] = [
-  {
-    id: "CH001",
-    noiDung: "Python là ngôn ngữ lập trình thuộc loại nào?",
-    module: "Module 1",
-    loaiCauHoi: "Trắc nghiệm",
-    mucDo: "Dễ",
-    chuDe: ["Python", "Basic"],
-    ngayTao: "12/07/2026",
-    cacDapAn: [
-      { id: "A", noiDung: "Compiled" },
-      { id: "B", noiDung: "Interpreted" },
-      { id: "C", noiDung: "Assembly" },
-      { id: "D", noiDung: "Machine" },
-    ],
-    dapAnDungId: "B",
-  },
-  {
-    id: "CH002",
-    noiDung: "Giải thích Decorator trong Python.",
-    module: "Module 4",
-    loaiCauHoi: "Tự luận",
-    mucDo: "Khó",
-    chuDe: ["Decorator"],
-    ngayTao: "10/07/2026",
-    huongDanTuLuan: "Sinh viên trình bày đúng khái niệm, cú pháp và ví dụ.",
-  },
-];
+import {
+  getQuestionsBySubjectAction,
+  getSubjectDetailAction,
+  saveQuestionAction,
+} from "@/actions/getQuestionBank";
 
 export default function QuestionBankDetailPage() {
-  const [questions, setQuestions] = useState<CauHoi[]>(fakeQuestions);
-  const [openModal, setOpenModal] = useState(false);
-  const [editingQuestion, setEditingQuestion] = useState<CauHoi | undefined>();
+  const params = useParams();
+  
+  // Lấy mã môn học từ URL
+  const subjectId = (params?.subject_id as string) || (params?.id as string) || "";
 
-  const [keyword, setKeyword] = useState("");
-  const [selectedModule, setSelectedModule] = useState("Tất cả Module");
-  const [selectedType, setSelectedType] = useState("Tất cả loại");
-  const [selectedDifficulty, setSelectedDifficulty] = useState("Tất cả mức độ");
-  const [selectedTopic, setSelectedTopic] = useState("Tất cả chủ đề");
+  // State quản lý dữ liệu
+  const [subjectData, setSubjectData] = useState<SubjectInfo | null>(null);
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [openModal, setOpenModal] = useState<boolean>(false);
+  const [editingQuestion, setEditingQuestion] = useState<Question | undefined>();
 
-  const [currentPage, setCurrentPage] = useState(1);
+  // State bộ lọc
+  const [keyword, setKeyword] = useState<string>("");
+  const [selectedModule, setSelectedModule] = useState<string>("Tất cả Module");
+  const [selectedType, setSelectedType] = useState<string>("Tất cả loại");
+  const [selectedDifficulty, setSelectedDifficulty] = useState<string>("Tất cả mức độ");
+  const [selectedTopic, setSelectedTopic] = useState<string>("Tất cả chủ đề");
+
+  // State phân trang
+  const [currentPage, setCurrentPage] = useState<number>(1);
   const pageSize = 5;
 
-  const modules = useMemo(() => {
-    return [...new Set(questions.map((q) => q.module).filter(Boolean))];
-  }, [questions]);
+  // Fetch dữ liệu môn học & câu hỏi
+  const fetchData = useCallback(async () => {
+    if (!subjectId) return;
+    setLoading(true);
+    try {
+      const [subjRes, questionsRes] = await Promise.all([
+        getSubjectDetailAction(subjectId),
+        getQuestionsBySubjectAction(subjectId),
+      ]);
 
-  const topics = useMemo(() => {
-    return [...new Set(questions.flatMap((q) => q.chuDe || []))];
-  }, [questions]);
+      if (subjRes) {
+        setSubjectData({
+          subject_id: subjRes.subject_id,
+          code: subjRes.code || subjRes.subject_id.substring(0, 8).toUpperCase(),
+          title: subjRes.title,
+          description: subjRes.description || "",
+          instructor: subjRes.instructor || "Giảng viên phụ trách",
+          status_id: subjRes.status_id,
+          totalQuestions: questionsRes?.length || 0,
+          totalModules: subjRes.totalModules || 0,
+        });
+      }
 
-  const filteredQuestions = useMemo(() => {
-    return questions.filter((q) => {
-      // Chuẩn hóa từ khóa tìm kiếm
-      const searchKeyword = keyword?.trim().toLowerCase() || "";
-
-      // Kiểm tra id và noiDung an toàn (ép kiểu chuỗi + phòng ngừa null/undefined)
-      const matchKeyword =
-        String(q.id ?? "")
-          .toLowerCase()
-          .includes(searchKeyword) ||
-        (q.noiDung ?? "").toLowerCase().includes(searchKeyword);
-
-      const matchModule =
-        selectedModule === "Tất cả Module" || q.module === selectedModule;
-
-      const matchType =
-        selectedType === "Tất cả loại" || q.loaiCauHoi === selectedType;
-
-      const matchDifficulty =
-        selectedDifficulty === "Tất cả mức độ" ||
-        q.mucDo === selectedDifficulty;
-
-      const matchTopic =
-        selectedTopic === "Tất cả chủ đề" ||
-        (q.chuDe && q.chuDe.includes(selectedTopic));
-
-      return (
-        matchKeyword &&
-        matchModule &&
-        matchType &&
-        matchDifficulty &&
-        matchTopic
-      );
-    });
-  }, [
-    questions,
-    keyword,
-    selectedModule,
-    selectedType,
-    selectedDifficulty,
-    selectedTopic,
-  ]);
-
-  const totalPages = Math.ceil(filteredQuestions.length / pageSize);
-
-  const displayQuestions = filteredQuestions.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize,
-  );
-
-  const handleSave = (question: CauHoi) => {
-    if (editingQuestion) {
-      // Đang chỉnh sửa: Dùng ID của editingQuestion làm gốc và ép kiểu String khi so sánh
-      const targetId = String(editingQuestion.id);
-
-      setQuestions((prevQuestions) =>
-        prevQuestions.map((q) =>
-          String(q.id) === targetId
-            ? { ...question, id: editingQuestion.id } // Giữ nguyên ID chuẩn của câu hỏi
-            : q,
-        ),
-      );
-    } else {
-      // Đang thêm mới: Tạo ID mới nếu chưa có
-      const newQuestion = {
-        ...question,
-        id: question.id || `CH_${Date.now()}`,
-      };
-      setQuestions((prevQuestions) => [newQuestion, ...prevQuestions]);
+      setQuestions(questionsRes || []);
+    } catch (error) {
+      console.error("Lỗi tải dữ liệu:", error);
+    } finally {
+      setLoading(false);
     }
+  }, [subjectId]);
 
-    // Đóng trạng thái chỉnh sửa
-    setEditingQuestion(undefined);
-    setOpenModal(false); // Đóng modal sau khi lưu thành công
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // RESET VỀ TRANG 1 KHI BỘ LỌC THAY ĐỔI
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [keyword, selectedType, selectedModule, selectedDifficulty, selectedTopic]);
+
+  // Xử lý Thêm / Sửa câu hỏi
+  const handleSave = async (question: Question) => {
+    try {
+      const payload: any = {
+        ...question,
+        ...(editingQuestion?.question_id ? { question_id: editingQuestion.question_id } : {}),
+        subject_id: subjectId,
+      };
+
+      const result = await saveQuestionAction(payload);
+
+      if (result.success) {
+        alert("Lưu câu hỏi thành công!");
+        await fetchData(); 
+        setEditingQuestion(undefined);
+        setOpenModal(false);
+      } else {
+        alert(`Lỗi: ${result.error || "Vui lòng thử lại!"}`);
+      }
+    } catch (err) {
+      console.error("Lỗi khi lưu:", err);
+      alert("Đã xảy ra lỗi hệ thống!");
+    }
   };
 
-  const handleEdit = (question: CauHoi) => {
+  // LOGIC LỌC CÂU HỎI ĐỘNG (FIX TRIỆT ĐỂ LỖI BỘ LỌC & CÂU HỎI ĐÚNG/SAI)
+  // LOGIC LỌC CÂU HỎI ĐỘNG (ĐÃ FIX LỖI TYPESCRIPT BẰNG ÉP KIỂU)
+  const filteredQuestions = useMemo(() => {
+    return questions.filter((q) => {
+      const qAny = q as any; // Ép kiểu để hết 3 lỗi gạch đỏ TypeScript
+
+      // 1. Tìm kiếm theo từ khóa
+      const searchKeyword = keyword?.trim().toLowerCase() || "";
+      const cleanContent = (q.content || "").replace(/<[^>]*>/g, "").toLowerCase();
+      const matchKeyword =
+        !searchKeyword ||
+        String(q.question_id ?? "").toLowerCase().includes(searchKeyword) ||
+        cleanContent.includes(searchKeyword) ||
+        (q.question_title ?? "").toLowerCase().includes(searchKeyword);
+
+      // 2. Lọc theo Loại câu hỏi
+      let matchType = true;
+      if (
+        selectedType && 
+        selectedType !== "Tất cả loại" && 
+        selectedType !== "Tất cả" && 
+        selectedType !== "ALL"
+      ) {
+        const typeMap: Record<string, string[]> = {
+          "MULTIPLE_CHOICE": ["MULTIPLE_CHOICE", "Trắc nghiệm"],
+          "TRUE_FALSE": ["TRUE_FALSE", "Đúng / Sai", "Đúng/Sai"],
+          "ESSAY": ["ESSAY", "Tự luận"],
+          "Trắc nghiệm": ["MULTIPLE_CHOICE", "Trắc nghiệm"],
+          "Đúng / Sai": ["TRUE_FALSE", "Đúng / Sai", "Đúng/Sai"],
+          "Tự luận": ["ESSAY", "Tự luận"],
+        };
+
+        const validTypes = typeMap[selectedType] || [selectedType];
+        matchType = validTypes.includes(q.question_type);
+      }
+
+      // 3. Lọc theo Module
+      const matchModule =
+        selectedModule === "Tất cả Module" ||
+        selectedModule === "Tất cả" ||
+        qAny.module_id === selectedModule ||
+        qAny.module_name === selectedModule;
+
+      // 4. Lọc theo Mức độ
+      const matchDifficulty =
+        selectedDifficulty === "Tất cả mức độ" ||
+        selectedDifficulty === "Tất cả" ||
+        qAny.difficulty === selectedDifficulty ||
+        qAny.level === selectedDifficulty;
+
+      // 5. Lọc theo Chủ đề
+      const matchTopic =
+        selectedTopic === "Tất cả chủ đề" ||
+        selectedTopic === "Tất cả" ||
+        qAny.topic_id === selectedTopic ||
+        qAny.topic_name === selectedTopic;
+
+      return matchKeyword && matchType && matchModule && matchDifficulty && matchTopic;
+    });
+  }, [questions, keyword, selectedType, selectedModule, selectedDifficulty, selectedTopic]);
+
+  // Phân trang
+  const totalPages = Math.ceil(filteredQuestions.length / pageSize) || 1;
+  const displayQuestions = filteredQuestions.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
+
+  const handleEdit = (question: Question) => {
     setEditingQuestion(question);
     setOpenModal(true);
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm("Bạn có chắc chắn muốn xóa câu hỏi này?")) {
-      setQuestions(questions.filter((q) => q.id !== id));
+  const handleDelete = (questionId: string) => {
+    if (confirm("Bạn có chắc chắn muốn xóa câu hỏi này khỏi ngân hàng đề?")) {
+      setQuestions((prev) => prev.filter((q) => q.question_id !== questionId));
     }
   };
 
-  return (
-    <div className="min-h-screen bg-slate-50/60 font-sans text-slate-800 antialiased">
-      <Navbar />
+  const currentSubject: SubjectInfo = subjectData || {
+    subject_id: subjectId,
+    code: subjectId.substring(0, 8).toUpperCase(),
+    title: "Đang tải dữ liệu môn học...",
+    description: "Đang tải thông tin chi tiết môn học...",
+    instructor: "Giảng viên",
+    status_id: "SUBJECT_ACTIVE",
+    totalQuestions: questions.length,
+    totalModules: 0,
+  };
 
-      {/* Header section môn học */}
-      <SubjectHeader subject={subject} />
+  return (
+    <div className="min-h-screen bg-slate-50/80 font-sans text-slate-800 antialiased selection:bg-emerald-500 selection:text-white">
+      {/* Navbar & Header */}
+      <Navbar />
+      <SubjectHeader subject={currentSubject} />
 
       <main className="mx-auto max-w-7xl px-4 sm:px-6 py-8 space-y-8">
-        {/* Thông tin môn học & Mini Metrics Inline Bar */}
+        
+        {/* 1. THÔNG TIN MÔN HỌC & THỐNG KÊ */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
-          <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm hover:shadow-md transition">
-            <SubjectInfo subject={subject} />
+          <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm hover:shadow-md transition-all duration-300">
+            <SubjectInfoComponent subject={currentSubject} />
           </div>
 
-          {/* Quick Info Sidebar Card */}
-          <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white rounded-2xl p-6 shadow-md flex flex-col justify-between relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none" />
-
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-indigo-400 text-xs font-bold uppercase tracking-wider">
-                <Sparkles size={16} /> Thông số quản lý
+          <div className="bg-gradient-to-br from-emerald-950 via-slate-900 to-emerald-900 text-white rounded-2xl p-6 shadow-md flex flex-col justify-between relative overflow-hidden border border-emerald-800/40">
+            <div className="absolute top-0 right-0 w-36 h-36 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+            
+            <div className="space-y-3 relative z-10">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold uppercase tracking-wider">
+                <Sparkles size={14} /> Bảng Tổng Quan
               </div>
-              <h3 className="text-xl font-extrabold text-white">
-                Ngân hàng đề {subject.code}
+              <h3 className="text-xl font-extrabold text-white tracking-tight">
+                Ngân Hàng Đề {currentSubject.code}
               </h3>
-              <p className="text-xs text-slate-300 leading-relaxed">
-                Bộ câu hỏi được phân loại theo Module và chủ đề giúp tạo đề thi
-                tự động chính xác.
+              <p className="text-xs text-emerald-100/70 leading-relaxed">
+                Hệ thống lưu trữ và quản lý câu hỏi tiêu chuẩn, phục vụ tạo đề thi tự động.
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 pt-6 border-t border-slate-800">
-              <div className="bg-white/5 backdrop-blur-sm rounded-xl p-3 border border-white/10">
-                <div className="flex items-center gap-2 text-indigo-300 text-xs font-medium">
-                  <HelpCircle size={14} /> Câu hỏi
+            <div className="grid grid-cols-2 gap-3 pt-6 border-t border-emerald-800/50 relative z-10">
+              <div className="bg-emerald-900/30 backdrop-blur-md rounded-xl p-3.5 border border-emerald-500/20">
+                <div className="flex items-center gap-2 text-emerald-300 text-xs font-semibold">
+                  <HelpCircle size={15} /> Tổng câu hỏi
                 </div>
-                <div className="text-xl font-black text-white mt-1">
+                <div className="text-2xl font-black text-white mt-1">
                   {questions.length}
                 </div>
               </div>
 
-              <div className="bg-white/5 backdrop-blur-sm rounded-xl p-3 border border-white/10">
-                <div className="flex items-center gap-2 text-emerald-400 text-xs font-medium">
-                  <Layers size={14} /> Module
+              <div className="bg-emerald-900/30 backdrop-blur-md rounded-xl p-3.5 border border-emerald-500/20">
+                <div className="flex items-center gap-2 text-teal-300 text-xs font-semibold">
+                  <Layers size={15} /> Tổng Module
                 </div>
-                <div className="text-xl font-black text-white mt-1">
-                  {modules.length}
+                <div className="text-2xl font-black text-white mt-1">
+                  {currentSubject.totalModules || 0}
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Thanh Lọc & Tìm Kiếm */}
+        {/* 2. BỘ LỌC TÌM KIẾM */}
         <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm space-y-4">
           <QuestionFilter
             keyword={keyword}
@@ -237,8 +269,8 @@ export default function QuestionBankDetailPage() {
             setSelectedType={setSelectedType}
             selectedTopic={selectedTopic}
             setSelectedTopic={setSelectedTopic}
-            modules={modules}
-            topics={topics}
+            modules={[]}
+            topics={[]}
             onAddQuestion={() => {
               setEditingQuestion(undefined);
               setOpenModal(true);
@@ -246,68 +278,66 @@ export default function QuestionBankDetailPage() {
           />
         </div>
 
-        {/* Danh sách Câu hỏi */}
-        <section className="space-y-4">
-          <div className="flex items-center justify-between px-1">
-            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-              <FileQuestion size={20} className="text-indigo-600" />
-              Danh sách câu hỏi
-              <span className="text-xs font-semibold bg-indigo-50 text-indigo-600 px-2.5 py-0.5 rounded-full">
-                {filteredQuestions.length}
-              </span>
-            </h2>
-
-            {filteredQuestions.length > 0 && (
-              <p className="text-xs text-slate-500">
-                Hiển thị trang {currentPage} / {totalPages || 1}
-              </p>
-            )}
+        {/* 3. DANH SÁCH CÂU HỎI */}
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-slate-200/80 shadow-sm gap-3 text-slate-500">
+            <Loader2 size={36} className="animate-spin text-emerald-600" />
+            <p className="text-sm font-semibold text-slate-600">Đang đồng bộ dữ liệu câu hỏi...</p>
           </div>
-
-          {displayQuestions.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center shadow-sm">
-              <div className="mx-auto w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mb-4">
-                <SearchX size={28} />
-              </div>
-              <h3 className="text-lg font-bold text-slate-800">
-                Không tìm thấy câu hỏi phù hợp
-              </h3>
-              <p className="mt-1 text-sm text-slate-500 max-w-md mx-auto">
-                Thử điều chỉnh lại bộ lọc tìm kiếm hoặc thêm mới câu hỏi cho môn
-                học này.
-              </p>
-              <button
-                onClick={() => {
-                  setEditingQuestion(undefined);
-                  setOpenModal(true);
-                }}
-                className="mt-5 inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 py-2.5 rounded-xl shadow-sm transition"
-              >
-                <Plus size={16} /> Thêm câu hỏi ngay
-              </button>
+        ) : (
+          <section className="space-y-4">
+            <div className="flex items-center justify-between px-1">
+              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2.5">
+                <BookOpenCheck size={22} className="text-emerald-600" />
+                Danh sách câu hỏi
+                <span className="text-xs font-bold bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full border border-emerald-200/60">
+                  {filteredQuestions.length} câu
+                </span>
+              </h2>
             </div>
-          ) : (
-            <div className="space-y-4">
-              {displayQuestions.map((question, index) => (
-                <div
-                  key={question.id}
-                  className="bg-white rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all duration-200 overflow-hidden"
-                >
-                  <QuestionCard
-                    question={question}
-                    index={(currentPage - 1) * pageSize + index}
-                    onEdit={() => handleEdit(question)}
-                    onDelete={() => handleDelete(question.id)}
-                  />
+
+            {displayQuestions.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center shadow-sm space-y-4">
+                <div className="mx-auto w-16 h-16 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                  <SearchX size={32} />
                 </div>
-              ))}
-            </div>
-          )}
-        </section>
+                <div className="space-y-1">
+                  <h3 className="text-base font-bold text-slate-800">Không tìm thấy câu hỏi nào</h3>
+                  <p className="text-xs text-slate-500">Thử thay đổi bộ lọc hoặc thêm câu hỏi mới vào môn học này.</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setEditingQuestion(undefined);
+                    setOpenModal(true);
+                  }}
+                  className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-5 py-2.5 rounded-xl shadow-sm hover:shadow-md transition-all duration-200"
+                >
+                  <Plus size={16} /> Thêm câu hỏi ngay
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {displayQuestions.map((question, index) => (
+                  <div
+                    key={question.question_id || index}
+                    className="bg-white rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md hover:border-emerald-300 transition-all duration-200 overflow-hidden"
+                  >
+                    <QuestionCard
+                      question={question}
+                      index={(currentPage - 1) * pageSize + index}
+                      onEdit={() => handleEdit(question)}
+                      onDelete={() => handleDelete(question.question_id)}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
 
-        {/* Phân trang */}
-        {totalPages > 1 && (
-          <div className="flex justify-center pt-2">
+        {/* 4. PHÂN TRANG */}
+        {!loading && totalPages > 1 && (
+          <div className="flex justify-center pt-4">
             <Pagination
               currentPage={currentPage}
               totalPages={totalPages}
@@ -317,7 +347,7 @@ export default function QuestionBankDetailPage() {
         )}
       </main>
 
-      {/* Modal Thêm / Sửa Câu Hỏi */}
+      {/* MODAL THÊM / SỬA CÂU HỎI */}
       <AddQuestionModal
         open={openModal}
         onClose={() => {
@@ -325,7 +355,7 @@ export default function QuestionBankDetailPage() {
           setEditingQuestion(undefined);
         }}
         onSave={handleSave}
-        modules={modules}
+        subjectId={subjectId}
         editQuestion={editingQuestion}
       />
     </div>

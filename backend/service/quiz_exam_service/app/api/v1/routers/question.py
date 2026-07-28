@@ -33,6 +33,7 @@ def get_questions_list(
         )
 
     questions = crud_question.get_multi_by_subject_id(db, subject_id=subject_id)
+    
     return questions
 
 @router.post("/")
