@@ -79,6 +79,7 @@ export default function QuestionFilter({
               ))}
             </select>
 
+            {/* BỘ LỌC LOẠI CÂU HỎI (ĐÃ THÊM ĐÚNG / SAI) */}
             <select
               value={selectedType}
               onChange={(e) => setSelectedType(e.target.value)}
@@ -86,6 +87,7 @@ export default function QuestionFilter({
             >
               <option>Tất cả loại</option>
               <option>Trắc nghiệm</option>
+              <option>Đúng / Sai</option>
               <option>Tự luận</option>
             </select>
 
