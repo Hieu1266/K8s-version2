@@ -1,32 +1,22 @@
 "use client";
 
-import { use, useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useCallback } from "react";
+import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import QuestionPoolManager from "@/components/exam-management/QuestionPoolManager";
 import CreateQuizDrawer from "@/components/exam-management/CreateQuizDrawer";
 import EditQuizModal from "@/components/exam-management/EditQuizModal";
-import {
-  Quiz,
-  // Question,
-  // QuestionPool,
-  QuizCreatePayload
-} from "@/types/exam-management";
-import { getQuizzesAction, createQuizAction, deleteQuizAction } from "@/actions/getQuizzes";
+import { Quiz, QuizCreatePayload, QuizUpdatePayload } from "@/types/exam-management";
+import { getQuizzesAction, createQuizAction, deleteQuizAction, updateQuizAction } from "@/actions/getQuizzes";
 
-export default function SubjectDetailPage({
-  params,
-}: {
-  params: Promise<{ subject_id: string }>;
-}) {
+export default function SubjectDetailPage() {
   const router = useRouter();
-  const resolvedParams = use(params);
-  const subjectId = resolvedParams.subject_id;
+  const params = useParams();
+  const subjectId = params.subject_id as string;
 
   const [activeTab, setActiveTab] = useState<"QUIZZES" | "POOLS">("QUIZZES");
 
-  // State quản lý mở Thanh trượt (Drawer) tạo mới
   const [isCreateDrawerOpen, setIsCreateDrawerOpen] = useState(false);
   const [editingQuiz, setEditingQuiz] = useState<Quiz | null>(null);
 
@@ -34,17 +24,7 @@ export default function SubjectDetailPage({
   const [isLoadingQuizzes, setIsLoadingQuizzes] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
 
-  // =========================================================================
-  // MOCK DATA (Giữ nguyên)
-  // =========================================================================
-  const [subjectQuestions] = useState<Question[]>([
-    { question_id: "q-101", subject_id: subjectId, question_title: "Tính đóng gói (Encapsulation) trong OOP là gì?", question_type: "MULTIPLE_CHOICE", max_points: 1.0 },
-  ]);
-  const [subjectPools] = useState<QuestionPool[]>([
-    { pool_id: "p-01", title: "Kho câu hỏi Dễ", description: "Cơ bản", created_at: "2026-03-20", questions: [subjectQuestions[0]] },
-  ]);
-
-  // 🟢 HÀM FETCH API (Giữ nguyên logic)
+  // 🟢 HÀM FETCH API
   const fetchQuizzes = useCallback(async (searchQuery: string = "") => {
     setIsLoadingQuizzes(true);
     try {
@@ -89,15 +69,41 @@ export default function SubjectDetailPage({
     const result = await createQuizAction(payload, `/instructor-management/exam-manage/${subjectId}`);
     if (result.success) {
       alert("Tạo bài kiểm tra mới thành công!");
-      setIsCreateDrawerOpen(false); // Đóng Drawer
+      setIsCreateDrawerOpen(false);
       await fetchQuizzes();
     } else {
       alert(`Lỗi khi tạo bài thi: ${result.error}`);
     }
   };
 
-  const handleEditQuizSuccess = (updatedData: any) => {
-    setQuizzes((prev) => prev.map((q) => q.quiz_id === editingQuiz?.quiz_id ? { ...q, ...updatedData } : q));
+  // 🆕 Gọi API PUT thật thay vì chỉ merge local state
+  const handleEditQuizSuccess = async (updatedData: Partial<Quiz>) => {
+    if (!editingQuiz) return;
+
+    const payload: QuizUpdatePayload = {
+      title: updatedData.title,
+      description: updatedData.description,
+      duration_minutes: updatedData.duration_minutes,
+      passing_score: updatedData.passing_score,
+      max_attempts: updatedData.max_attempts,
+      placement_type: updatedData.placement_type,
+      is_active: updatedData.is_active,
+    };
+
+    const result = await updateQuizAction(
+      editingQuiz.quiz_id,
+      payload,
+      `/instructor-management/exam-manage/${subjectId}`
+    );
+
+    if (!result.success) {
+      alert(`Lỗi khi cập nhật bài thi: ${result.error}`);
+      return;
+    }
+
+    setQuizzes((prev) =>
+      prev.map((q) => (q.quiz_id === editingQuiz.quiz_id ? { ...q, ...(result.data || updatedData) } : q))
+    );
     setEditingQuiz(null);
     alert("Cập nhật bài thi thành công!");
   };
@@ -110,7 +116,6 @@ export default function SubjectDetailPage({
     <div className="min-h-screen bg-slate-50 text-slate-800">
       <Navbar />
 
-      {/* Header Banner - Lược bỏ icon, giao diện tối giản hơn */}
       <section className="bg-white border-b border-slate-200 py-8 px-6">
         <div className="max-w-7xl mx-auto">
           <button
@@ -130,7 +135,6 @@ export default function SubjectDetailPage({
               </h1>
             </div>
 
-            {/* Nút Kích hoạt Drawer Tạo Quiz */}
             <button
               onClick={() => setIsCreateDrawerOpen(true)}
               className="px-4 py-2 bg-blue-600 text-white font-medium text-sm rounded-lg hover:bg-blue-700 transition"
@@ -139,7 +143,6 @@ export default function SubjectDetailPage({
             </button>
           </div>
 
-          {/* Navigation Tabs - Lược bỏ emoji */}
           <div className="flex gap-6 mt-8 border-b border-slate-200 pb-px">
             <button
               onClick={() => setActiveTab("QUIZZES")}
@@ -157,13 +160,12 @@ export default function SubjectDetailPage({
                 : "border-transparent text-slate-500 hover:text-slate-800"
                 }`}
             >
-              Kho câu hỏi ({subjectPools.length})
+              Kho câu hỏi
             </button>
           </div>
         </div>
       </section>
 
-      {/* Main Content */}
       <section className="max-w-7xl mx-auto px-6 py-8">
         {activeTab === "QUIZZES" ? (
           <div className="space-y-6">
@@ -219,7 +221,6 @@ export default function SubjectDetailPage({
                             </span>
                           </td>
                           <td className="p-4 text-right">
-                            {/* Actions thay thế Icon bằng Text + Divider */}
                             <div className="flex items-center justify-end gap-3 text-sm">
                               <Link
                                 href={`/instructor-management/exam-manage/${subjectId}/quiz/${qz.quiz_id}`}
@@ -256,13 +257,10 @@ export default function SubjectDetailPage({
         )}
       </section>
 
-      {/* DRAWER TẠO QUIZ MỚI (Thay cho Modal) */}
       <CreateQuizDrawer
         subjectId={subjectId}
         isOpen={isCreateDrawerOpen}
         onClose={() => setIsCreateDrawerOpen(false)}
-        subjectQuestions={subjectQuestions}
-        subjectPools={subjectPools}
         onSuccess={handleCreateQuizSuccess}
       />
 

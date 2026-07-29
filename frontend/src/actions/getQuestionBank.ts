@@ -42,16 +42,16 @@ function mapQuestion(raw: any): Question {
     options: Array.isArray(raw.options)
       ? raw.options
       : Array.isArray(raw.question_options)
-      ? raw.question_options
-      : [],
+        ? raw.question_options
+        : [],
     rubrics: (
       Array.isArray(raw.rubrics)
         ? raw.rubrics
         : Array.isArray(raw.rubric_criterias)
-        ? raw.rubric_criterias
-        : Array.isArray(raw.rubric_criteria)
-        ? raw.rubric_criteria
-        : []
+          ? raw.rubric_criterias
+          : Array.isArray(raw.rubric_criteria)
+            ? raw.rubric_criteria
+            : []
     ).map((r: any) => ({
       criteria_id: r.criteria_id,
       title: r.title ?? "",
@@ -88,7 +88,7 @@ export async function getSubjectDetailAction(
         const modules = await modRes.json();
         if (Array.isArray(modules)) totalModules = modules.length;
       }
-    } catch (e) {}
+    } catch (e) { }
 
     return {
       subject_id: data.subject_id,

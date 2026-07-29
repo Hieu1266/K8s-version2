@@ -14,6 +14,7 @@ class QuestionPool(SQLModel, table=True):
 
     pool_id: UUID = Field(default_factory=uuid.uuid4, primary_key=True, index=True)
     owner_id: UUID = Field(nullable=False)
+    subject_id: UUID = Field(nullable=False, index=True)  
     title: str = Field(nullable=False, max_length=255)
     description: Optional[str] = Field(default=None)
     created_at: date = Field(default_factory=date.today)

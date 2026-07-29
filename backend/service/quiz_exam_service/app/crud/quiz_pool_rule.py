@@ -34,4 +34,18 @@ class CRUDQuizPoolRule(CRUDBase[QuizPoolRule, QuizPoolRuleCreate, QuizPoolRuleUp
             
         db.flush()
         return db_objs
+
+    # 🆕 Lấy danh sách luật bốc pool của 1 quiz
+    def get_multi_by_quiz(self, db: Session, quiz_id: UUID) -> list[QuizPoolRule]:
+        statement = select(QuizPoolRule).where(QuizPoolRule.quiz_id == quiz_id)
+        return db.exec(statement).all()
+
+    # 🆕 Lấy 1 rule, đảm bảo đúng thuộc quiz_id (tránh sửa/xóa nhầm rule của quiz khác)
+    def get_by_id_and_quiz(self, db: Session, rule_id: UUID, quiz_id: UUID) -> QuizPoolRule | None:
+        statement = select(QuizPoolRule).where(
+            QuizPoolRule.rule_id == rule_id,
+            QuizPoolRule.quiz_id == quiz_id,
+        )
+        return db.exec(statement).first()
+
 crud_quiz_pool_rule = CRUDQuizPoolRule(QuizPoolRule)

@@ -277,10 +277,6 @@ export default function CourseApprovalDashboardWithTesting() {
           </div>
 
           <div className="max-w-3xl">
-            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-semibold backdrop-blur-sm">
-              <Sparkles size={14} />
-              Trung tâm kiểm định chất lượng
-            </div>
 
             <h1 className="text-3xl font-black uppercase tracking-tight drop-shadow-md md:text-4xl">
               PHÊ DUYỆT KHÓA HỌC
@@ -399,18 +395,16 @@ export default function CourseApprovalDashboardWithTesting() {
                         type="button"
                         key={course.id}
                         onClick={() => setSelectedCourseId(course.id)}
-                        className={`group w-full rounded-xl border p-4 text-left transition-all ${
-                          selected
+                        className={`group w-full rounded-xl border p-4 text-left transition-all ${selected
                             ? "border-blue-500 bg-blue-50/70 shadow-sm ring-4 ring-blue-50"
                             : "border-slate-200 bg-white hover:border-blue-200 hover:bg-slate-50"
-                        }`}
+                          }`}
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <p
-                              className={`line-clamp-2 text-sm font-bold leading-5 ${
-                                selected ? "text-blue-700" : "text-slate-900"
-                              }`}
+                              className={`line-clamp-2 text-sm font-bold leading-5 ${selected ? "text-blue-700" : "text-slate-900"
+                                }`}
                             >
                               {course.name}
                             </p>
@@ -421,11 +415,10 @@ export default function CourseApprovalDashboardWithTesting() {
 
                           <ChevronRight
                             size={18}
-                            className={`mt-0.5 shrink-0 transition-transform ${
-                              selected
+                            className={`mt-0.5 shrink-0 transition-transform ${selected
                                 ? "translate-x-0.5 text-blue-600"
                                 : "text-slate-300 group-hover:translate-x-0.5"
-                            }`}
+                              }`}
                           />
                         </div>
 
@@ -466,11 +459,10 @@ export default function CourseApprovalDashboardWithTesting() {
                           {activeCourse.id}
                         </span>
                         <span
-                          className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-semibold ${
-                            isEligibleToPublish
+                          className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-semibold ${isEligibleToPublish
                               ? "bg-emerald-50 text-emerald-700"
                               : "bg-amber-50 text-amber-700"
-                          }`}
+                            }`}
                         >
                           {isEligibleToPublish ? (
                             <CheckCircle2 size={12} />
@@ -653,11 +645,10 @@ export default function CourseApprovalDashboardWithTesting() {
                               Tiến độ học tập
                             </span>
                             <span
-                              className={`font-bold ${
-                                tester.progress === 100
+                              className={`font-bold ${tester.progress === 100
                                   ? "text-emerald-600"
                                   : "text-blue-600"
-                              }`}
+                                }`}
                             >
                               {tester.progress}%
                             </span>
@@ -665,11 +656,10 @@ export default function CourseApprovalDashboardWithTesting() {
 
                           <div className="h-2 overflow-hidden rounded-full bg-slate-100">
                             <div
-                              className={`h-full rounded-full transition-all duration-500 ${
-                                tester.progress === 100
+                              className={`h-full rounded-full transition-all duration-500 ${tester.progress === 100
                                   ? "bg-emerald-500"
                                   : "bg-blue-500"
-                              }`}
+                                }`}
                               style={{ width: `${tester.progress}%` }}
                             />
                           </div>
@@ -717,11 +707,10 @@ export default function CourseApprovalDashboardWithTesting() {
                         type="button"
                         key={tester.id}
                         onClick={() => handleToggleTester(tester.id)}
-                        className={`flex items-center justify-between gap-3 rounded-xl border p-4 text-left transition-all ${
-                          assigned
+                        className={`flex items-center justify-between gap-3 rounded-xl border p-4 text-left transition-all ${assigned
                             ? "border-blue-400 bg-blue-50/70 ring-2 ring-blue-50"
                             : "border-slate-200 bg-white hover:border-blue-200 hover:bg-slate-50"
-                        }`}
+                          }`}
                       >
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold text-slate-900">
@@ -733,11 +722,10 @@ export default function CourseApprovalDashboardWithTesting() {
                         </div>
 
                         <span
-                          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${
-                            assigned
+                          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${assigned
                               ? "border-blue-600 bg-blue-600 text-white"
                               : "border-slate-300 bg-white"
-                          }`}
+                            }`}
                         >
                           {assigned && <Check size={13} strokeWidth={3} />}
                         </span>
@@ -749,20 +737,18 @@ export default function CourseApprovalDashboardWithTesting() {
 
               {/* Approval actions */}
               <section
-                className={`rounded-2xl border p-5 shadow-sm sm:p-6 ${
-                  isEligibleToPublish
+                className={`rounded-2xl border p-5 shadow-sm sm:p-6 ${isEligibleToPublish
                     ? "border-emerald-200 bg-emerald-50/50"
                     : "border-amber-200 bg-amber-50/50"
-                }`}
+                  }`}
               >
                 <div className="flex flex-col justify-between gap-5 xl:flex-row xl:items-center">
                   <div className="flex items-start gap-3">
                     <div
-                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
-                        isEligibleToPublish
+                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${isEligibleToPublish
                           ? "bg-emerald-100 text-emerald-700"
                           : "bg-amber-100 text-amber-700"
-                      }`}
+                        }`}
                     >
                       {isEligibleToPublish ? (
                         <CheckCircle2 size={21} />
@@ -773,22 +759,20 @@ export default function CourseApprovalDashboardWithTesting() {
 
                     <div>
                       <p
-                        className={`text-sm font-bold ${
-                          isEligibleToPublish
+                        className={`text-sm font-bold ${isEligibleToPublish
                             ? "text-emerald-800"
                             : "text-amber-800"
-                        }`}
+                          }`}
                       >
                         {isEligibleToPublish
                           ? "Khóa học đã đủ điều kiện phát hành"
                           : "Khóa học chưa đủ điều kiện phát hành"}
                       </p>
                       <p
-                        className={`mt-1 max-w-2xl text-xs leading-5 ${
-                          isEligibleToPublish
+                        className={`mt-1 max-w-2xl text-xs leading-5 ${isEligibleToPublish
                             ? "text-emerald-700"
                             : "text-amber-700"
-                        }`}
+                          }`}
                       >
                         {isEligibleToPublish
                           ? "Tất cả người học thử đã hoàn thành 100% và xác nhận khóa học đạt chuẩn chất lượng."

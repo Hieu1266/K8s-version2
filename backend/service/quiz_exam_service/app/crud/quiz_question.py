@@ -22,7 +22,8 @@ class CRUDQuizQuestion(CRUDBase[QuizQuestion, QuizQuestionCreate, QuizQuestionUp
             db_obj = QuizQuestion(
                 quiz_id=quiz_id,
                 question_id=q.question_id,
-                order_index=next_index
+                order_index=next_index,
+                video_trigger_seconds=q.video_trigger_seconds,
             )
             db.add(db_obj)
             db_objs.append(db_obj)
@@ -67,6 +68,30 @@ class CRUDQuizQuestion(CRUDBase[QuizQuestion, QuizQuestionCreate, QuizQuestionUp
             db.add(q)
             
         db.flush()  # Đồng bộ toàn bộ thay đổi vào transaction hiện tại
+        db.commit()
         return True
+
+    # 🆕 Lấy danh sách câu hỏi cố định của 1 quiz, sắp xếp theo order_index
+    def get_multi_by_quiz(self, db: Session, quiz_id: UUID) -> list[QuizQuestion]:
+        statement = (
+            select(QuizQuestion)
+            .where(QuizQuestion.quiz_id == quiz_id)
+            .order_by(QuizQuestion.order_index)
+        )
+        return db.exec(statement).all()
+
+    # 🆕 Sắp xếp lại thứ tự câu hỏi (kéo thả / nút lên-xuống ở FE gửi lên toàn bộ thứ tự mới)
+    def reorder_questions(
+        self, db: Session, *, quiz_id: UUID, ordered_items: list[tuple[UUID, int]]
+    ) -> None:
+        existing = {
+            qq.question_id: qq for qq in self.get_multi_by_quiz(db, quiz_id)
+        }
+        for question_id, new_order in ordered_items:
+            qq = existing.get(question_id)
+            if qq:
+                qq.order_index = new_order
+                db.add(qq)
+        db.commit()
 
 crud_quiz_question = CRUDQuizQuestion(QuizQuestion)

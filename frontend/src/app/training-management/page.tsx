@@ -109,10 +109,6 @@ export default function FacultyDashboard() {
 
                 <div className="relative z-10 flex h-full flex-col">
                   <div className="mb-5 flex items-center justify-between">
-                    <span className="font-mono text-[11px] font-bold text-slate-400">
-                      {String(index + 1).padStart(2, "0")}
-                    </span>
-
                     <div className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-400 transition-all duration-300 group-hover:border-[#0066FF] group-hover:bg-[#0066FF] group-hover:text-white">
                       <ArrowRight
                         size={17}

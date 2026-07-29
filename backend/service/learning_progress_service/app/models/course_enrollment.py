@@ -1,11 +1,12 @@
 import uuid
 from uuid import UUID
 from datetime import datetime
-from typing import Optional, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING, List
 from sqlmodel import Field, SQLModel, Relationship
 
 if TYPE_CHECKING:
     from app.models.certificate import Certificate
+    from app.models.comment import Comment
 
 class CourseEnrollment(SQLModel, table=True):
     __tablename__ = "course_enrollment"
@@ -23,3 +24,5 @@ class CourseEnrollment(SQLModel, table=True):
         back_populates="enrollment", 
         sa_relationship_kwargs={"uselist": False}
     )
+
+    comments: List["Comment"] = Relationship(back_populates="enrollment")

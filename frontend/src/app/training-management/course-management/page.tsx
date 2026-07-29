@@ -351,10 +351,6 @@ export default function CourseManagementPage() {
           </div>
 
           <div className="max-w-3xl">
-            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-semibold backdrop-blur-sm">
-              <Sparkles size={14} />
-              Trung tâm quản trị khóa học
-            </div>
 
             <h1 className="text-3xl font-black uppercase tracking-tight drop-shadow-md md:text-4xl">
               QUẢN LÝ KHÓA HỌC HỆ THỐNG
@@ -485,13 +481,12 @@ export default function CourseManagementPage() {
                       <div
                         key={course.course_id}
                         onClick={() => setSelectedCourseRow(course)}
-                        className={`relative cursor-pointer rounded-2xl border bg-white p-5 shadow-sm transition-all hover:shadow-md ${
-                          isSelected
+                        className={`relative cursor-pointer rounded-2xl border bg-white p-5 shadow-sm transition-all hover:shadow-md ${isSelected
                             ? "border-[#0066FF] ring-2 ring-[#0066FF]/10 shadow-md bg-blue-50/10"
                             : isDuplicated
                               ? "border-amber-300 bg-amber-50/5"
                               : "border-slate-200"
-                        }`}
+                          }`}
                       >
                         {isDuplicated && (
                           <span className="absolute top-2 right-2 text-[9px] bg-amber-100 text-amber-800 font-extrabold px-1.5 py-0.5 rounded-sm uppercase tracking-wide">
@@ -513,11 +508,10 @@ export default function CourseManagementPage() {
                                   {(course.price || 0).toLocaleString()}đ
                                 </span>
                                 <span
-                                  className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                    currentType === "LONG_TERM"
+                                  className={`px-2 py-0.5 rounded text-[10px] font-bold ${currentType === "LONG_TERM"
                                       ? "text-purple-600 bg-purple-50"
                                       : "text-[#0066FF] bg-blue-50"
-                                  }`}
+                                    }`}
                                 >
                                   {currentType === "LONG_TERM"
                                     ? "DÀI HẠN"
@@ -580,7 +574,7 @@ export default function CourseManagementPage() {
                           <strong className="text-slate-800">
                             {getCourseTypeFromCurriculum(
                               selectedCourseRow.curriculum_id ||
-                                (selectedCourseRow as any).curriculumId,
+                              (selectedCourseRow as any).curriculumId,
                             ) === "LONG_TERM"
                               ? "DÀI HẠN"
                               : "NGẮN HẠN"}
@@ -603,7 +597,7 @@ export default function CourseManagementPage() {
                           <strong className="text-slate-800">
                             {getMonthFromCurriculum(
                               selectedCourseRow.curriculum_id ||
-                                (selectedCourseRow as any).curriculumId,
+                              (selectedCourseRow as any).curriculumId,
                             )}
                           </strong>
                         </span>
@@ -616,7 +610,7 @@ export default function CourseManagementPage() {
                       </span>
                       <div className="max-h-80 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
                         {(selectedCourseRow as any).modules &&
-                        (selectedCourseRow as any).modules.length > 0 ? (
+                          (selectedCourseRow as any).modules.length > 0 ? (
                           (selectedCourseRow as any).modules.map(
                             (mod: any, mIdx: number) => (
                               <div
