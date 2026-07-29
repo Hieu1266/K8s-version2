@@ -2,12 +2,16 @@ from pydantic import BaseModel
 from uuid import UUID
 from datetime import datetime
 from typing import Optional, List
+from app.models.enum import TestingEnrollment
 
 class CourseEnrollmentCreate(BaseModel):
     course_id: UUID
+    is_tested: bool = False
+
 
 class CourseEnrollmentUpdate(BaseModel):
-    current_overall_progress: float
+    current_overall_progress: float = None
+    testing_course_status: TestingEnrollment = None
 
 class CourseEnrollmentResponse(BaseModel):
     enrollment_id: UUID

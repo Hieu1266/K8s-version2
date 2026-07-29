@@ -4,11 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.api.v1.deps import get_db
-# 🎯 Import đúng file CRUD (hỗ trợ cả alias nếu tên file của bạn là question_bank hoặc crud_question_bank)
-try:
-    from app.crud.crud_question_bank import crud_question_bank
-except ImportError:
-    from app.crud.question_bank import crud_question_bank
+from app.crud.question_bank import crud_question_bank
 
 from app.schemas.question_bank import (
     QuestionResponse,

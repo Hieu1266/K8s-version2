@@ -5,7 +5,7 @@ from uuid import UUID
 import httpx
 from app.crud.video_progress import crud_video_progress
 from app.core.config import settings
-from app.core.security import get_current_user_role
+from app.core.security import get_current_user_role, RoleChecker
 from app.crud.course_enrollment import crud_course_enrollment
 from app.crud.lesson_progress import crud_lesson_progress
 from app.crud.user_lesson_note import crud_note
@@ -61,23 +61,73 @@ async def enroll_course(
             lesson["has_quiz"] = lesson.get("is_quiz", False)
 
     # Bước 3: Tạo bản ghi Đăng ký học chính thức
-    enroll = crud_course_enrollment.create(db, {"user_id": user_id, "course_id": course_id})
+    enroll = crud_course_enrollment.create(db, {"user_id": user_id, "course_id": course_id, "is_tested": False})
     
     # Bước 4: Khởi tạo tiến độ bài học & tiến độ video
     if lessons_list:
         # 4.1. Khởi tạo tiến độ chung cho tất cả các bài học
         crud_lesson_progress.init_course_progress(
-            db=db, user_id=user_id, course_id=course_id, lessons=lessons_list
+            db=db, user_id=user_id, course_id=course_id, lessons=lessons_list, is_tested=False
         )
         
         # 4.2. Lọc các bài học có video (duration_seconds > 0) để khởi tạo video progress
         video_lessons = [l for l in lessons_list if l.get("duration_seconds", 0) > 0]
         if video_lessons:
             crud_video_progress.init_video_progress(
-                db=db, user_id=user_id, lessons=video_lessons
+                db=db, user_id=user_id, lessons=video_lessons, is_tested=False
             )
         
     return enroll
+
+@router.post("/create-testing-enrollment/{tester_id}")
+async def create_testing_enrollment(
+    db: SessionDep,
+    obj_in: CourseEnrollmentCreate,
+    tester_id: UUID,
+    current_user: dict = Depends(RoleChecker(["Manager"]))
+):
+    course_id = obj_in.course_id
+    existing_enroll = crud_course_enrollment.get_by_user_and_course(db, user_id=tester_id, course_id=course_id)
+    if existing_enroll:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Người dùng đã đăng ký khóa học này rồi."
+        )
+    course_lessons_url = f"{settings.BACKEND_COURSE_URL}/courses/{course_id}/lessons"
+    
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(course_lessons_url, timeout=5.0)
+            if response.status_code == status.HTTP_404_NOT_FOUND:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Khóa học không tồn tại.")
+            elif response.status_code != status.HTTP_200_OK:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Lỗi cấu trúc khóa học.")
+                
+            course_data = response.json()
+            lessons_list = course_data.get("lessons", [])
+            
+        except httpx.RequestError:
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Course Service sập.")
+
+    # Chuẩn hóa dữ liệu: Map `is_quiz` sang `has_quiz` để tương thích với logic CRUD hiện tại
+    for lesson in lessons_list:
+        if "has_quiz" not in lesson:
+            lesson["has_quiz"] = lesson.get("is_quiz", False)
+
+    enroll = crud_course_enrollment.create(db, {"user_id": tester_id, "course_id": course_id, "is_tested": True})
+    if lessons_list:
+        # 4.1. Khởi tạo tiến độ chung cho tất cả các bài học
+        crud_lesson_progress.init_course_progress(
+        db=db, user_id=tester_id, course_id=course_id, lessons=lessons_list, is_tested=True
+    )
+    video_lessons = [l for l in lessons_list if l.get("duration_seconds", 0) > 0]
+    if video_lessons:
+        crud_video_progress.init_video_progress(
+           db=db, user_id=tester_id, lessons=video_lessons, is_tested=True
+        )
+        
+    return enroll
+
 # 2. LẤY DANH SÁCH TIẾN ĐỘ KHÓA HỌC (Đang học / Đã xong)
 @router.get("/history/{is_completed}", response_model=List[CourseInProgress])
 async def get_progress_list(
@@ -234,3 +284,4 @@ def is_enrolled_course(
 ):
     user_id = current_user["user_id"]
     return crud_course_enrollment.check_already_enrolled(db, user_id, course_id)
+

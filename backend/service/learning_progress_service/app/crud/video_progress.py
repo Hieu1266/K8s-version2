@@ -7,7 +7,7 @@ from app.models.video_progress import VideoProgress
 from app.models.lesson_progress import LessonProgress
 
 class CRUDVideoProgress(CRUDBase[VideoProgress, VideoProgressCreate, VideoProgressUpdate, UUID]):
-    def init_video_progress(self, db: Session, user_id: UUID, lessons: List[Dict[str, Any]]):
+    def init_video_progress(self, db: Session, user_id: UUID, lessons: List[Dict[str, Any]], is_tested: bool):
         """
         Khởi tạo tiến độ video hàng loạt cho học viên khi đăng ký khóa học
         """
@@ -26,16 +26,28 @@ class CRUDVideoProgress(CRUDBase[VideoProgress, VideoProgressCreate, VideoProgre
 
             # Chỉ tạo tiến độ cho bài học có video (duration > 0) và chưa tồn tại
             if lesson_id not in existing_lesson_ids and duration > 0:
-                video_progress = VideoProgress(
-                    user_id=user_id,
-                    lesson_id=lesson_id,
-                    duration_seconds=duration,
-                    last_watched_second=0,
-                    max_watched_second=0,
-                    completion_percentage=0.0,
-                    is_finished=False,
-                    current_points=0.0
-                )
+                if not is_tested:
+                    video_progress = VideoProgress(
+                        user_id=user_id,
+                        lesson_id=lesson_id,
+                        duration_seconds=duration,
+                        last_watched_second=0,
+                        max_watched_second=0,
+                        completion_percentage=0.0,
+                        is_finished=False,
+                        current_points=0.0
+                    )
+                else:
+                    video_progress = VideoProgress(
+                        user_id=user_id,
+                        lesson_id=lesson_id,
+                        duration_seconds=duration,
+                        last_watched_second=0,
+                        max_watched_second=duration,
+                        completion_percentage=100,
+                        is_finished=True,
+                        current_points=10
+                    )
                 new_progress_list.append(video_progress)
 
         # 3. Lưu hàng loạt vào DB bằng add_all để tối ưu hiệu năng

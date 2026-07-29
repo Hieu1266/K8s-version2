@@ -3,7 +3,7 @@ from uuid import UUID
 from datetime import datetime
 from typing import Optional, TYPE_CHECKING
 from sqlmodel import Field, SQLModel, Relationship
-from app.models.enum import StructurePart, TestingEnrollment
+from app.models.enum import StructurePart
 
 if TYPE_CHECKING:
     from app.models.course_enrollment import CourseEnrollment
@@ -16,7 +16,7 @@ class Comment(SQLModel, table=True):
         nullable=False, 
         index=True
     )
-    test_id: UUID = Field(nullable=False)
+    tester_id: UUID = Field(nullable=False)
     structure_part: StructurePart = Field(nullable=False, default=StructurePart.COURSE)
     part_id: UUID = Field(nullable=False)
     title: str = Field(max_length=255, nullable=False) #Tiêu đề của phần được nhận xét

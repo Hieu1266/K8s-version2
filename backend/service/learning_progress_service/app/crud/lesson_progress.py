@@ -40,17 +40,19 @@ class CRUDLessonProgress(CRUDBase[LessonProgress, LessonProgressCreate, LessonPr
         db.refresh(db_obj)
         return db_obj
     
-    def init_course_progress(self, db: Session, user_id: UUID, course_id: UUID, lessons: list[dict]):
+    def init_course_progress(self, db: Session, user_id: UUID, course_id: UUID, lessons: list[dict], is_tested: bool):
         for index, lesson in enumerate(lessons):
             lesson_id = lesson["lesson_id"]
             is_optional = lesson["is_optional"]
             has_quiz = lesson.get("has_quiz", False)  
             first_subject_lesson = lesson.get("first_subject_lesson", False)
-            
-            if first_subject_lesson or is_optional:
+            if not is_tested: 
+                if first_subject_lesson or is_optional:
+                    initial_status = LessonStatus.UNLOCKED
+                else:
+                    initial_status = LessonStatus.LOCKED
+            else: 
                 initial_status = LessonStatus.UNLOCKED
-            else:
-                initial_status = LessonStatus.LOCKED
             
             db_obj = LessonProgress(
                 user_id=user_id,

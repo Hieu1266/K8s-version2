@@ -5,7 +5,7 @@ import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 
 const COURSE_API_URL = process.env.NEXT_PUBLIC_COURSE_BACKEND_URL;
-const EXAM_QUIZ_URL = process.env.NEXT_PUBLIC_PROGRESS_BACKEND_URL;
+const EXAM_QUIZ_URL = process.env.NEXT_PUBLIC_EXAM_BACKEND_URL;
 // const EXAM_QUIZ_URL = process.env.NEXT_PUBLIC_EXAM_BACKEND_URL;
 
 // Lấy Header xác thực bằng Cookie
