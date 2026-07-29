@@ -38,7 +38,6 @@ class RubricItem(BaseModel):
     criteria_id: UUID
     title: str
     description: str | None = None
-    # 🎯 Map giá trị từ cột max_score trong DB sang biến percentage trả về API
     percentage: float = Field(default=0.0, validation_alias="max_score")
 
     class Config:

@@ -2,10 +2,11 @@
 
 import { Question, SubjectInfo, QuestionTypeEnum } from "@/types/questions-bank";
 import { cookies } from "next/headers";
-import { revalidatePath } from "next/cache"; // 🎯 Import thêm revalidatePath
+import { revalidatePath } from "next/cache";
 
 const COURSE_API_URL = process.env.NEXT_PUBLIC_COURSE_BACKEND_URL;
 const EXAM_QUIZ_URL = process.env.NEXT_PUBLIC_PROGRESS_BACKEND_URL;
+// const EXAM_QUIZ_URL = process.env.NEXT_PUBLIC_EXAM_BACKEND_URL;
 
 // Lấy Header xác thực bằng Cookie
 async function getAuthHeaders(customToken?: string) {
@@ -26,9 +27,7 @@ async function getAuthHeaders(customToken?: string) {
   };
 }
 
-/**
- * Hàm Map dữ liệu từ Backend/DB trả về sang định dạng Question Chuẩn
- */
+
 function mapQuestion(raw: any): Question {
   const maxPoints = Number(raw.max_points ?? 0);
 
@@ -107,9 +106,7 @@ export async function getSubjectDetailAction(
   }
 }
 
-/**
- * Lấy danh sách câu hỏi theo Môn học (Kèm Options & Rubrics)
- */
+
 export async function getQuestionsBySubjectAction(
   subjectId: string,
   token?: string
@@ -133,9 +130,7 @@ export async function getQuestionsBySubjectAction(
   }
 }
 
-/**
- * Lưu câu hỏi (Thêm mới hoặc Cập nhật)
- */
+
 export async function saveQuestionAction(
   question: Question | any,
   token?: string
@@ -148,7 +143,6 @@ export async function saveQuestionAction(
 
     const method = isUpdate ? "PATCH" : "POST";
 
-    // 1. Build Body dữ liệu
     const body: Record<string, any> = {
       question_title: question.question_title ?? "",
       body_content: question.content || question.body_content || "",
@@ -160,7 +154,6 @@ export async function saveQuestionAction(
       body.subject_id = question.subject_id;
     }
 
-    // 2. Làm sạch mảng Rubrics / Options
     if (question.question_type === "ESSAY") {
       body.rubrics = (question.rubrics || []).map((r: any) => {
         const item: any = {
@@ -188,7 +181,6 @@ export async function saveQuestionAction(
 
     const headers = await getAuthHeaders(token);
 
-    // 🎯 FIX CHÍNH TẠI ĐÂY: Luôn bọc key { question: body } cho cả POST và PATCH
     const fullPayload: Record<string, any> = {
       question: body,
     };
@@ -232,9 +224,7 @@ export async function saveQuestionAction(
   }
 }
 
-/**
- * Xóa câu hỏi
- */
+
 export async function deleteQuestionAction(
   questionId: string,
   subjectId?: string, // 🎯 Thêm tham số subjectId để refresh cache trang
