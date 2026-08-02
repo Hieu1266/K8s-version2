@@ -71,6 +71,14 @@ class CRUDQuizQuestion(CRUDBase[QuizQuestion, QuizQuestionCreate, QuizQuestionUp
         db.commit()
         return True
 
+    # 🆕 Lấy 1 câu hỏi cố định theo cặp (quiz_id, question_id) - dùng để cập nhật video_trigger_seconds riêng
+    def get_by_quiz_and_question(self, db: Session, *, quiz_id: UUID, question_id: UUID) -> QuizQuestion | None:
+        statement = select(QuizQuestion).where(
+            QuizQuestion.quiz_id == quiz_id,
+            QuizQuestion.question_id == question_id,
+        )
+        return db.exec(statement).first()
+
     # 🆕 Lấy danh sách câu hỏi cố định của 1 quiz, sắp xếp theo order_index
     def get_multi_by_quiz(self, db: Session, quiz_id: UUID) -> list[QuizQuestion]:
         statement = (

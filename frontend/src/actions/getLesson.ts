@@ -8,6 +8,7 @@ import {
     LessonCreatePayload,
     LessonUpdatePayload,
     LessonResource,
+    LessonShort
 } from "@/types/lessons";
 
 
@@ -293,3 +294,34 @@ export async function deleteLessonResourceAction(
     }
 }
 
+export async function getLessonsBySubjectAction(
+    subjectId: string,
+    filterType?: string
+): Promise<LessonShort[]> {
+    try {
+        const baseUrl = COURSE_URL
+        // 🟢 Luôn đính kèm ?filter_type= nếu filterType có giá trị (bao gồm cả STANDALONE_LESSON)
+        const query = filterType ? `?filter_type=${encodeURIComponent(filterType)}` : "";
+
+        const endpoint = `${baseUrl}/lessons/subject/${subjectId}${query}`;
+
+        const response = await fetch(endpoint, {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            cache: "no-store",
+        });
+
+        if (!response.ok) {
+            console.error(`Lỗi API Backend [Status ${response.status}]:`, await response.text());
+            return [];
+        }
+
+        const data = await response.json();
+        return Array.isArray(data) ? data : [];
+    } catch (error) {
+        console.error("Exception tại getLessonsBySubjectAction:", error);
+        return [];
+    }
+}

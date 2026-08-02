@@ -36,4 +36,10 @@ class Curriculum(SQLModel, table=True):
     )
     # Quan hệ
     # Một CTDT thuộc về một khóa học
-    course: Optional["Course"] = Relationship(back_populates="curriculum")
+    course: Optional["Course"] = Relationship(
+        back_populates="curriculum",
+        sa_relationship_kwargs={
+        "cascade": "all, delete-orphan",
+        "passive_deletes": True  
+    }
+        )

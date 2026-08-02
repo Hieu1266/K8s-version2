@@ -10,7 +10,13 @@ if TYPE_CHECKING:
 class QuizQuestion(SQLModel, table=True):
     __tablename__ = "quiz_question"
 
-    quiz_id: UUID = Field(foreign_key="quiz.quiz_id", primary_key=True, nullable=False)
+    # Thêm ondelete="CASCADE" vào foreign_key
+    quiz_id: UUID = Field(
+        foreign_key="quiz.quiz_id", 
+        primary_key=True, 
+        nullable=False,
+        ondelete="CASCADE"
+    )
     question_id: UUID = Field(foreign_key="question.question_id", primary_key=True, nullable=False)
     video_trigger_seconds: Optional[int] = Field(default=None) # Mốc giây kích hoạt đề thi tự động trong video bài giảng
     order_index: int = Field(default=1, nullable=False)    # Thứ tự hiển thị của câu hỏi trong riêng đề thi này

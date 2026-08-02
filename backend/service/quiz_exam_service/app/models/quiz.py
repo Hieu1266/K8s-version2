@@ -32,10 +32,23 @@ class Quiz(SQLModel, table=True):
     is_peer_review: bool = Field(default=False, nullable=False)
     created_at: date = Field(default_factory=date.today)
 
-    # Quan hệ nội bộ phân hệ
-    quiz_questions: List["QuizQuestion"] = Relationship(back_populates="quiz") # FIXED_QUESTION
-    pool_rules: List["QuizPoolRule"] = Relationship(back_populates="quiz")     # RANDOM_QUESTION
+    # Quan hệ nội bộ phân hệ (Đã thêm cascade delete)
+    quiz_questions: List["QuizQuestion"] = Relationship(
+        back_populates="quiz",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    ) # FIXED_QUESTION
     
-    submissions: List["QuizSubmission"] = Relationship(back_populates="quiz")
+    pool_rules: List["QuizPoolRule"] = Relationship(
+        back_populates="quiz",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )     # RANDOM_QUESTION
     
-    peer_assignments: List["PeerReviewAssignment"] = Relationship(back_populates="quiz")
+    submissions: List["QuizSubmission"] = Relationship(
+        back_populates="quiz",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
+    
+    peer_assignments: List["PeerReviewAssignment"] = Relationship(
+        back_populates="quiz",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )

@@ -1,13 +1,54 @@
 import shutil
 from pathlib import Path
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from app.api.v1.deps import SessionDep
 from app.core.security import RoleChecker, get_current_user_role
-from app.schemas.lesson import LessonCreate, LessonUpdate, LessonManagementOut
+from app.schemas.lesson import LessonCreate, LessonUpdate, LessonManagementOut, LessonFilterType, LessonShortResponse
 from app.models.lesson import Lesson
+from typing import List, Optional
 from app.crud.lesson import crud_lesson
 from app.crud.module import crud_module
 from uuid import UUID
+from app.core.config import settings
+import asyncio
+import httpx
+
+
+QUIZ_SERVICE_BASE_URL = settings.BACKEND_QUIZ_EXAM_URL
+
+async def filter_lessons_without_quiz(lesson_ids: List[UUID]) -> List[UUID]:
+    """
+    Gửi request kiểm tra song song sang Quiz Service.
+    Trả về danh sách lesson_ids CHƯA ĐƯỢC GẮN QUIZ.
+    """
+    if not lesson_ids:
+        return []
+
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        # Hàm con gọi API từng lesson
+        async def check_single_lesson(lesson_id: UUID) -> tuple[UUID, bool]:
+            try:
+                response = await client.get(f"{QUIZ_SERVICE_BASE_URL}/quizzes/{lesson_id}/had-quiz")
+                if response.status_code == 200:
+                    # Trả về (lesson_id, True/False)
+                    return lesson_id, response.json()
+            except Exception as e:
+                # Ném log lỗi nếu không kết nối được Quiz Service
+                print(f"Error checking quiz for lesson {lesson_id}: {str(e)}")
+            
+            # Nếu gặp lỗi API, mặc định coi như chưa có quiz (hoặc xử lý theo nghiệp vụ)
+            return lesson_id, False
+
+        # Chạy tất cả các request song song cùng lúc
+        tasks = [check_single_lesson(lid) for lid in lesson_ids]
+        results = await asyncio.gather(*tasks)
+
+        # Lọc ra danh sách lesson_id có response là False (chưa có quiz)
+        lessons_without_quiz = [
+            lesson_id for lesson_id, had_quiz in results if not had_quiz
+        ]
+        
+        return lessons_without_quiz
 
 router = APIRouter(prefix="/lessons", tags=["lessons"])
 
@@ -153,6 +194,43 @@ def get_lesson_list(
         )
     lessons = crud_lesson.get_multi_by_module(db, module_id)
     return lessons
+
+@router.get(
+    "/subject/{subject_id}",
+    response_model=List[LessonShortResponse],
+    status_code=status.HTTP_200_OK,
+    summary="Lấy danh sách Lesson trong Subject (đã loại bỏ bài có Quiz)"
+)
+async def get_lessons_by_subject(
+    db: SessionDep,
+    subject_id: UUID,
+    filter_type: Optional[LessonFilterType] = Query(
+        default=None,
+        description="Bộ lọc bài học: 'IN_VIDEO', 'STANDALONE_LESSON', 'INSIDE_LESSON'."
+    )
+):
+    # 1. Lấy danh sách lesson từ DB theo bộ lọc cơ bản
+    lessons = crud_lesson.get_lessons_by_subject(
+        db=db,
+        subject_id=subject_id,
+        filter_type=filter_type
+    )
+
+    if not lessons:
+        return []
+
+    # 2. Trích xuất danh sách lesson_id
+    lesson_ids = [lesson.lesson_id for lesson in lessons]
+
+    # 3. Call API Quiz Service để lấy danh sách các lesson_id CHƯA GẮN QUIZ
+    valid_lesson_ids = await filter_lessons_without_quiz(lesson_ids)
+
+    # 4. Filter lại danh sách lesson ban đầu
+    valid_lessons = [
+        lesson for lesson in lessons if lesson.lesson_id in valid_lesson_ids
+    ]
+
+    return valid_lessons
 
 @router.get("/is-existed/{lesson_id}")
 def is_existed(

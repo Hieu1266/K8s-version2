@@ -92,3 +92,8 @@ export interface LessonResourceItem {
     file_extension: string;
     created_at?: string;
 }
+
+export interface LessonShort {
+    lesson_id: string;
+    title: string;
+}

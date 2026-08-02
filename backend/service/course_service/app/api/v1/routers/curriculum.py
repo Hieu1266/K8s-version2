@@ -3,8 +3,7 @@ import shutil
 import uuid   
 from fastapi import APIRouter, File, UploadFile, HTTPException, status, Depends
 from uuid import UUID
-
-
+from app.models.curriculum import Curriculum
 from app.models.course_instructor_link import CourseInstructorLink
 from app.models.course import Course
 from app.api.v1.deps import SessionDep
@@ -100,7 +99,13 @@ def delete_curriculum(
     db: SessionDep,   
     current_user: dict = Depends(RoleChecker(["Admin", "Instructor", "Manager"]))
 ):
+    # Gọi hàm delete đã gom gọn logic truy vấn SQL ở file CRUD
     db_obj = crud_curriculum.delete(db=db, id=curriculum_id)
+    
     if not db_obj:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy chương trình đào tạo cần xóa")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Không tìm thấy chương trình đào tạo cần xóa"
+        )
+        
     return {"message": "Xóa chương trình đào tạo khỏi hệ thống thành công"}

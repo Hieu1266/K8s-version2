@@ -9,7 +9,7 @@ from app.schemas.quiz import (
     QuizFixedQuestionItem, QuizPoolRuleItem, QuizQuestionReorderItem,
 )
 from app.models.enum import QuizType
-from app.schemas.quiz_question import QuizQuestionCreate
+from app.schemas.quiz_question import QuizQuestionCreate, QuizQuestionUpdate
 from app.schemas.quiz_pool_rule import QuizPoolRuleCreate, QuizPoolRuleUpdate
 from uuid import UUID
 import httpx
@@ -245,6 +245,33 @@ async def add_fixed_questions(
     db.commit()
     
     return {"status": "success", "message": "Đã thêm danh sách câu hỏi và tự động sắp xếp thứ tự hiển thị thành công."}
+
+# 🆕 Cập nhật video_trigger_seconds (mốc giây kích hoạt trong video) riêng cho 1 câu hỏi đã có trong đề thi
+@router.patch("/{quiz_id}/questions/{question_id}")
+async def update_fixed_question(
+    db: SessionDep,
+    quiz_id: UUID,
+    question_id: UUID,
+    obj_in: QuizQuestionUpdate,
+    current_user: dict = Depends(get_current_user_role)
+):
+    db_quiz = await _get_quiz_or_404_and_check_owner(db, quiz_id, current_user)
+
+    if db_quiz.placement_type != "IN_VIDEO" and obj_in.video_trigger_seconds is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Chỉ đề thi có placement_type = IN_VIDEO mới cấu hình được mốc giây kích hoạt."
+        )
+
+    quiz_question = crud_quiz_question.get_by_quiz_and_question(db, quiz_id=quiz_id, question_id=question_id)
+    if not quiz_question:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Câu hỏi không nằm trong đề thi này.")
+
+    updated = crud_quiz_question.update(db, db_obj=quiz_question, obj_in=obj_in)
+    return {
+        "status": "success",
+        "data": {"question_id": updated.question_id, "video_trigger_seconds": updated.video_trigger_seconds},
+    }
 
 # 🆕 Xóa 1 câu hỏi cố định khỏi đề thi (tự động dồn lại order_index)
 @router.delete("/{quiz_id}/questions/{question_id}")

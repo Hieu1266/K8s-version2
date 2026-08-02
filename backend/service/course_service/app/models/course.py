@@ -26,7 +26,8 @@ class Course(SQLModel, table=True):
     curriculum_id: UUID = Field(
         foreign_key="curriculum.curriculum_id", 
         nullable=False, 
-        unique=True 
+        unique=True,
+        ondelete="CASCADE"
     )
     instructor_id: Optional[UUID] = Field(default=None, nullable=True)
     title: str = Field(nullable=False, max_length=255)

@@ -1,24 +1,44 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Quiz, QuizPlacementType } from "@/types/exam-management";
+import { getLessonsBySubjectAction } from "@/actions/getLesson";
+import { LessonShort } from "@/types/lessons";
 
 interface Props {
   quiz: Quiz | null;
+  subjectId: string;
   onClose: () => void;
   onSuccess: (updatedData: Partial<Quiz>) => void;
 }
 
-export default function EditQuizModal({ quiz, onClose, onSuccess }: Props) {
+export default function EditQuizModal({ quiz, subjectId, onClose, onSuccess }: Props) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [durationMinutes, setDurationMinutes] = useState(15);
   const [passingScore, setPassingScore] = useState(5.0);
   const [maxAttempts, setMaxAttempts] = useState(3);
-  const [placementType, setPlacementType] =
-    useState<QuizPlacementType>("STANDALONE_LESSON");
+  const [placementType, setPlacementType] = useState<QuizPlacementType | "">("");
+  const [targetLessonId, setTargetLessonId] = useState<string>("");
   const [isActive, setIsActive] = useState(true);
 
+  const [lessons, setLessons] = useState<LessonShort[]>([]);
+  const [isLoadingLessons, setIsLoadingLessons] = useState(false);
+
+  const fetchLessons = useCallback(async (pType: string) => {
+    setIsLoadingLessons(true);
+    try {
+      const data = await getLessonsBySubjectAction(subjectId, pType);
+      setLessons(data);
+    } catch (error) {
+      console.error("Lỗi khi tải danh sách bài học:", error);
+      setLessons([]);
+    } finally {
+      setIsLoadingLessons(false);
+    }
+  }, [subjectId]);
+
+  // Load lại dữ liệu bài thi hiện tại khi Modal mở
   useEffect(() => {
     if (quiz) {
       setTitle(quiz.title);
@@ -26,22 +46,47 @@ export default function EditQuizModal({ quiz, onClose, onSuccess }: Props) {
       setDurationMinutes(quiz.duration_minutes);
       setPassingScore(quiz.passing_score);
       setMaxAttempts(quiz.max_attempts);
-      setPlacementType(quiz.placement_type);
+      setPlacementType(quiz.placement_type || "");
+      setTargetLessonId(quiz.target_lesson_id || "");
       setIsActive(quiz.is_active);
+
+      if (quiz.placement_type) {
+        fetchLessons(quiz.placement_type);
+      } else {
+        setLessons([]);
+      }
     }
-  }, [quiz]);
+  }, [quiz, fetchLessons]);
+
+  const handlePlacementTypeChange = (newType: string) => {
+    setPlacementType(newType as QuizPlacementType);
+
+    if (!newType) {
+      setTargetLessonId("");
+      setLessons([]);
+    } else {
+      fetchLessons(newType);
+    }
+  };
 
   if (!quiz) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!placementType) {
+      alert("Vui lòng chọn vị trí hiển thị cho bài thi!");
+      return;
+    }
+
     onSuccess({
       title,
       description,
       duration_minutes: durationMinutes,
       passing_score: passingScore,
       max_attempts: maxAttempts,
-      placement_type: placementType,
+      placement_type: placementType as QuizPlacementType,
+      target_lesson_id: targetLessonId.trim() || null,
       is_active: isActive,
     });
   };
@@ -113,6 +158,49 @@ export default function EditQuizModal({ quiz, onClose, onSuccess }: Props) {
               />
             </div>
           </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">
+              Vị trí hiển thị *
+            </label>
+            <select
+              required
+              className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm bg-white"
+              value={placementType}
+              onChange={(e) => handlePlacementTypeChange(e.target.value)}
+            >
+              <option value="">-- Chọn vị trí hiển thị --</option>
+              <option value="STANDALONE_LESSON">Bài thi trong module</option>
+              <option value="INSIDE_LESSON">Đính kèm bên trong một bài đọc</option>
+              <option value="IN_VIDEO">Nhúng vào mốc thời gian video</option>
+            </select>
+          </div>
+
+          {placementType && (
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Bài học gán kèm (Tùy chọn)
+              </label>
+              <select
+                className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-[#0066FF] outline-none"
+                value={targetLessonId}
+                onChange={(e) => setTargetLessonId(e.target.value)}
+                disabled={isLoadingLessons}
+              >
+                <option value="">-- Không gán bài học --</option>
+                {lessons.map((lesson) => (
+                  <option key={lesson.lesson_id} value={lesson.lesson_id}>
+                    {lesson.title}
+                  </option>
+                ))}
+              </select>
+              <p className="text-[11px] text-slate-400 mt-1">
+                {isLoadingLessons
+                  ? "Đang tải danh sách bài học..."
+                  : "Chọn bài học để gán kèm hoặc chọn '-- Không gán bài học --' để bỏ qua."}
+              </p>
+            </div>
+          )}
 
           <div className="flex items-center gap-2 pt-2">
             <input

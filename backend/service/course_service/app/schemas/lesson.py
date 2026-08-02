@@ -3,6 +3,7 @@ from uuid import UUID
 from typing import Optional, List
 from datetime import date
 from app.schemas.lesson_resource import LessonResourceResponse
+from enum import Enum
 
 class LessonCreate(BaseModel):
     module_id: UUID
@@ -45,6 +46,18 @@ class LessonManagementOut(BaseModel):
     is_optional: bool
     is_quiz: bool
     resources: List[LessonResourceResponse] = []
+
+    class Config:
+        from_attributes = True
+
+class LessonFilterType(str, Enum):
+    IN_VIDEO = "IN_VIDEO"                    # 1. Lesson có chứa Video (video_url)
+    STANDALONE_LESSON = "STANDALONE_LESSON"  # 2. Lesson là Bài thi (is_quiz == True)
+    INSIDE_LESSON = "INSIDE_LESSON"          # 3. Các bài đọc / văn bản còn lại
+    
+class LessonShortResponse(BaseModel):
+    lesson_id: UUID
+    title: str
 
     class Config:
         from_attributes = True

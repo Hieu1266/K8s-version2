@@ -183,6 +183,29 @@ export const removeFixedQuestionAction = async (
     }
 };
 
+// 7.5. 🆕 Cập nhật mốc giây kích hoạt trong video riêng cho 1 câu hỏi đã có trong đề thi
+export const updateFixedQuestionTriggerAction = async (
+    quizId: string,
+    questionId: string,
+    videoTriggerSeconds: number
+): Promise<{ success: boolean; error?: string }> => {
+    try {
+        const res = await fetch(`${EXAM_QUIZ_URL}/quizzes/${quizId}/questions/${questionId}`, {
+            method: "PATCH",
+            headers: await authHeaders(),
+            body: JSON.stringify({ video_trigger_seconds: videoTriggerSeconds }),
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            return { success: false, error: typeof err?.detail === "string" ? err.detail : "Cập nhật thời gian thất bại." };
+        }
+        return { success: true };
+    } catch (error: any) {
+        console.error("❌ updateFixedQuestionTriggerAction:", error.message);
+        return { success: false, error: error.message || "Lỗi kết nối máy chủ." };
+    }
+};
+
 // 8. 🆕 Sắp xếp lại thứ tự câu hỏi cố định
 export const reorderFixedQuestionsAction = async (
     quizId: string,

@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { getLessonsBySubjectAction } from "@/actions/getLesson";
+import { LessonShort } from "@/types/lessons";
 
 export default function CreateQuizDrawer({
     subjectId,
@@ -11,8 +13,8 @@ export default function CreateQuizDrawer({
     subjectId: string;
     isOpen: boolean;
     onClose: () => void;
-    subjectQuestions: any[];
-    subjectPools: any[];
+    subjectQuestions?: any[];
+    subjectPools?: any[];
     onSuccess: (data: any) => void;
 }) {
     const [formData, setFormData] = useState({
@@ -22,40 +24,78 @@ export default function CreateQuizDrawer({
         passing_score: 5.0,
         max_attempts: 1,
         quiz_type: "FIXED_QUESTION",
-        placement_type: "STANDALONE_LESSON",
+        placement_type: "", // Mặc định chưa chọn
+        target_lesson_id: "",
         is_peer_review: false,
         is_active: true,
     });
 
-    // Reset form khi mở lại Drawer
+    const [lessons, setLessons] = useState<LessonShort[]>([]);
+    const [isLoadingLessons, setIsLoadingLessons] = useState(false);
+
+    const fetchLessons = useCallback(async (placementType: string) => {
+        setIsLoadingLessons(true);
+        try {
+            const data = await getLessonsBySubjectAction(subjectId, placementType);
+            setLessons(data);
+        } catch (error) {
+            console.error("Lỗi khi tải danh sách bài học:", error);
+            setLessons([]);
+        } finally {
+            setIsLoadingLessons(false);
+        }
+    }, [subjectId]);
+
+    // Reset Form về trạng thái rỗng ban đầu khi mở Drawer
     useEffect(() => {
         if (isOpen) {
             setFormData({
                 title: "", description: "", duration_minutes: 45, passing_score: 5.0, max_attempts: 1,
-                quiz_type: "FIXED_QUESTION", placement_type: "STANDALONE_LESSON", is_peer_review: false, is_active: true,
+                quiz_type: "FIXED_QUESTION",
+                placement_type: "",
+                target_lesson_id: "",
+                is_peer_review: false, is_active: true,
             });
+            setLessons([]);
         }
     }, [isOpen]);
+
+    // Tự động gọi API khi placement_type có giá trị
+    useEffect(() => {
+        if (!isOpen) return;
+
+        if (formData.placement_type) {
+            fetchLessons(formData.placement_type);
+        } else {
+            setLessons([]);
+            setFormData((prev) => ({ ...prev, target_lesson_id: "" }));
+        }
+    }, [formData.placement_type, isOpen, fetchLessons]);
 
     if (!isOpen) return null;
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        onSuccess(formData);
+
+        if (!formData.placement_type) {
+            alert("Vui lòng chọn vị trí hiển thị cho bài thi!");
+            return;
+        }
+
+        onSuccess({
+            ...formData,
+            target_lesson_id: formData.target_lesson_id.trim() || null,
+        });
     };
 
     return (
         <div className="fixed inset-0 z-50 flex justify-end">
-            {/* Overlay nền đen mờ - Bấm ra ngoài để đóng */}
             <div
                 className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity"
                 onClick={onClose}
             />
 
-            {/* Drawer trượt từ phải sang (Width cố định hoặc responsive) */}
             <div className="relative w-full max-w-lg bg-white h-full shadow-2xl flex flex-col animate-slide-in-right">
-
-                {/* Header cố định */}
                 <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-white">
                     <h2 className="text-lg font-semibold text-slate-900">Tạo bài thi mới</h2>
                     <button onClick={onClose} className="text-slate-400 hover:text-slate-600 font-bold text-xl">
@@ -63,7 +103,6 @@ export default function CreateQuizDrawer({
                     </button>
                 </div>
 
-                {/* Nội dung Form cuộn được */}
                 <div className="flex-1 overflow-y-auto p-6 space-y-5">
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Tên bài thi *</label>
@@ -120,9 +159,54 @@ export default function CreateQuizDrawer({
                             <option value="RANDOM_QUESTION">Đề ngẫu nhiên (Lấy từ Kho câu hỏi)</option>
                         </select>
                     </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Vị trí hiển thị *</label>
+                        <select
+                            required
+                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                            value={formData.placement_type}
+                            onChange={(e) => setFormData({ ...formData, placement_type: e.target.value })}
+                        >
+                            <option value="">-- Chọn vị trí hiển thị --</option>
+                            <option value="STANDALONE_LESSON">Bài thi trong module</option>
+                            <option value="INSIDE_LESSON">Đính kèm bên trong một bài đọc</option>
+                            <option value="IN_VIDEO">Nhúng vào mốc thời gian video</option>
+                        </select>
+                    </div>
+
+                    {/* Hiển thị selector bài học khi chọn vị trí */}
+                    {formData.placement_type && (
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">
+                                Chọn bài học gán kèm (Tùy chọn)
+                            </label>
+                            <select
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                                value={formData.target_lesson_id}
+                                onChange={(e) => setFormData({ ...formData, target_lesson_id: e.target.value })}
+                                disabled={isLoadingLessons}
+                            >
+                                <option value="">-- Không gán bài học --</option>
+                                {lessons.map((lesson) => (
+                                    <option key={lesson.lesson_id} value={lesson.lesson_id}>
+                                        {lesson.title}
+                                    </option>
+                                ))}
+                            </select>
+                            <p className="text-xs text-slate-400 mt-1">
+                                {isLoadingLessons
+                                    ? "Đang tải danh sách bài học..."
+                                    : formData.placement_type === "IN_VIDEO"
+                                        ? "Danh sách hiển thị các bài học video."
+                                        : formData.placement_type === "INSIDE_LESSON"
+                                            ? "Danh sách hiển thị các bài đọc."
+                                            : "Danh sách tất cả bài học trong môn học."}
+                            </p>
+                        </div>
+                    )}
                 </div>
 
-                {/* Footer cố định ở dưới cùng */}
                 <div className="px-6 py-4 border-t border-slate-200 bg-gray-50 flex justify-end gap-3">
                     <button
                         type="button"
@@ -138,7 +222,6 @@ export default function CreateQuizDrawer({
                         Lưu & Tạo mới
                     </button>
                 </div>
-
             </div>
         </div>
     );

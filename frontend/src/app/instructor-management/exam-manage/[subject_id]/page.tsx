@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { use, useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import QuestionPoolManager from "@/components/exam-management/QuestionPoolManager";
@@ -10,10 +10,14 @@ import EditQuizModal from "@/components/exam-management/EditQuizModal";
 import { Quiz, QuizCreatePayload, QuizUpdatePayload } from "@/types/exam-management";
 import { getQuizzesAction, createQuizAction, deleteQuizAction, updateQuizAction } from "@/actions/getQuizzes";
 
-export default function SubjectDetailPage() {
+export default function SubjectDetailPage({
+  params,
+}: {
+  params: Promise<{ subject_id: string }>;
+}) {
   const router = useRouter();
-  const params = useParams();
-  const subjectId = params.subject_id as string;
+  const resolvedParams = use(params);
+  const subjectId = resolvedParams.subject_id;
 
   const [activeTab, setActiveTab] = useState<"QUIZZES" | "POOLS">("QUIZZES");
 
@@ -76,7 +80,7 @@ export default function SubjectDetailPage() {
     }
   };
 
-  // 🆕 Gọi API PUT thật thay vì chỉ merge local state
+  // 🟢 ĐÃ BỔ SUNG: Bổ sung target_lesson_id vào payload cập nhật
   const handleEditQuizSuccess = async (updatedData: Partial<Quiz>) => {
     if (!editingQuiz) return;
 
@@ -87,6 +91,7 @@ export default function SubjectDetailPage() {
       passing_score: updatedData.passing_score,
       max_attempts: updatedData.max_attempts,
       placement_type: updatedData.placement_type,
+      target_lesson_id: updatedData.target_lesson_id || null,
       is_active: updatedData.is_active,
     };
 
@@ -264,8 +269,10 @@ export default function SubjectDetailPage() {
         onSuccess={handleCreateQuizSuccess}
       />
 
+      {/* 🟢 ĐÃ SỬA: Đã truyền thêm subjectId={subjectId} */}
       <EditQuizModal
         quiz={editingQuiz}
+        subjectId={subjectId}
         onClose={() => setEditingQuiz(null)}
         onSuccess={handleEditQuizSuccess}
       />
