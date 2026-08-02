@@ -7,37 +7,38 @@ export interface Quiz {
   quiz_id: string;
   subject_id: string;
   title: string;
-  description: string;
+  description?: string;
   duration_minutes: number;
-  passing_score: number;
+  passing_percentage: number; // 🟢 Thay thế passing_score
   max_attempts: number;
-  quiz_type: QuizType;
+  quiz_type: "FIXED_QUESTION" | "RANDOM_QUESTION";
   placement_type: QuizPlacementType;
   target_lesson_id?: string | null;
   is_active: boolean;
-  created_at: string;
   is_peer_review: boolean;
+  created_at?: string;
 }
 
 export interface QuizCreatePayload {
   title: string;
-  description: string;
-  subject_id: string;
+  description?: string;
   duration_minutes: number;
-  passing_score: number;
+  passing_percentage: number; // 🟢 Thay thế passing_score
   max_attempts: number;
-  quiz_type: QuizType;
-  placement_type: QuizPlacementType;
+  quiz_type: string;
+  placement_type: string;
   target_lesson_id?: string | null;
-  is_peer_review: boolean;
+  is_peer_review?: boolean;
+  is_active?: boolean;
 }
+
 
 // Khớp QuizUpdate (mọi field optional)
 export interface QuizUpdatePayload {
   title?: string;
   description?: string;
   duration_minutes?: number;
-  passing_score?: number;
+  passing_percentage?: number;
   max_attempts?: number;
   placement_type?: QuizPlacementType;
   target_lesson_id?: string | null;

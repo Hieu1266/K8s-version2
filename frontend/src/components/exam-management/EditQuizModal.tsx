@@ -15,9 +15,12 @@ interface Props {
 export default function EditQuizModal({ quiz, subjectId, onClose, onSuccess }: Props) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [durationMinutes, setDurationMinutes] = useState(15);
-  const [passingScore, setPassingScore] = useState(5.0);
-  const [maxAttempts, setMaxAttempts] = useState(3);
+
+  // 🟢 Lưu dạng String
+  const [durationMinutes, setDurationMinutes] = useState<string>("15");
+  const [passingPercentage, setPassingPercentage] = useState<string>("80");
+  const [maxAttempts, setMaxAttempts] = useState<string>("3");
+
   const [placementType, setPlacementType] = useState<QuizPlacementType | "">("");
   const [targetLessonId, setTargetLessonId] = useState<string>("");
   const [isActive, setIsActive] = useState(true);
@@ -38,14 +41,16 @@ export default function EditQuizModal({ quiz, subjectId, onClose, onSuccess }: P
     }
   }, [subjectId]);
 
-  // Load lại dữ liệu bài thi hiện tại khi Modal mở
   useEffect(() => {
     if (quiz) {
       setTitle(quiz.title);
       setDescription(quiz.description || "");
-      setDurationMinutes(quiz.duration_minutes);
-      setPassingScore(quiz.passing_score);
-      setMaxAttempts(quiz.max_attempts);
+
+      // 🟢 Ép kiểu về String khi nhận dữ liệu từ quiz props
+      setDurationMinutes(String(quiz.duration_minutes ?? 15));
+      setPassingPercentage(String(quiz.passing_percentage ?? 80.0));
+      setMaxAttempts(String(quiz.max_attempts ?? 3));
+
       setPlacementType(quiz.placement_type || "");
       setTargetLessonId(quiz.target_lesson_id || "");
       setIsActive(quiz.is_active);
@@ -79,16 +84,23 @@ export default function EditQuizModal({ quiz, subjectId, onClose, onSuccess }: P
       return;
     }
 
-    onSuccess({
+    // 🟢 Chuyển sang dạng Số trước khi truyền dữ liệu
+    const payload = {
       title,
       description,
-      duration_minutes: durationMinutes,
-      passing_score: passingScore,
-      max_attempts: maxAttempts,
+      duration_minutes: durationMinutes === "" ? 0 : Number(durationMinutes),
+      passing_percentage: passingPercentage === "" ? 0 : Number(passingPercentage),
+      max_attempts: maxAttempts === "" ? 0 : Number(maxAttempts),
       placement_type: placementType as QuizPlacementType,
       target_lesson_id: targetLessonId.trim() || null,
       is_active: isActive,
-    });
+    };
+
+    // 🐞 DEBUG TẠI ĐÂY: Mở F12 -> Console để xem dữ liệu
+    console.log("=== DEBUG EDIT QUIZ PAYLOAD ===", payload);
+    console.log("Kiểu dữ liệu của passing_percentage:", typeof payload.passing_percentage);
+
+    onSuccess(payload);
   };
 
   return (
@@ -130,7 +142,7 @@ export default function EditQuizModal({ quiz, subjectId, onClose, onSuccess }: P
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
                 Thời lượng (phút)
@@ -139,22 +151,38 @@ export default function EditQuizModal({ quiz, subjectId, onClose, onSuccess }: P
                 type="number"
                 min={1}
                 value={durationMinutes}
-                onChange={(e) => setDurationMinutes(Number(e.target.value))}
-                className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm outline-none"
+                onChange={(e) => setDurationMinutes(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#0066FF]"
               />
             </div>
+
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
-                Điểm đạt
+                Tỷ lệ đạt (%) *
               </label>
               <input
                 type="number"
-                step="0.5"
                 min={0}
-                max={10}
-                value={passingScore}
-                onChange={(e) => setPassingScore(Number(e.target.value))}
-                className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm outline-none"
+                max={100}
+                step={1}
+                required
+                value={passingPercentage}
+                onChange={(e) => setPassingPercentage(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#0066FF]"
+                placeholder="80"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Số lần làm
+              </label>
+              <input
+                type="number"
+                min={1}
+                value={maxAttempts}
+                onChange={(e) => setMaxAttempts(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#0066FF]"
               />
             </div>
           </div>

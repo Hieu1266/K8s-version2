@@ -9,7 +9,7 @@ class QuizCreate(BaseModel):
     description: str
     subject_id: UUID
     duration_minutes: int
-    passing_score: float
+    passing_percentage: float | None = None
     max_attempts: int
     quiz_type: QuizType
     placement_type: QuizPlacementType
@@ -20,7 +20,7 @@ class QuizUpdate(BaseModel):
     title: str | None = None
     description: str | None = None
     duration_minutes: int | None = None
-    passing_score: float | None = None
+    passing_percentage: float | None = None
     max_attempts: int | None = None
     placement_type: QuizPlacementType | None = None
     target_lesson_id: UUID | None = None
@@ -34,7 +34,7 @@ class QuizItem(BaseModel):
     title: str 
     description: str 
     duration_minutes: int 
-    passing_score: float 
+    passing_percentage: float 
     max_attempts: int
     quiz_type: QuizType
     placement_type: QuizPlacementType

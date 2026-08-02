@@ -69,6 +69,23 @@ def is_lesson_had_quiz(
 ):
     return crud_quiz.is_lesson_had_quiz(db, lesson_id)
 
+# 🆕 Sắp xếp lại thứ tự câu hỏi cố định (kéo thả / nút lên-xuống)
+@router.patch("/{quiz_id}/questions/reorder")
+async def reorder_fixed_questions(
+    db: SessionDep,
+    quiz_id: UUID,
+    obj_in: list[QuizQuestionReorderItem],
+    current_user: dict = Depends(get_current_user_role)
+):
+    await _get_quiz_or_404_and_check_owner(db, quiz_id, current_user)
+
+    ordered_items = [(item.question_id, item.order_index) for item in obj_in]
+    crud_quiz_question.reorder_questions(db, quiz_id=quiz_id, ordered_items=ordered_items)
+
+    return {"status": "success", "message": "Đã cập nhật lại thứ tự câu hỏi."}
+
+
+
 @router.post("/", status_code=status.HTTP_201_CREATED)
 async def create_initial_quiz(
     db: SessionDep, 
@@ -145,6 +162,7 @@ async def update_quiz(
     obj_in: QuizUpdate,
     current_user: dict = Depends(get_current_user_role)
 ):
+    print(f"DEBUG: Payload nhận được (Pydantic model): {obj_in.model_dump()}")
     db_quiz = await _get_quiz_or_404_and_check_owner(db, quiz_id, current_user)
 
     if obj_in.target_lesson_id and obj_in.target_lesson_id != db_quiz.target_lesson_id:
@@ -211,7 +229,7 @@ async def get_quiz_detail(
         title=db_quiz.title,
         description=db_quiz.description or "",
         duration_minutes=db_quiz.duration_minutes,
-        passing_score=db_quiz.passing_score,
+        passing_percentage=db_quiz.passing_percentage,
         max_attempts=db_quiz.max_attempts,
         quiz_type=db_quiz.quiz_type,
         placement_type=db_quiz.placement_type,
@@ -222,6 +240,7 @@ async def get_quiz_detail(
         fixed_questions=fixed_questions,
         pool_rules=pool_rules,
     )
+
 
 @router.post("/{quiz_id}/questions", status_code=status.HTTP_200_OK)
 async def add_fixed_questions(
@@ -288,21 +307,6 @@ async def remove_fixed_question(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Câu hỏi không nằm trong đề thi này.")
 
     return {"status": "success", "message": "Đã xóa câu hỏi khỏi đề thi."}
-
-# 🆕 Sắp xếp lại thứ tự câu hỏi cố định (kéo thả / nút lên-xuống)
-@router.patch("/{quiz_id}/questions/reorder")
-async def reorder_fixed_questions(
-    db: SessionDep,
-    quiz_id: UUID,
-    obj_in: list[QuizQuestionReorderItem],
-    current_user: dict = Depends(get_current_user_role)
-):
-    await _get_quiz_or_404_and_check_owner(db, quiz_id, current_user)
-
-    ordered_items = [(item.question_id, item.order_index) for item in obj_in]
-    crud_quiz_question.reorder_questions(db, quiz_id=quiz_id, ordered_items=ordered_items)
-
-    return {"status": "success", "message": "Đã cập nhật lại thứ tự câu hỏi."}
 
 
 @router.post("/{quiz_id}/pool-rules", status_code=status.HTTP_200_OK)

@@ -17,14 +17,15 @@ export default function CreateQuizDrawer({
     subjectPools?: any[];
     onSuccess: (data: any) => void;
 }) {
+    // 🟢 Chuyển các trường số sang dạng chuỗi (String) để quản lý an toàn
     const [formData, setFormData] = useState({
         title: "",
         description: "",
-        duration_minutes: 45,
-        passing_score: 5.0,
-        max_attempts: 1,
+        duration_minutes: "45",
+        passing_percentage: "80",
+        max_attempts: "1",
         quiz_type: "FIXED_QUESTION",
-        placement_type: "", // Mặc định chưa chọn
+        placement_type: "",
         target_lesson_id: "",
         is_peer_review: false,
         is_active: true,
@@ -46,21 +47,25 @@ export default function CreateQuizDrawer({
         }
     }, [subjectId]);
 
-    // Reset Form về trạng thái rỗng ban đầu khi mở Drawer
+    // Reset Form về trạng thái ban đầu khi mở Drawer
     useEffect(() => {
         if (isOpen) {
             setFormData({
-                title: "", description: "", duration_minutes: 45, passing_score: 5.0, max_attempts: 1,
+                title: "",
+                description: "",
+                duration_minutes: "45",
+                passing_percentage: "80",
+                max_attempts: "1",
                 quiz_type: "FIXED_QUESTION",
                 placement_type: "",
                 target_lesson_id: "",
-                is_peer_review: false, is_active: true,
+                is_peer_review: false,
+                is_active: true,
             });
             setLessons([]);
         }
     }, [isOpen]);
 
-    // Tự động gọi API khi placement_type có giá trị
     useEffect(() => {
         if (!isOpen) return;
 
@@ -82,10 +87,20 @@ export default function CreateQuizDrawer({
             return;
         }
 
-        onSuccess({
+        // 🟢 Ép kiểu an toàn sang Number trước khi đẩy dữ liệu
+        const payload = {
             ...formData,
+            duration_minutes: formData.duration_minutes === "" ? 0 : Number(formData.duration_minutes),
+            passing_percentage: formData.passing_percentage === "" ? 0 : Number(formData.passing_percentage),
+            max_attempts: formData.max_attempts === "" ? 0 : Number(formData.max_attempts),
             target_lesson_id: formData.target_lesson_id.trim() || null,
-        });
+        };
+
+        // 🐞 DEBUG TẠI ĐÂY: Mở F12 -> Console để xem dữ liệu
+        console.log("=== DEBUG CREATE QUIZ PAYLOAD ===", payload);
+        console.log("Kiểu dữ liệu của passing_percentage:", typeof payload.passing_percentage);
+
+        onSuccess(payload);
     };
 
     return (
@@ -127,23 +142,41 @@ export default function CreateQuizDrawer({
                         />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-3 gap-3">
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">Thời gian (phút)</label>
                             <input
                                 type="number"
+                                min={1}
                                 className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                                 value={formData.duration_minutes}
-                                onChange={(e) => setFormData({ ...formData, duration_minutes: Number(e.target.value) })}
+                                onChange={(e) => setFormData({ ...formData, duration_minutes: e.target.value })}
                             />
                         </div>
+
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Điểm đạt (trên 10)</label>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Tỷ lệ đạt (%) *</label>
                             <input
-                                type="number" step="0.5"
+                                type="number"
+                                min={0}
+                                max={100}
+                                step={1}
+                                required
                                 className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                                value={formData.passing_score}
-                                onChange={(e) => setFormData({ ...formData, passing_score: Number(e.target.value) })}
+                                value={formData.passing_percentage}
+                                onChange={(e) => setFormData({ ...formData, passing_percentage: e.target.value })}
+                                placeholder="80"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Số lần làm</label>
+                            <input
+                                type="number"
+                                min={1}
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                                value={formData.max_attempts}
+                                onChange={(e) => setFormData({ ...formData, max_attempts: e.target.value })}
                             />
                         </div>
                     </div>
@@ -175,7 +208,6 @@ export default function CreateQuizDrawer({
                         </select>
                     </div>
 
-                    {/* Hiển thị selector bài học khi chọn vị trí */}
                     {formData.placement_type && (
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">

@@ -206,31 +206,35 @@ export const updateFixedQuestionTriggerAction = async (
     }
 };
 
-// 8. 🆕 Sắp xếp lại thứ tự câu hỏi cố định
-export const reorderFixedQuestionsAction = async (
-    quizId: string,
-    orderedQuestionIds: string[]
-): Promise<{ success: boolean; error?: string }> => {
+// 8. 🆕 Sắp xếp lại thứ tự câu hỏi cố định (Đã bổ sung Token)
+export async function reorderFixedQuestionsAction(quizId: string, orderedIds: string[]) {
     try {
-        const payload = orderedQuestionIds.map((question_id, idx) => ({
-            question_id,
-            order_index: idx + 1,
+        // 🟢 Chuyển đổi mảng chuỗi ID thành mảng Object [{ question_id, order_index }]
+        const payload = orderedIds.map((id, index) => ({
+            question_id: id,
+            order_index: index + 1, // Thứ tự bắt đầu từ 1
         }));
+
         const res = await fetch(`${EXAM_QUIZ_URL}/quizzes/${quizId}/questions/reorder`, {
             method: "PATCH",
-            headers: await authHeaders(),
+            headers: await authHeaders(), // 🟢 Sử dụng authHeaders() để tự động gửi Content-Type & Token
             body: JSON.stringify(payload),
         });
+
         if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            return { success: false, error: typeof err?.detail === "string" ? err.detail : "Sắp xếp thất bại." };
+            const errorData = await res.json().catch(() => ({}));
+            return {
+                success: false,
+                error: typeof errorData?.detail === "string" ? errorData.detail : JSON.stringify(errorData?.detail)
+            };
         }
+
         return { success: true };
     } catch (error: any) {
         console.error("❌ reorderFixedQuestionsAction:", error.message);
         return { success: false, error: error.message || "Lỗi kết nối máy chủ." };
     }
-};
+}
 
 // 9. 🆕 Thêm luật bốc pool ngẫu nhiên
 export const addPoolRuleAction = async (

@@ -34,6 +34,9 @@ export default function QuizConfigPage({
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // State hỗ trợ Drag & Drop Native
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+
   // Dùng cho FIXED_QUESTION
   const [bankQuestions, setBankQuestions] = useState<Question[]>([]);
   const [selectedToAdd, setSelectedToAdd] = useState<string[]>([]);
@@ -48,6 +51,7 @@ export default function QuizConfigPage({
 
   const [busy, setBusy] = useState(false);
 
+  // Tải dữ liệu ban đầu
   const fetchData = useCallback(async () => {
     setLoading(true);
     setErrorMessage(null);
@@ -91,7 +95,7 @@ export default function QuizConfigPage({
     }
   }, [quiz?.fixed_questions]);
 
-  // ============ FIXED_QUESTION handlers ============
+  // ============ FIXED_QUESTION handlers (Optimistic UI) ============
   const assignedQuestionIds = new Set((quiz?.fixed_questions || []).map((q) => q.question_id));
   const availableQuestions = bankQuestions.filter((q) => !assignedQuestionIds.has(q.question_id));
 
@@ -100,53 +104,86 @@ export default function QuizConfigPage({
   };
 
   const handleAddSelectedQuestions = async () => {
-    if (selectedToAdd.length === 0) return;
+    if (selectedToAdd.length === 0 || !quiz) return;
     setBusy(true);
-    const result = await addFixedQuestionsAction(
-      quizId,
-      selectedToAdd,
-      quiz?.placement_type === "IN_VIDEO" && videoTriggerSeconds !== "" ? Number(videoTriggerSeconds) : null
-    );
+
+    const triggerValue = quiz.placement_type === "IN_VIDEO" && videoTriggerSeconds !== "" ? Number(videoTriggerSeconds) : null;
+    const result = await addFixedQuestionsAction(quizId, selectedToAdd, triggerValue);
     setBusy(false);
 
     if (!result.success) {
       alert(result.error || "Thêm câu hỏi thất bại.");
       return;
     }
+
+    // Tối ưu UI: Cập nhật state local ngay mà không gọi fetchData()
+    const addedQuestions = bankQuestions.filter((q) => selectedToAdd.includes(q.question_id));
+    const newFixedQuestions = [
+      ...quiz.fixed_questions,
+      ...addedQuestions.map((q, idx) => ({
+        question_id: q.question_id,
+        order_index: quiz.fixed_questions.length + idx + 1,
+        video_trigger_seconds: triggerValue,
+        question: q,
+      })),
+    ];
+
+    setQuiz({ ...quiz, fixed_questions: newFixedQuestions });
     setSelectedToAdd([]);
     setVideoTriggerSeconds("");
-    await fetchData();
   };
 
   const handleRemoveQuestion = async (questionId: string) => {
-    if (!confirm("Xóa câu hỏi này khỏi đề thi?")) return;
+    if (!confirm("Xóa câu hỏi này khỏi đề thi?") || !quiz) return;
+
+    // Optimistic Update
+    const previousQuestions = quiz.fixed_questions;
+    setQuiz({
+      ...quiz,
+      fixed_questions: quiz.fixed_questions.filter((q) => q.question_id !== questionId),
+    });
+
     setBusy(true);
     const result = await removeFixedQuestionAction(quizId, questionId);
     setBusy(false);
+
     if (!result.success) {
       alert(result.error || "Xóa câu hỏi thất bại.");
-      return;
+      setQuiz({ ...quiz, fixed_questions: previousQuestions }); // Rollback nếu lỗi
     }
-    await fetchData();
   };
 
-  const handleMoveQuestion = async (index: number, direction: -1 | 1) => {
-    if (!quiz) return;
+  // 🟢 KÉO THẢ (DRAG & DROP) HANDLERS
+  const handleDragStart = (index: number) => {
+    setDraggedIndex(index);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault(); // Cho phép drop
+  };
+
+  const handleDrop = async (targetIndex: number) => {
+    if (draggedIndex === null || draggedIndex === targetIndex || !quiz) return;
+
     const list = [...quiz.fixed_questions].sort((a, b) => a.order_index - b.order_index);
-    const targetIndex = index + direction;
-    if (targetIndex < 0 || targetIndex >= list.length) return;
+    const [draggedItem] = list.splice(draggedIndex, 1);
+    list.splice(targetIndex, 0, draggedItem);
 
-    [list[index], list[targetIndex]] = [list[targetIndex], list[index]];
-    const orderedIds = list.map((q) => q.question_id);
+    // Cập nhật lại order_index mới
+    const reorderedList = list.map((q, idx) => ({ ...q, order_index: idx + 1 }));
 
-    setBusy(true);
+    // Optimistic Update local state
+    setQuiz({ ...quiz, fixed_questions: reorderedList });
+    setDraggedIndex(null);
+
+    // Gửi thứ tự mới lên backend ngầm
+    const orderedIds = reorderedList.map((q) => q.question_id);
     const result = await reorderFixedQuestionsAction(quizId, orderedIds);
-    setBusy(false);
+
     if (!result.success) {
-      alert(result.error || "Sắp xếp thất bại.");
-      return;
+      alert(result.error || "Sắp xếp thất bại trên máy chủ.");
+      await fetchData(); // Rollback bằng cách fetch lại dữ liệu chuẩn
     }
-    await fetchData();
   };
 
   const handleSaveTrigger = async (questionId: string) => {
@@ -158,11 +195,21 @@ export default function QuizConfigPage({
     setBusy(true);
     const result = await updateFixedQuestionTriggerAction(quizId, questionId, Number(value));
     setBusy(false);
+
     if (!result.success) {
       alert(result.error || "Cập nhật thời gian thất bại.");
       return;
     }
-    await fetchData();
+
+    // Cập nhật local state
+    if (quiz) {
+      setQuiz({
+        ...quiz,
+        fixed_questions: quiz.fixed_questions.map((q) =>
+          q.question_id === questionId ? { ...q, video_trigger_seconds: Number(value) } : q
+        ),
+      });
+    }
   };
 
   // ============ RANDOM_QUESTION handlers ============
@@ -179,6 +226,7 @@ export default function QuizConfigPage({
     setBusy(true);
     const result = await addPoolRuleAction(quizId, addPoolId, addPoolQuantity);
     setBusy(false);
+
     if (!result.success) {
       alert(result.error || "Thêm luật pool thất bại.");
       return;
@@ -198,23 +246,34 @@ export default function QuizConfigPage({
     setBusy(true);
     const result = await updatePoolRuleAction(quizId, ruleId, newQuantity);
     setBusy(false);
+
     if (!result.success) {
       alert(result.error || "Cập nhật số lượng thất bại.");
       return;
     }
-    await fetchData();
+
+    if (quiz) {
+      setQuiz({
+        ...quiz,
+        pool_rules: quiz.pool_rules.map((r) => (r.rule_id === ruleId ? { ...r, quantity: newQuantity } : r)),
+      });
+    }
   };
 
   const handleDeleteRule = async (ruleId: string) => {
-    if (!confirm("Xóa luật cấu hình pool này khỏi đề thi?")) return;
+    if (!confirm("Xóa luật cấu hình pool này khỏi đề thi?") || !quiz) return;
+
+    const previousRules = quiz.pool_rules;
+    setQuiz({ ...quiz, pool_rules: quiz.pool_rules.filter((r) => r.rule_id !== ruleId) });
+
     setBusy(true);
     const result = await deletePoolRuleAction(quizId, ruleId);
     setBusy(false);
+
     if (!result.success) {
       alert(result.error || "Xóa luật pool thất bại.");
-      return;
+      setQuiz({ ...quiz, pool_rules: previousRules });
     }
-    await fetchData();
   };
 
   if (loading) {
@@ -273,12 +332,17 @@ export default function QuizConfigPage({
       <section className="max-w-7xl mx-auto px-6 py-8 space-y-6">
         {quiz.quiz_type === "FIXED_QUESTION" ? (
           <>
-            {/* Danh sách câu hỏi đã gán */}
+            {/* Danh sách câu hỏi đã gán (Hỗ trợ Kéo & Thả Native) */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm">
               <div className="p-5 border-b border-slate-100 flex justify-between items-center">
-                <h2 className="text-lg font-bold">
-                  Danh sách Câu hỏi trong Đề ({sortedFixedQuestions.length})
-                </h2>
+                <div>
+                  <h2 className="text-lg font-bold">
+                    Danh sách Câu hỏi trong Đề ({sortedFixedQuestions.length})
+                  </h2>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    💡 Giữ biểu tượng <span className="font-bold">⋮⋮</span> để kéo và thả câu hỏi để thay đổi thứ tự.
+                  </p>
+                </div>
                 <p className="text-sm text-slate-500">
                   Tổng điểm:{" "}
                   <span className="font-bold text-[#0066FF]">
@@ -286,28 +350,56 @@ export default function QuizConfigPage({
                   </span>
                 </p>
               </div>
+
               <div className="divide-y divide-slate-100">
                 {sortedFixedQuestions.length === 0 ? (
                   <p className="p-6 text-center text-base text-slate-400">Chưa có câu hỏi nào trong đề thi.</p>
                 ) : (
                   sortedFixedQuestions.map((q, idx) => (
-                    <div key={q.question_id} className="p-5 flex items-start justify-between gap-4 hover:bg-slate-50">
-                      <div className="flex items-start gap-4 flex-1 min-w-0">
+                    <div
+                      key={q.question_id}
+                      draggable
+                      onDragStart={() => handleDragStart(idx)}
+                      onDragOver={handleDragOver}
+                      onDrop={() => handleDrop(idx)}
+                      className={`p-5 flex items-start justify-between gap-4 transition cursor-default ${draggedIndex === idx ? "opacity-30 bg-blue-50 border-2 border-dashed border-blue-400" : "hover:bg-slate-50/80"
+                        }`}
+                    >
+                      <div className="flex items-start gap-3 flex-1 min-w-0">
+                        {/* Tay nắm Kéo thả */}
+                        <div
+                          title="Kéo để di chuyển"
+                          className="cursor-grab active:cursor-grabbing p-1 text-slate-400 hover:text-slate-600 flex items-center justify-center select-none"
+                        >
+                          <span className="text-xl leading-none">⋮⋮</span>
+                        </div>
+
                         <span className="w-8 h-8 shrink-0 bg-slate-100 text-slate-600 font-bold rounded-lg text-sm flex items-center justify-center">
                           {idx + 1}
                         </span>
-                        <div className="min-w-0">
-                          <p className="text-base font-bold">{q.question.question_title}</p>
+
+                        <div className="min-w-0 flex-1">
+                          {/* 🟢 FIXED: Hiển thị định dạng HTML cho tiêu đề & nội dung câu hỏi */}
+                          <div
+                            className="text-base font-bold text-slate-900 prose prose-slate max-w-none"
+                            dangerouslySetInnerHTML={{ __html: q.question.question_title }}
+                          />
+
                           {q.question.body_content && (
-                            <p className="text-sm text-slate-600 mt-1 leading-relaxed">{q.question.body_content}</p>
+                            <div
+                              className="text-sm text-slate-600 mt-1 leading-relaxed prose prose-slate max-w-none"
+                              dangerouslySetInnerHTML={{ __html: q.question.body_content }}
+                            />
                           )}
-                          <span className="text-sm text-slate-400 mt-1 block">
+
+                          <span className="text-xs text-slate-400 mt-2 block font-medium">
                             {q.question.question_type} · {q.question.max_points} điểm
                           </span>
+
                           {quiz.placement_type === "IN_VIDEO" && (
-                            <div className="flex items-center gap-2 mt-2">
-                              <label className="text-sm font-semibold text-slate-700">
-                                Mốc giây kích hoạt trong video:
+                            <div className="flex items-center gap-2 mt-3 bg-slate-50 p-2 rounded-xl border border-slate-200 w-fit">
+                              <label className="text-xs font-semibold text-slate-700">
+                                Mốc giây kích hoạt video:
                               </label>
                               <input
                                 type="number"
@@ -319,12 +411,12 @@ export default function QuizConfigPage({
                                     [q.question_id]: e.target.value === "" ? "" : Number(e.target.value),
                                   }))
                                 }
-                                className="w-24 px-2 py-1 border border-slate-300 rounded-lg text-sm outline-none"
+                                className="w-20 px-2 py-1 border border-slate-300 rounded-lg text-xs outline-none bg-white"
                               />
                               <button
                                 disabled={busy}
                                 onClick={() => handleSaveTrigger(q.question_id)}
-                                className="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-sm font-bold rounded-lg transition"
+                                className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition"
                               >
                                 Lưu
                               </button>
@@ -332,25 +424,12 @@ export default function QuizConfigPage({
                           )}
                         </div>
                       </div>
+
                       <div className="flex items-center gap-1 shrink-0">
-                        <button
-                          disabled={busy || idx === 0}
-                          onClick={() => handleMoveQuestion(idx, -1)}
-                          className="px-2.5 py-1.5 text-sm font-semibold text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg disabled:opacity-30 transition"
-                        >
-                          Lên
-                        </button>
-                        <button
-                          disabled={busy || idx === sortedFixedQuestions.length - 1}
-                          onClick={() => handleMoveQuestion(idx, 1)}
-                          className="px-2.5 py-1.5 text-sm font-semibold text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg disabled:opacity-30 transition"
-                        >
-                          Xuống
-                        </button>
                         <button
                           disabled={busy}
                           onClick={() => handleRemoveQuestion(q.question_id)}
-                          className="px-2.5 py-1.5 text-sm font-semibold text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition"
+                          className="px-3 py-1.5 text-xs font-bold text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition"
                         >
                           Xóa
                         </button>
@@ -368,20 +447,20 @@ export default function QuizConfigPage({
               {quiz.placement_type === "IN_VIDEO" && (
                 <div className="max-w-xs">
                   <label className="block text-sm font-semibold text-slate-700 mb-1">
-                    Mốc giây kích hoạt trong video (áp dụng cho các câu chọn thêm lần này)
+                    Mốc giây kích hoạt trong video (cho các câu chọn lần này)
                   </label>
                   <input
                     type="number"
                     min={0}
                     value={videoTriggerSeconds}
                     onChange={(e) => setVideoTriggerSeconds(e.target.value === "" ? "" : Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-xl text-base outline-none"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm outline-none"
                     placeholder="Vd: 120"
                   />
                 </div>
               )}
 
-              <div className="max-h-[32rem] overflow-y-auto space-y-2">
+              <div className="max-h-[32rem] overflow-y-auto space-y-2 pr-1">
                 {availableQuestions.length === 0 ? (
                   <p className="text-base text-slate-400 text-center py-6">
                     Không còn câu hỏi nào khác trong Ngân hàng câu hỏi để thêm.
@@ -390,7 +469,7 @@ export default function QuizConfigPage({
                   availableQuestions.map((q) => {
                     const checked = selectedToAdd.includes(q.question_id);
                     return (
-                      <label
+                      <div
                         key={q.question_id}
                         onClick={() => handleToggleAdd(q.question_id)}
                         className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition ${checked ? "bg-blue-50/60 border-[#0066FF]" : "bg-white border-slate-200 hover:bg-slate-50"
@@ -399,19 +478,26 @@ export default function QuizConfigPage({
                         <input type="checkbox" checked={checked} onChange={() => { }} className="mt-1.5 h-4 w-4" />
                         <div className="flex-1 min-w-0">
                           <div className="flex justify-between gap-3">
-                            <span className="text-base font-bold text-slate-800">{q.question_title}</span>
-                            <span className="text-sm font-semibold px-2 py-0.5 bg-slate-100 text-slate-600 rounded shrink-0">
+                            {/* 🟢 FIXED: Hiển thị định dạng HTML ở ngân hàng câu hỏi */}
+                            <div
+                              className="text-base font-bold text-slate-800 prose prose-slate max-w-none"
+                              dangerouslySetInnerHTML={{ __html: q.question_title }}
+                            />
+                            <span className="text-xs font-semibold px-2 py-0.5 bg-slate-100 text-slate-600 rounded shrink-0 h-fit">
                               {q.question_type}
                             </span>
                           </div>
                           {q.body_content && (
-                            <p className="text-sm text-slate-600 mt-1 leading-relaxed">{q.body_content}</p>
+                            <div
+                              className="text-sm text-slate-600 mt-1 leading-relaxed prose prose-slate max-w-none"
+                              dangerouslySetInnerHTML={{ __html: q.body_content }}
+                            />
                           )}
-                          <span className="text-sm text-emerald-600 font-semibold mt-1 block">
+                          <span className="text-xs text-emerald-600 font-semibold mt-1 block">
                             {q.max_points} điểm
                           </span>
                         </div>
-                      </label>
+                      </div>
                     );
                   })
                 )}
@@ -422,7 +508,7 @@ export default function QuizConfigPage({
                 <button
                   onClick={handleAddSelectedQuestions}
                   disabled={busy || selectedToAdd.length === 0}
-                  className="px-5 py-2.5 bg-blue-50 text-[#0066FF] hover:bg-blue-100 text-sm font-bold rounded-xl transition disabled:opacity-50"
+                  className="px-5 py-2.5 bg-blue-600 text-white hover:bg-blue-700 text-sm font-bold rounded-xl transition disabled:opacity-50"
                 >
                   Thêm vào đề thi
                 </button>
@@ -521,7 +607,7 @@ export default function QuizConfigPage({
                   <button
                     onClick={handleAddPoolRule}
                     disabled={busy || !addPoolId}
-                    className="px-5 py-2.5 bg-purple-50 text-purple-700 hover:bg-purple-100 text-sm font-bold rounded-xl transition disabled:opacity-50"
+                    className="px-5 py-2.5 bg-purple-600 text-white hover:bg-purple-700 text-sm font-bold rounded-xl transition disabled:opacity-50"
                   >
                     Gán vào đề thi
                   </button>

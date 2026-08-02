@@ -20,7 +20,7 @@ class Quiz(SQLModel, table=True):
     title: str = Field(nullable=False, max_length=255)
     description: Optional[str] = Field(default=None)
     duration_minutes: int = Field(default=15, nullable=False)
-    passing_score: float = Field(default=5.0, nullable=False)
+    passing_percentage: Optional[float] = Field(default=5.0)
     max_attempts: int = Field(default=3, nullable=False)
     
     # Loại đề thi (RANDOM_QUESTION hoặc FIXED_QUESTION)
