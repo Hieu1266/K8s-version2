@@ -108,7 +108,7 @@ def create_user(
 def get_user(
     session: SessionDep,
     user_id: UUID,
-    current_user: dict = Depends(RoleChecker(["Admin"]))
+    current_user: dict = Depends(get_current_user_role)
 ):
     user = crud_user.get_by_id(session, user_id)
     if user is None:

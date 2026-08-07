@@ -1,18 +1,19 @@
 from uuid import UUID
 import httpx
 from fastapi import HTTPException, status
-from fastapi import APIRouter, Depends
-from app.schemas.quiz_submission import QuizSubmissionCreate, QuizSubmissionStatusResponse
+from fastapi import APIRouter, Depends, Header, Request
+from app.schemas.quiz_submission import QuizSubmissionCreate, QuizSubmissionStatusResponse, QuizSubmissionSummaryResponse, QuizUserSummaryResponse, UserSubmissionItem, GradeSubmissionRequest
 from app.schemas.quiz import QuizTakeResponse
-from app.schemas.submission_detail import SubmissionDetailCreate
+from app.schemas.submission_detail import SubmissionDetailCreate, QuizSubmissionDetailResponse
 from app.api.v1.deps import SessionDep
 from app.models.enum import QuizType, SubmissionStatus, QuizPlacementType
 from app.crud.quiz import crud_quiz
 from app.crud.question import crud_question
 from app.crud.quiz_submission import crud_quiz_submission
 from app.crud.submission_detail import crud_submission_detail
-from app.core.security import get_current_user_role, oauth2_scheme
+from app.core.security import get_current_user_role, oauth2_scheme, RoleChecker
 from app.core.config import settings
+from typing import List
 
 router = APIRouter(prefix="/quiz-submissions", tags=["Quiz Submissions"])
 
@@ -352,3 +353,99 @@ def get_status(
         return None
     else:
         return submmit.status
+
+@router.get(
+    "/subjects/{subject_id}/quizzes",
+    response_model=List[QuizSubmissionSummaryResponse],
+    summary="Lấy danh sách bài thi thuộc môn học kèm thống kê bài nộp"
+)
+def get_quizzes_by_subject(
+    subject_id: UUID,
+    db: SessionDep,
+    current_user: dict = Depends(RoleChecker(["Instructor"]))
+):
+    """
+    API dành cho Giảng viên lấy danh sách bài thi thuộc môn học cụ thể:
+    - Báo cáo số lượng bài nộp đã hoàn thành và bài nộp chờ chấm.
+    """
+    user_id_str = current_user.get("user_id")
+    if not user_id_str:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Không tìm thấy thông tin xác thực người dùng."
+        )
+
+    # Lấy dữ liệu bài thi kèm thống kê bài nộp từ DB
+    quizzes_summary = crud_quiz_submission.get_quizzes_summary_by_subject(db=db, subject_id=subject_id)
+    
+    return quizzes_summary
+@router.get(
+    "/quizzes/{quiz_id}/users",
+    response_model=List[QuizUserSummaryResponse],
+    summary="Lấy danh sách sinh viên đã nộp đề thi"
+)
+def get_quiz_users_summary(
+    quiz_id: UUID,
+    db: SessionDep,
+    authorization: str = Header(...),
+    current_user: dict = Depends(RoleChecker(["Instructor", "Admin"]))
+):
+    token = authorization.replace("Bearer ", "").strip() if authorization else ""
+    return crud_quiz_submission.get_users_summary_by_quiz(db=db, quiz_id=quiz_id, token=token)
+
+
+@router.get(
+    "/quizzes/{quiz_id}/users/{user_id}",
+    response_model=List[UserSubmissionItem],
+    summary="Lấy các lượt nộp của 1 sinh viên trong 1 đề thi"
+)
+def get_user_submissions_for_quiz(
+    quiz_id: UUID,
+    user_id: UUID,
+    db: SessionDep,
+    current_user: dict = Depends(RoleChecker(["Instructor", "Admin"]))
+):
+    return crud_quiz_submission.get_submissions_by_user_and_quiz(db, quiz_id, user_id)
+
+@router.get(
+    "/{submission_id}/detail",
+    response_model=QuizSubmissionDetailResponse,
+    summary="Xem chi tiết nội dung bài làm của lượt nộp"
+)
+
+@router.get(
+    "/{submission_id}/detail",
+    response_model=QuizSubmissionDetailResponse,
+    summary="Xem chi tiết nội dung bài làm"
+)
+def get_submission_detail(
+    submission_id: UUID,
+    db: SessionDep,
+    request: Request,
+    current_user: dict = Depends(RoleChecker(["Instructor", "Admin"]))
+):
+    auth_header = request.headers.get("Authorization", "")
+    token = auth_header.replace("Bearer ", "").strip()
+    
+    detail = crud_quiz_submission.get_submission_detail(
+        db=db, submission_id=submission_id, token=token
+    )
+    
+    if not detail:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Không tìm thấy chi tiết bài làm"
+        )
+    return detail
+
+@router.put("/{submission_id}/grade")
+def grade_submission(
+    submission_id: UUID,
+    payload: GradeSubmissionRequest,
+    db: SessionDep,
+    current_user = Depends(RoleChecker(["Instructor"])), # Đảm bảo quyền Giảng viên
+):
+    updated_submission = crud_quiz_submission.update_teacher_grading(
+        db=db, submission_id=submission_id, gradings=payload.gradings
+    )
+    return {"message": "Cập nhật điểm thành công", "status": updated_submission.status}

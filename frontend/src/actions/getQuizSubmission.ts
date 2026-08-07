@@ -7,8 +7,14 @@ import {
     SubmissionDetailUpdateResponse,
     QuizSubmitResponse,
     QuizSubmissionStatusResponse,
-    QuizStatusActionResult
+    QuizStatusActionResult,
+    QuizSubmissionSummary,
+    QuizUserSummaryItem,
+    UserSubmissionItem,
+    QuizSubmissionDetail,
+    QuestionGradingPayload
 } from '@/types/quiz-submission';
+
 
 const BASE_URL = process.env.NEXT_PUBLIC_EXAM_BACKEND_URL;
 
@@ -106,6 +112,9 @@ export async function submitQuizAction(
     }
 }
 
+/**
+ * 4. Lấy trạng thái bài thi theo lesson_id
+ */
 export async function getQuizStatusByLessonAction(lessonId: string): Promise<QuizStatusActionResult> {
     try {
         const headers = await getAuthHeader();
@@ -134,20 +143,16 @@ export async function getQuizStatusByLessonAction(lessonId: string): Promise<Qui
 }
 
 /**
- * 5. Chấm ngay 1 câu hỏi (dùng cho câu hỏi chèn giữa video - cần biết đúng/sai ngay
- * để quyết định có cho video chạy tiếp hay không). Cho phép gọi lại nhiều lần
- * nếu trả lời sai (backend không giới hạn số lần thử).
+ * 5. Chấm ngay 1 câu hỏi (dùng cho câu hỏi chèn giữa video)
  */
 export async function submitQuestionAction(
     detailId: string
 ): Promise<{ success: boolean; data?: { success: boolean; is_correct: boolean | null }; error?: string }> {
     try {
-        // 🆕 SỬA LỖI: getAuthHeader() trả về object header (đã có sẵn "Authorization: Bearer ...."),
-        // không phải chuỗi token thô - trước đây bị nối nhầm thành "Bearer [object Object]".
         const headers = await getAuthHeader();
         const res = await fetch(`${BASE_URL}/submission-details/submit-question/${detailId}`, {
             method: 'POST',
-            headers, // 🆕 SỬA LỖI: header đúng chính tả 'Content-Type' (trước đây là 'Content-[#Type]')
+            headers,
             cache: 'no-store',
         });
 
@@ -157,8 +162,123 @@ export async function submitQuestionAction(
         }
 
         const data = await res.json();
-        return { success: true, data }; // data trả về { success: true, is_correct: boolean }
+        return { success: true, data };
     } catch (err: any) {
         return { success: false, error: err.message || 'Lỗi kết nối' };
+    }
+}
+
+/**
+ * 6. Lấy danh sách bài thi thuộc môn học kèm thống kê bài nộp (Giảng viên)
+ */
+export async function getQuizzesSummaryBySubjectAction(
+    subjectId: string
+): Promise<{ success: boolean; data?: QuizSubmissionSummary[]; error?: string }> {
+    try {
+        const headers = await getAuthHeader();
+        const res = await fetch(`${BASE_URL}/quiz-submissions/subjects/${subjectId}/quizzes`, {
+            method: 'GET',
+            headers,
+            cache: 'no-store',
+        });
+
+        const result = await res.json();
+        if (!res.ok) {
+            return { success: false, error: result.detail || 'Không thể tải danh sách bài thi' };
+        }
+
+        return { success: true, data: result };
+    } catch (err: any) {
+        return { success: false, error: err.message || 'Lỗi kết nối máy chủ' };
+    }
+}
+
+/**
+ * 1. Lấy danh sách học viên và số lượt nộp của đề thi
+ */
+export async function getQuizUsersSummaryAction(
+    quizId: string
+): Promise<{ success: boolean; data?: QuizUserSummaryItem[]; error?: string }> {
+    try {
+        const headers = await getAuthHeader();
+        const res = await fetch(`${BASE_URL}/quiz-submissions/quizzes/${quizId}/users`, {
+            method: 'GET',
+            headers,
+            cache: 'no-store',
+        });
+
+        const result = await res.json();
+        if (!res.ok) return { success: false, error: result.detail || 'Không thể tải danh sách học viên' };
+        return { success: true, data: result };
+    } catch (err: any) {
+        return { success: false, error: err.message || 'Lỗi kết nối máy chủ' };
+    }
+}
+
+/**
+ * 2. Lấy các lượt nộp của riêng 1 học viên trong đề thi
+ */
+export async function getUserSubmissionsByQuizAction(
+    quizId: string,
+    userId: string
+): Promise<{ success: boolean; data?: UserSubmissionItem[]; error?: string }> {
+    try {
+        const headers = await getAuthHeader();
+        const res = await fetch(`${BASE_URL}/quiz-submissions/quizzes/${quizId}/users/${userId}`, {
+            method: 'GET',
+            headers,
+            cache: 'no-store',
+        });
+
+        const result = await res.json();
+        if (!res.ok) return { success: false, error: result.detail || 'Không thể tải lượt nộp của học viên' };
+        return { success: true, data: result };
+    } catch (err: any) {
+        return { success: false, error: err.message || 'Lỗi kết nối máy chủ' };
+    }
+}
+
+export async function getSubmissionDetailAction(
+    submissionId: string
+): Promise<{ success: boolean; data?: QuizSubmissionDetail; error?: string }> {
+    try {
+        const headers = await getAuthHeader();
+        const res = await fetch(`${BASE_URL}/quiz-submissions/${submissionId}/detail`, {
+            method: 'GET',
+            headers,
+            cache: 'no-store',
+        });
+
+        const result = await res.json();
+        if (!res.ok) {
+            return { success: false, error: result.detail || 'Không thể lấy chi tiết bài làm' };
+        }
+        return { success: true, data: result };
+    } catch (err: any) {
+        return { success: false, error: err.message || 'Lỗi kết nối máy chủ' };
+    }
+}
+
+export async function updateSubmissionGradingAction(
+    submissionId: string,
+    gradings: QuestionGradingPayload[]
+): Promise<{ success: boolean; message?: string; error?: string }> {
+    try {
+        const headers = await getAuthHeader();
+        const res = await fetch(`${BASE_URL}/quiz-submissions/${submissionId}/grade`, {
+            method: 'PUT',
+            headers,
+            body: JSON.stringify({ gradings }),
+            cache: 'no-store',
+        });
+
+        const result = await res.json();
+        if (!res.ok) {
+            return { success: false, error: result.detail || 'Cập nhật điểm thất bại' };
+        }
+
+        return { success: true, message: result.message || 'Cập nhật điểm thành công' };
+    } catch (err: any) {
+        return { success: false, error: err.message || 'Lỗi kết nối máy chủ' };
     }
 }

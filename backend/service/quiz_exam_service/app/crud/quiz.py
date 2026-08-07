@@ -36,4 +36,6 @@ class CRUDQuiz(CRUDBase[Quiz, QuizCreate, QuizUpdate, UUID]):
                  Quiz.target_lesson_id == lesson_id
             )
             return db.exec(statement).first()
+
+    
 crud_quiz = CRUDQuiz(Quiz)

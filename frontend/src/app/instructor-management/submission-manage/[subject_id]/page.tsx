@@ -3,19 +3,18 @@
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
-import { Loader2, ArrowLeft, Clock, FileText, CheckCircle2, AlertCircle, ChevronRight } from "lucide-react";
-
-interface QuizItem {
-    quiz_id: string;
-    title: string;
-    description?: string;
-    duration_minutes: number;
-    quiz_type: "FIXED_QUESTION" | "RANDOM_QUESTION";
-    is_active: boolean;
-    total_submissions: number;
-    pending_gradings: number; // SUBMITTED (chưa chấm)
-    graded_count: number;     // GRADED
-}
+import {
+    Loader2,
+    ArrowLeft,
+    Clock,
+    FileText,
+    CheckCircle2,
+    AlertCircle,
+    ChevronRight,
+    Inbox
+} from "lucide-react";
+import { getQuizzesSummaryBySubjectAction } from "@/actions/getQuizSubmission";
+import { QuizSubmissionSummary } from "@/types/quiz-submission";
 
 export default function SubjectQuizzesSubmissionPage({
     params,
@@ -24,48 +23,36 @@ export default function SubjectQuizzesSubmissionPage({
 }) {
     const { subject_id } = use(params);
 
-    const [quizzes, setQuizzes] = useState<QuizItem[]>([]);
+    const [quizzes, setQuizzes] = useState<QuizSubmissionSummary[]>([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        // Gọi API lấy danh sách Quiz kèm thống kê submission theo subject_id
-        // Giả lập mock fetch:
-        setLoading(true);
-        const timer = setTimeout(() => {
-            setQuizzes([
-                {
-                    quiz_id: "q1-uuid",
-                    title: "Kiểm tra Giữa kỳ - Lý thuyết Toán Cao Cấp",
-                    description: "Bài thi gồm 10 trắc nghiệm + 2 câu tự luận vẽ đồ thị.",
-                    duration_minutes: 45,
-                    quiz_type: "FIXED_QUESTION",
-                    is_active: true,
-                    total_submissions: 42,
-                    pending_gradings: 8,
-                    graded_count: 34,
-                },
-                {
-                    quiz_id: "q2-uuid",
-                    title: "Quiz Ôn tập Chương 1",
-                    description: "Trắc nghiệm tự động chấm.",
-                    duration_minutes: 15,
-                    quiz_type: "RANDOM_QUESTION",
-                    is_active: true,
-                    total_submissions: 50,
-                    pending_gradings: 0,
-                    graded_count: 50,
-                },
-            ]);
-            setLoading(false);
-        }, 400);
+        async function fetchQuizzes() {
+            setLoading(true);
+            setError(null);
 
-        return () => clearTimeout(timer);
+            const result = await getQuizzesSummaryBySubjectAction(subject_id);
+
+            if (result.success && result.data) {
+                setQuizzes(result.data);
+            } else {
+                setError(result.error || "Không thể tải danh sách bài thi.");
+            }
+
+            setLoading(false);
+        }
+
+        if (subject_id) {
+            fetchQuizzes();
+        }
     }, [subject_id]);
 
     return (
         <div className="min-h-screen bg-slate-100 text-slate-800">
             <Navbar />
 
+            {/* Header section */}
             <section className="bg-gradient-to-r from-[#0052D4] via-[#0066FF] to-[#4364F7] text-white py-10 px-6">
                 <div className="max-w-7xl mx-auto">
                     <Link
@@ -81,12 +68,38 @@ export default function SubjectQuizzesSubmissionPage({
                 </div>
             </section>
 
+            {/* Main content section */}
             <section className="max-w-7xl mx-auto px-6 py-8">
-                {loading ? (
-                    <div className="flex justify-center py-20 bg-white rounded-2xl border border-slate-200">
-                        <Loader2 size={32} className="animate-spin text-[#0066FF]" />
+                {/* Trạng thái Loading */}
+                {loading && (
+                    <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-slate-200">
+                        <Loader2 size={32} className="animate-spin text-[#0066FF] mb-2" />
+                        <span className="text-xs text-slate-500 font-medium">Đang tải danh sách bài thi...</span>
                     </div>
-                ) : (
+                )}
+
+                {/* Trạng thái Báo lỗi */}
+                {!loading && error && (
+                    <div className="flex flex-col items-center justify-center py-12 bg-red-50 rounded-2xl border border-red-200 text-center p-6">
+                        <AlertCircle size={36} className="text-red-500 mb-2" />
+                        <h3 className="text-sm font-bold text-red-700">Đã xảy ra lỗi</h3>
+                        <p className="text-xs text-red-600 mt-1 max-w-md">{error}</p>
+                    </div>
+                )}
+
+                {/* Trạng thái Danh sách trống */}
+                {!loading && !error && quizzes.length === 0 && (
+                    <div className="flex flex-col items-center justify-center py-16 bg-white rounded-2xl border border-slate-200 text-center p-6">
+                        <Inbox size={40} className="text-slate-300 mb-2" />
+                        <h3 className="text-base font-bold text-slate-700">Chưa có bài thi nào</h3>
+                        <p className="text-xs text-slate-500 mt-1">
+                            Môn học này hiện chưa được khởi tạo bài thi nào.
+                        </p>
+                    </div>
+                )}
+
+                {/* Trạng thái Hiển thị danh sách Quizzes */}
+                {!loading && !error && quizzes.length > 0 && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {quizzes.map((quiz) => (
                             <div
@@ -106,7 +119,9 @@ export default function SubjectQuizzesSubmissionPage({
                                     </div>
 
                                     <h3 className="text-lg font-bold text-slate-800 mb-2">{quiz.title}</h3>
-                                    <p className="text-xs text-slate-500 line-clamp-2 mb-4">{quiz.description}</p>
+                                    <p className="text-xs text-slate-500 line-clamp-2 mb-4">
+                                        {quiz.description || "Không có mô tả cho bài thi này."}
+                                    </p>
 
                                     <div className="flex items-center gap-4 text-xs text-slate-500 border-t border-slate-100 pt-3">
                                         <span className="flex items-center gap-1">
