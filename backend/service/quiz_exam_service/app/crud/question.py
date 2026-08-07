@@ -2,6 +2,7 @@ from sqlmodel import Session, select, update, func
 from app.crud.base import CRUDBase
 from uuid import UUID
 from app.models.question import Question
+from app.models.question_pool_link import QuestionPoolLink
 from app.schemas.question import QuestionCreate, QuestionUpdate
 
 class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate, UUID]):
@@ -32,4 +33,14 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate, UUID]):
             Question.subject_id == subject_id
         )
         return db.exec(statement).first() or 0
+    def get_random_by_pool(self, db: Session, pool_id: UUID, limit: int) -> list[Question]:
+        """Lấy danh sách ngẫu nhiên tối đa `limit` câu hỏi từ một Question Pool."""
+        statement = (
+            select(Question)
+            .join(QuestionPoolLink)
+            .where(QuestionPoolLink.pool_id == pool_id)
+            .order_by(func.random())
+            .limit(limit)
+        )
+        return db.exec(statement).all()
 crud_question = CRUDQuestion(Question)

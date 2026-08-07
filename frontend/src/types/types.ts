@@ -18,6 +18,7 @@ export enum QuizPlacementType {
 export enum QuestionType {
     MULTIPLE_CHOICE = 'MULTIPLE_CHOICE', // Trắc nghiệm (một hoặc nhiều đáp án)
     ESSAY = 'ESSAY',                     // Tự luận (hỗ trợ text, LaTeX, đồ thị)
+    TRUE_FALSE = "TRUE_FALSE",
 }
 
 

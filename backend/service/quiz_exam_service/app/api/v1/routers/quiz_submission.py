@@ -1,0 +1,354 @@
+from uuid import UUID
+import httpx
+from fastapi import HTTPException, status
+from fastapi import APIRouter, Depends
+from app.schemas.quiz_submission import QuizSubmissionCreate, QuizSubmissionStatusResponse
+from app.schemas.quiz import QuizTakeResponse
+from app.schemas.submission_detail import SubmissionDetailCreate
+from app.api.v1.deps import SessionDep
+from app.models.enum import QuizType, SubmissionStatus, QuizPlacementType
+from app.crud.quiz import crud_quiz
+from app.crud.question import crud_question
+from app.crud.quiz_submission import crud_quiz_submission
+from app.crud.submission_detail import crud_submission_detail
+from app.core.security import get_current_user_role, oauth2_scheme
+from app.core.config import settings
+
+router = APIRouter(prefix="/quiz-submissions", tags=["Quiz Submissions"])
+
+@router.post("/start/{lesson_id}", response_model=QuizTakeResponse)
+def start_quiz_submission(
+    lesson_id: UUID,
+    db: SessionDep,
+    current_user: dict = Depends(get_current_user_role)
+):
+    quiz_id = crud_quiz.get_quiz_by_lesson(db, lesson_id)
+    user_id_str = current_user.get("user_id")
+    if not user_id_str:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, 
+            detail="Không tìm thấy ID người dùng trong token"
+        )
+    
+    user_id = UUID(user_id_str)
+
+    # 1. Lấy thông tin bài thi và kiểm tra trạng thái
+    quiz = crud_quiz.get_by_id(db, quiz_id)
+    if not quiz:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy bài thi")
+    
+    if not quiz.is_active:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Bài thi hiện đang bị khóa")
+
+    # 🆕 Câu hỏi chèn giữa video (IN_VIDEO) chỉ hỗ trợ đề thi dạng câu hỏi cố định,
+    # vì cần video_trigger_seconds gắn cứng theo từng câu (pool bốc ngẫu nhiên không có mốc giây).
+    if quiz.placement_type == QuizPlacementType.IN_VIDEO and quiz.quiz_type != QuizType.FIXED_QUESTION:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Đề thi chèn giữa video phải là dạng câu hỏi cố định (FIXED_QUESTION)."
+        )
+
+    # 🆕 2. RESUME: Nếu user đã có 1 lượt làm bài đang dang dở (IN_PROGRESS) cho quiz này,
+    # trả lại đúng lượt đó (kèm đáp án đã lưu) thay vì luôn tạo attempt mới.
+    # Quan trọng với quiz IN_VIDEO: tránh việc reload trang / rời bài học giữa chừng bị mất tiến trình
+    # hoặc bị tính thành 1 lượt làm bài mới.
+    existing_in_progress = crud_quiz_submission.get_in_progress_by_quiz_and_user(
+        db, quiz_id=quiz.quiz_id, user_id=user_id
+    )
+    if existing_in_progress:
+        return _build_take_response(existing_in_progress)
+
+    selected_questions = []
+    # question_id -> video_trigger_seconds (chỉ có giá trị với FIXED_QUESTION, lấy từ QuizQuestion)
+    trigger_seconds_map: dict = {}
+
+    # 3. Xử lý bốc câu hỏi thông qua CRUD
+    if quiz.quiz_type == QuizType.FIXED_QUESTION:
+        sorted_links = sorted(quiz.quiz_questions, key=lambda x: x.order_index)
+        selected_questions = [link.question for link in sorted_links]
+        # 🆕 Giữ lại mốc giây kích hoạt riêng của từng câu hỏi trong đề thi này
+        trigger_seconds_map = {
+            link.question_id: link.video_trigger_seconds for link in sorted_links
+        }
+
+    elif quiz.quiz_type == QuizType.RANDOM_QUESTION:
+        for rule in quiz.pool_rules:
+            # Gọi hàm CRUD thay vì viết câu truy vấn SQL trực tiếp tại đây
+            questions_from_pool = crud_question.get_random_by_pool(
+                db=db, 
+                pool_id=rule.pool_id, 
+                limit=rule.quantity
+            )
+            selected_questions.extend(questions_from_pool)
+
+    if not selected_questions:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="Đề thi chưa có câu hỏi nào được cấu hình."
+        )
+
+    # 4. Tạo mới QuizSubmission
+    submission_in = QuizSubmissionCreate(
+        quiz_id=quiz.quiz_id,
+        user_id=user_id
+    )
+    new_submission = crud_quiz_submission.create(db=db, obj_in=submission_in)
+
+    # 5. Tạo các bản ghi SubmissionDetail rỗng và build Response
+    questions_response = []
+    
+    for question in selected_questions:
+        detail_in = SubmissionDetailCreate(
+            submission_id=new_submission.submission_id,
+            question_id=question.question_id,
+            # 🆕 Gán mốc giây kích hoạt (None nếu không phải quiz IN_VIDEO / RANDOM_QUESTION)
+            video_trigger_seconds=trigger_seconds_map.get(question.question_id)
+        )
+        new_detail = crud_submission_detail.create(db=db, obj_in=detail_in)
+        
+        options_res = [
+            {"option_id": opt.option_id, "option_text": opt.option_text} 
+            for opt in question.options
+        ]
+        
+        questions_response.append({
+            "detail_id": new_detail.detail_id,
+            "question_id": question.question_id,
+            "question_title": question.question_title,
+            "question_type": question.question_type,
+            "body_content": question.body_content,
+            "max_points": question.max_points,
+            "options": options_res,
+            "video_trigger_seconds": new_detail.video_trigger_seconds,  # 🆕
+            "selected_option_id": None,  # 🆕 mới tạo, chưa trả lời gì
+            "is_answered_correct": None,  # 🆕
+        })
+
+    return {
+        "submission_id": new_submission.submission_id,
+        "quiz_id": quiz.quiz_id,
+        "title": quiz.title,
+        "quiz_type": quiz.quiz_type,
+        "attempt_number": new_submission.attempt_number,
+        "questions": questions_response
+    }
+
+
+# 🆕 Dựng lại QuizTakeResponse từ 1 submission IN_PROGRESS đã tồn tại (dùng cho resume).
+def _build_take_response(submission) -> dict:
+    questions_response = []
+
+    # Nếu là quiz FIXED_QUESTION thì sắp xếp lại đúng thứ tự order_index đã cấu hình
+    order_map = {}
+    if submission.quiz and submission.quiz.quiz_type == QuizType.FIXED_QUESTION:
+        order_map = {
+            qq.question_id: qq.order_index for qq in submission.quiz.quiz_questions
+        }
+    sorted_details = sorted(
+        submission.details,
+        key=lambda d: order_map.get(d.question_id, 999)
+    )
+
+    for detail in sorted_details:
+        question = detail.question
+
+        # Xác định đã trả lời đúng/sai hay chưa trả lời, KHÔNG lộ đáp án đúng ra response
+        is_answered_correct = None
+        if detail.selected_option_id is not None:
+            correct_option = next((opt for opt in question.options if opt.is_correct), None)
+            is_answered_correct = bool(
+                correct_option and detail.selected_option_id == correct_option.option_id
+            )
+
+        options_res = [
+            {"option_id": opt.option_id, "option_text": opt.option_text}
+            for opt in question.options
+        ]
+
+        questions_response.append({
+            "detail_id": detail.detail_id,
+            "question_id": question.question_id,
+            "question_title": question.question_title,
+            "question_type": question.question_type,
+            "body_content": question.body_content,
+            "max_points": question.max_points,
+            "options": options_res,
+            "video_trigger_seconds": detail.video_trigger_seconds,
+            "selected_option_id": detail.selected_option_id,
+            "is_answered_correct": is_answered_correct,
+        })
+
+    return {
+        "submission_id": submission.submission_id,
+        "quiz_id": submission.quiz_id,
+        "title": submission.quiz.title if submission.quiz else "",
+        "quiz_type": submission.quiz.quiz_type if submission.quiz else None,
+        "attempt_number": submission.attempt_number,
+        "questions": questions_response,
+    }
+
+
+@router.post("/{submission_id}/submit")
+async def submit_quiz(
+    submission_id: UUID,
+    db: SessionDep,
+    token: str = Depends(oauth2_scheme),               # Lấy raw JWT Token để forward sang Progress Service
+    current_user: dict = Depends(get_current_user_role)
+):
+    # 1. Tiến hành chấm điểm bài thi dưới DB
+    submitted_quiz = crud_quiz_submission.submit_and_evaluate(
+        db=db, 
+        submission_id=submission_id
+    )
+    
+    # 2. Kiểm tra điều kiện bài thi ĐẠT (is_passed == True hoặc đang đợi chấm điểm) và có gắn lesson_id
+    next_unlocked = False
+    if (submitted_quiz.is_passed or submitted_quiz.status == SubmissionStatus.SUBMITTED) and submitted_quiz.quiz and submitted_quiz.quiz.target_lesson_id:
+        lesson_id = submitted_quiz.quiz.target_lesson_id
+        
+        # Tạo URL và Header để gọi trực tiếp sang Progress Service
+        progress_url = f"{settings.BACKEND_LEARNING_PROGRESS_URL}/lesson_progress/lesson/{lesson_id}/complete"
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json"
+        }
+        
+        # Thực hiện request PUT liên dịch vụ trực tiếp trong Router
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.put(progress_url, headers=headers, timeout=5.0)
+                if response.status_code == 200:
+                    next_unlocked = True
+                else:
+                    print(f"Progress Service phản hồi lỗi ({response.status_code}): {response.text}")
+        except httpx.RequestError as exc:
+            print(f"Lỗi kết nối tới Progress Service: {exc}")
+
+    # 3. Trả về kết quả cho Client
+    return {
+        "message": "Nộp bài thành công",
+        "submission_id": submitted_quiz.submission_id,
+        "status": submitted_quiz.status,
+        "is_passed": submitted_quiz.is_passed,
+        "total_score": submitted_quiz.total_score,
+        "next_lesson_unlocked": next_unlocked
+    }
+
+GRADED_STATUSES = SubmissionStatus.GRADED
+
+def _build_status_response(submission_obj) -> dict:
+    """Hàm dùng chung để build response trạng thái bài làm."""
+    is_graded = submission_obj.status in GRADED_STATUSES
+
+    order_map = {}
+    if submission_obj.quiz and submission_obj.quiz.quiz_type == QuizType.FIXED_QUESTION:
+        order_map = {
+            qq.question_id: qq.order_index
+            for qq in submission_obj.quiz.quiz_questions
+        }
+    sorted_details = sorted(
+        submission_obj.details,
+        key=lambda d: order_map.get(d.question_id, 999)
+    )
+
+    questions_response = []
+    for detail in sorted_details:
+        question = detail.question
+
+        options_res = []
+        for opt in question.options:
+            option_data = {"option_id": opt.option_id, "option_text": opt.option_text}
+            if is_graded:
+                option_data["is_correct"] = opt.is_correct
+            options_res.append(option_data)
+
+        item = {
+            "detail_id": detail.detail_id,
+            "question_id": question.question_id,
+            "question_title": question.question_title,
+            "question_type": question.question_type,
+            "video_trigger_seconds": detail.video_trigger_seconds,  # 🆕 dùng cho tab "Bài thi" xem lại
+            "body_content": question.body_content,
+            "max_points": question.max_points,
+            "options": options_res,
+            "selected_option_id": detail.selected_option_id,
+            "essay_answer_text": detail.essay_answer_text,
+            "graph_json_data": detail.graph_json_data,
+            "graph_image_url": detail.graph_image_url,
+        }
+        if is_graded:
+            item["score_earned"] = detail.score_earned
+            item["teacher_feedback"] = detail.teacher_feedback
+
+        questions_response.append(item)
+
+    return {
+        "submission_id": submission_obj.submission_id,
+        "quiz_id": submission_obj.quiz_id,
+        "status": submission_obj.status,
+        "attempt_number": submission_obj.attempt_number,
+        "started_at": submission_obj.started_at,
+        "total_score": submission_obj.total_score if is_graded else None,
+        "is_passed": submission_obj.is_passed if is_graded else None,
+        "questions": questions_response
+    }
+
+
+@router.get("/lesson/{lesson_id}", response_model=QuizSubmissionStatusResponse)
+def get_submission_status_by_lesson(
+    lesson_id: UUID,
+    db: SessionDep,
+    current_user: dict = Depends(get_current_user_role)
+):
+    """
+    Tìm lượt làm bài để hiển thị cho một lesson_id, theo quy tắc:
+    - Nếu có lượt nào ĐẠT (is_passed == True) -> lấy lượt ĐẠT gần nhất (attempt_number lớn nhất).
+    - Nếu chưa từng đạt -> lấy lượt gần nhất bất kể trạng thái (kể cả đang làm dở / trượt).
+    """
+    # 1. Tìm quiz gắn với lesson
+    quiz_id = crud_quiz.get_quiz_by_lesson(db, lesson_id)
+    if not quiz_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Không tìm thấy bài thi cho bài học này"
+        )
+
+    user_id_str = current_user.get("user_id")
+    if not user_id_str:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Không tìm thấy ID người dùng trong token"
+        )
+    user_id = UUID(user_id_str)
+
+    # 2. Lấy tất cả lượt làm bài của user cho quiz này
+    submissions = crud_quiz_submission.get_by_quiz_and_user(db, quiz_id=quiz_id, user_id=user_id)
+    if not submissions:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Bạn chưa làm bài thi này lần nào"
+        )
+
+    # 3. Chọn lượt để hiển thị theo quy tắc
+    passed_submissions = [s for s in submissions if s.is_passed]
+    if passed_submissions:
+        target_submission = max(passed_submissions, key=lambda s: s.attempt_number)
+    else:
+        target_submission = max(submissions, key=lambda s: s.attempt_number)
+
+    # 4. Build response
+    return _build_status_response(target_submission)
+
+@router.get("/get-lastest-status/{lesson_id}")
+def get_status(
+    db: SessionDep,
+    lesson_id: UUID,
+    current_user: dict = Depends(get_current_user_role)
+):
+    user_id = UUID(current_user["user_id"])
+    quiz_id = crud_quiz.get_quiz_by_lesson(db, lesson_id)
+    submmit = crud_quiz_submission.get_last_attemp_submitted(db, quiz_id, user_id)
+    if submmit is None:
+        return None
+    else:
+        return submmit.status

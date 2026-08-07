@@ -31,4 +31,9 @@ class CRUDQuiz(CRUDBase[Quiz, QuizCreate, QuizUpdate, UUID]):
             Quiz.subject_id == subject_id
         )
         return db.exec(statement).first() or 0
+    def get_quiz_by_lesson(self, db: Session, lesson_id: UUID)-> UUID:
+            statement = select(Quiz.quiz_id).where(
+                 Quiz.target_lesson_id == lesson_id
+            )
+            return db.exec(statement).first()
 crud_quiz = CRUDQuiz(Quiz)

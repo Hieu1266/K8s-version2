@@ -21,13 +21,13 @@ class SubmissionDetail(SQLModel, table=True):
     
     # Trường hợp Tự luận gõ text/công thức toán: Lưu chuỗi HTML chứa mã LaTeX từ Rich Text Editor
     essay_answer_text: Optional[str] = Field(default=None)
-    
+    video_trigger_seconds: Optional[int] = Field(default=None)
     # Trường hợp Tự luận vẽ hình/đồ thị:
     # Lưu chuỗi tọa độ vẽ (dạng JSON string) để FE tái tạo lại nét vẽ nếu cần chỉnh sửa
     graph_json_data: Optional[str] = Field(default=None)
     # Lưu URL của ảnh kết quả đồ thị sau khi gửi qua Storage Service (Để hiển thị nhanh cho GV chấm)
     graph_image_url: Optional[str] = Field(default=None, max_length=500)
-
+    is_passed: Optional[bool] = Field(default= None)
     score_earned: Optional[float] = Field(default=None)   # Điểm đạt được cho riêng câu này
     teacher_feedback: Optional[str] = Field(default=None) # Nhận xét, sửa lỗi của Giảng viên (nếu có)
 

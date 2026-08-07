@@ -38,7 +38,7 @@ function CoursePreviewContent() {
 
       if (result && result.success) {
         alert(`Đăng ký thành công khóa học: ${course?.title}!`);
-        router.replace('/home');
+        router.replace('/course/' + id);
       } else {
         const msg = result?.message || "Đăng ký không thành công.";
 
@@ -53,7 +53,7 @@ function CoursePreviewContent() {
         if (isAlreadyEnrolled) {
           alert("Bạn đã đăng ký khóa học này rồi! Hệ thống sẽ chuyển bạn tới trang học.");
           setTimeout(() => {
-            router.replace('/home');
+            router.replace('/course/' + id);
           }, 100);
           return;
         }

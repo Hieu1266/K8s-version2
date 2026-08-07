@@ -22,12 +22,11 @@ async def fetch_ordered_lessons(course_id: UUID) -> list[dict]:
         try:
             response = await client.get(course_lessons_url, timeout=5.0)
             if response.status_code == 200:
-                # Trả về mảng chứa dict thông tin bài học [{"lesson_id":..., "is_optional":...}]
                 return response.json().get("lessons", [])
             return []
         except httpx.RequestError:
             raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE, 
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="Lỗi kết nối tới Course Service."
             )
 
@@ -45,65 +44,65 @@ async def fetch_total_lessons(course_id: UUID) -> int:
 @router.put("/lesson/{lesson_id}/complete", response_model=LessonProgressResponse)
 async def complete_lesson(
     lesson_id: UUID,
-    db: SessionDep, 
+    db: SessionDep,
     current_user: dict = Depends(get_current_user_role)
 ):
     user_id = UUID(current_user["user_id"])
-    
+
     # 1. Lấy thông tin tiến độ của user để kiểm tra tính hợp lệ
     progress = crud_lesson_progress.get_by_lesson(db, user_id=user_id, lesson_id=lesson_id)
-    if not progress: 
+    if not progress:
         raise HTTPException(status_code=404, detail="Không tìm thấy tiến độ bài học của học viên.")
     if progress.status == LessonStatus.LOCKED:
         raise HTTPException(status_code=400, detail="Bài học đang bị khóa.")
 
+    if progress.status == LessonStatus.COMPLETED:
+        return progress
+
     # 2. Lấy lộ trình các bài học từ Course Service
     ordered_lessons = await fetch_ordered_lessons(progress.course_id)
-    
+
     # 3. Cập nhật trạng thái bài học thành COMPLETED và mở khóa bài tiếp theo
     updated_progress = crud_lesson_progress.complete_and_unlock_next_by_lesson(
-        db=db, 
-        user_id=user_id, 
+        db=db,
+        user_id=user_id,
         lesson_id=lesson_id,
         ordered_lessons=ordered_lessons
     )
-    
+
     if not updated_progress:
         raise HTTPException(status_code=500, detail="Cập nhật tiến độ không thành công.")
 
     # 4. Tính toán tiến độ tổng thể của toàn khóa học
     total_lessons = await fetch_total_lessons(progress.course_id)
     completed_lessons = crud_lesson_progress.count_completed_lessons(db, user_id=user_id, course_id=progress.course_id)
-    
+
     if total_lessons > 0:
         overall_progress = round((completed_lessons / total_lessons) * 100, 2)
-        if overall_progress > 100.0: 
+        if overall_progress > 100.0:
             overall_progress = 100.0
-            
+
         is_completed = (completed_lessons >= total_lessons) or (overall_progress == 100.0)
-        
+
         enroll = crud_course_enrollment.get_by_user_and_course(db, user_id=user_id, course_id=progress.course_id)
         if enroll:
             crud_course_enrollment.update_overall_progress(
-                db=db, 
-                db_obj=enroll, 
-                progress=overall_progress, 
+                db=db,
+                db_obj=enroll,
+                progress=overall_progress,
                 is_completed=is_completed
             )
-            
+
     return updated_progress
 
-@router.get("/get-status/{lesson_id}", response_model=LessonStatus) 
+@router.get("/get-status/{lesson_id}", response_model=LessonStatus)
 async def get_lesson_progress_status(
     lesson_id: str,
     db: SessionDep,
     current_user = Depends(get_current_user_role)
 ):
-    # Lấy status từ DB hoặc CRUD service
-    status = crud_lesson_progress.get_lesson_progress_status(db, lesson_id=lesson_id)
-    
-    # NẾU STATUS LÀ NONE (Chưa có record tiến độ) -> Trả về status mặc định
+    user_id = UUID(current_user["user_id"])
+    status = crud_lesson_progress.get_lesson_progress_status(db, lesson_id=lesson_id, user_id=user_id)
     if status is None:
-        return "LOCKED"  # Hoặc "UNLOCKED" / "IN_PROGRESS" tùy thuộc bài học đầu hay bài tiếp theo
-        
+        return "LOCKED"
     return status

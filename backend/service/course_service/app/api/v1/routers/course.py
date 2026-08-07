@@ -10,9 +10,11 @@ from app.crud.course import crud_course
 from app.crud.course_media import crud_course_media
 from app.schemas.subject import SubjectPreview
 from app.schemas.module import ModulePreview
+from app.schemas.lesson import LessonLearningStructure
 from app.schemas.course import CourseCreate, CourseImageUploadResponse, CourseRead, CourseUpdate, CourseLessonsResponse, CoursePreview, CourseLearningStructure, LessonOrderInfo
 from app.core.config import settings
 import httpx
+import asyncio
 
 router = APIRouter(prefix="/courses", tags=["courses"])
 
@@ -308,6 +310,7 @@ def get_course_total_lessons(db: SessionDep, course_id: UUID):
     return crud_course.get_total_lessons(db, course_id=course_id)
 
 LEARNING_PROGRESS_SERVICE = settings.BACKEND_LEARNING_PROGRESS_URL
+EXAM_QUIZ_SERVICE = settings.BACKEND_QUIZ_EXAM_URL
 
 @router.get("/get-learning-course/{course_id}", response_model=CourseLearningStructure)
 async def get_learning_course(
@@ -317,10 +320,10 @@ async def get_learning_course(
     token: str = Depends(oauth2_scheme) 
 ):
     async with httpx.AsyncClient() as client:
+        headers = {"Authorization": f"Bearer {token}"}
+
+        # 1. Kiểm tra thông tin đăng ký (Enrollment Check)
         try:
-            # Truyền token vào Header
-            headers = {"Authorization": f"Bearer {token}"}
-            
             response = await client.get(
                 f"{LEARNING_PROGRESS_SERVICE}/course_enrollment/is-enrolled/{course_id}",
                 headers=headers,
@@ -345,24 +348,82 @@ async def get_learning_course(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail=f"Lỗi kết nối tới Enrollment Service: {exc}"
             )
+
         # 2. Nếu chưa đăng ký -> Từ chối quyền truy cập
-    if not is_enrolled:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Bạn chưa đăng ký khóa học này. Vui lòng đăng ký để truy cập bài học."
-        )
+        if not is_enrolled:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Bạn chưa đăng ký khóa học này. Vui lòng đăng ký để truy cập bài học."
+            )
 
-    # 3. Đã đăng ký -> Truy vấn cây bài học qua CRUD
-    course = crud_course.get_learning_structure(db=db, course_id=course_id)
-    
-    if not course:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, 
-            detail="Không tìm thấy khóa học"
-        )
-
-    # FastAPI/Pydantic sẽ tự động ép kiểu dữ liệu từ ORM model `course` 
-    # sang đúng cấu trúc của `CourseLearningStructure`
-    return course
+        # 3. Truy vấn cây cấu trúc bài học từ Database
+        course_orm = crud_course.get_learning_structure(db=db, course_id=course_id)
         
-    
+        if not course_orm:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, 
+                detail="Không tìm thấy khóa học"
+            )
+
+        # 4. Ép kiểu ORM Model thành Pydantic Schema
+        course_data = CourseLearningStructure.model_validate(course_orm, from_attributes=True)
+
+        # 5. Phân loại bài học
+        # 5.1. Bài học là Quiz -> Cần lấy submit_status
+        quiz_lessons = [
+            lesson
+            for subject in course_data.subjects
+            for module in subject.modules
+            for lesson in module.lessons
+            if lesson.is_quiz is True
+        ]
+
+        # 5.2. Bài học KHÔNG PHẢI là Quiz -> Cần kiểm tra had_quiz
+        non_quiz_lessons = [
+            lesson
+            for subject in course_data.subjects
+            for module in subject.modules
+            for lesson in module.lessons
+            if lesson.is_quiz is False
+        ]
+
+        # 6. Các hàm gọi API bất đồng bộ
+        async def fetch_lesson_status(lesson: LessonLearningStructure):
+            try:
+                res = await client.get(
+                    f"{EXAM_QUIZ_SERVICE}/quiz-submissions/get-lastest-status/{lesson.lesson_id}",
+                    headers=headers,
+                    timeout=5.0
+                )
+                if res.status_code == 200:
+                    lesson.submit_status = res.json()
+                else:
+                    lesson.submit_status = None
+            except httpx.RequestError:
+                lesson.submit_status = None
+
+        async def fetch_lesson_had_quiz(lesson: LessonLearningStructure):
+            try:
+                res = await client.get(
+                    f"{EXAM_QUIZ_SERVICE}/quizzes/{lesson.lesson_id}/had-quiz",
+                    headers=headers,
+                    timeout=5.0
+                )
+                if res.status_code == 200:
+                    lesson.had_quiz = res.json()  # Gán trực tiếp giá trị boolean (True/False)
+                else:
+                    lesson.had_quiz = False
+            except httpx.RequestError:
+                lesson.had_quiz = False
+
+        # 7. Gom tất cả request và gọi song song (Concurrent Async Calls)
+        tasks = []
+        if quiz_lessons:
+            tasks.extend(fetch_lesson_status(lesson) for lesson in quiz_lessons)
+        if non_quiz_lessons:
+            tasks.extend(fetch_lesson_had_quiz(lesson) for lesson in non_quiz_lessons)
+
+        if tasks:
+            await asyncio.gather(*tasks)
+
+        return course_data

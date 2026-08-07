@@ -2,7 +2,8 @@ from pydantic import BaseModel
 from uuid import UUID
 from app.models.enum import QuizPlacementType, QuizType
 from datetime import date
-from app.schemas.question import QuestionItem
+from app.schemas.question import QuestionItem, QuestionDisplay
+from typing import List
 
 class QuizCreate(BaseModel):
     title: str
@@ -80,3 +81,11 @@ class QuizDetail(QuizItem):
 class QuizQuestionReorderItem(BaseModel):
     question_id: UUID
     order_index: int
+
+class QuizTakeResponse(BaseModel):
+    submission_id: UUID
+    quiz_id: UUID
+    title: str
+    quiz_type: QuizType
+    attempt_number: int
+    questions: List[QuestionDisplay]
