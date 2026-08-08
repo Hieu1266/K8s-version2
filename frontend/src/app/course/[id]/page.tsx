@@ -245,15 +245,33 @@ export default function CourseLearningPage() {
     }
   };
 
-  const handleQuizPassed = (submissionStatus?: string) => {
+  const handleQuizPassed = (submissionStatus?: string, isPass?: boolean) => {
     if (!currentLesson || !course) return;
+
+    const isPendingGrading = submissionStatus === 'SUBMITTED';
+    const isFailed = isPass === false;
+
+    const shouldMarkCompleted = !isPendingGrading && !isFailed;
+    const shouldUnlockNext = shouldMarkCompleted || isPendingGrading;
 
     const currentIndex = flatLessons.findIndex(
       (f) => f.lesson.lesson_id === currentLesson.lesson_id
     );
 
+    const nextItem =
+      currentIndex !== -1 && currentIndex + 1 < flatLessons.length
+        ? flatLessons[currentIndex + 1]
+        : null;
+
+    // Nếu bài kế tiếp đã mở sẵn (không LOCKED) và không phải bài tùy chọn
+    // -> không cần tìm/mở thêm gì (tránh mở nhầm bài xa hơn, sai thứ tự)
+    const nextAlreadyAccessible =
+      !!nextItem && nextItem.lesson.status !== LessonStatus.LOCKED && !nextItem.lesson.is_optional;
+
     const unlockTarget =
-      currentIndex !== -1 ? findNextLockedLesson(currentIndex + 1) : null;
+      shouldUnlockNext && currentIndex !== -1 && !nextAlreadyAccessible
+        ? findNextLockedLesson(currentIndex + 1)
+        : null;
 
     setCourse((prevCourse) => {
       if (!prevCourse) return prevCourse;
@@ -265,7 +283,11 @@ export default function CourseLearningPage() {
             ...mod,
             lessons: mod.lessons.map((les: any) => {
               if (les.lesson_id === currentLesson.lesson_id) {
-                return { ...les, status: LessonStatus.COMPLETED, submit_status: submissionStatus ?? 'GRADED' };
+                return {
+                  ...les,
+                  submit_status: submissionStatus ?? les.submit_status,
+                  ...(shouldMarkCompleted ? { status: LessonStatus.COMPLETED } : {}),
+                };
               }
               if (unlockTarget && les.lesson_id === unlockTarget.lesson.lesson_id) {
                 return { ...les, status: LessonStatus.UNLOCKED };
@@ -276,8 +298,17 @@ export default function CourseLearningPage() {
         })),
       };
     });
-  };
 
+    setCurrentLesson((prev: LessonWithStatus | undefined): LessonWithStatus | undefined =>
+      prev
+        ? {
+          ...prev,
+          submit_status: (submissionStatus ?? prev.submit_status) as LessonWithStatus['submit_status'],
+          ...(shouldMarkCompleted ? { status: LessonStatus.COMPLETED } : {}),
+        }
+        : prev
+    );
+  };
   const handleCompleteAndNext = async () => {
     if (!currentLesson || !course) return;
 

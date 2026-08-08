@@ -138,5 +138,87 @@ class CRUDLessonProgress(CRUDBase[LessonProgress, LessonProgressCreate, LessonPr
             LessonProgress.user_id == user_id
         )
         return db.exec(statement).first()
-    
+
+    def unlock_next_lesson_only(
+        self, db: Session, user_id: UUID, lesson_id: UUID, ordered_lessons: list[dict]
+    ) -> LessonProgress | None:
+        current_progress = self.get_by_lesson(db, user_id=user_id, lesson_id=lesson_id)
+        if not current_progress:
+            return None
+
+        lesson_ids = [UUID(str(l["lesson_id"])) for l in ordered_lessons]
+
+        try:
+            current_index = lesson_ids.index(lesson_id)
+            current_lesson_info = ordered_lessons[current_index]
+
+            # Giữ đúng quy tắc cũ: bài học không bắt buộc thì không tự động mở bài tiếp theo
+            if current_lesson_info.get("is_optional", False):
+                return None
+
+            # Quét về phía trước, chỉ mở khóa bài BẮT BUỘC (is_optional == False)
+            # và CHƯA hoàn thành (status != COMPLETED) để tránh mở nhầm/mở lặp
+            # khi hàm này bị gọi nhiều lần (ví dụ do nộp bài nhiều lần).
+            for next_index in range(current_index + 1, len(lesson_ids)):
+                next_lesson_id = lesson_ids[next_index]
+                next_lesson_info = ordered_lessons[next_index]
+                next_progress = self.get_by_lesson(db, user_id=user_id, lesson_id=next_lesson_id)
+
+                if not next_progress:
+                    continue
+
+                is_next_optional = next_lesson_info.get("is_optional", False)
+
+                # Bỏ qua bài optional trong lúc quét — không dừng tại đây,
+                # tiếp tục tìm bài bắt buộc tiếp theo phía sau
+                if is_next_optional:
+                    continue
+
+                # Nếu bài bắt buộc gặp đầu tiên đã COMPLETED rồi thì không cần mở lại,
+                # dừng quét luôn vì các bài phía sau chắc chắn đã có trạng thái hợp lệ
+                if next_progress.status == LessonStatus.COMPLETED:
+                    return None
+
+                if next_progress.status == LessonStatus.LOCKED:
+                    next_progress.status = LessonStatus.UNLOCKED
+                    next_progress.updated_at = datetime.now(timezone.utc)
+                    db.add(next_progress)
+                    db.commit()
+                    db.refresh(next_progress)
+                    return next_progress
+
+                # Trạng thái khác LOCKED/COMPLETED (vd. đã UNLOCKED sẵn) -> không cần mở nữa
+                return None
+
+        except ValueError:
+            print(f"DEBUG: Không tìm thấy lesson_id {lesson_id} trong mảng lộ trình.")
+
+        return None
+    def mark_completed_only(self, db: Session, user_id: UUID, lesson_id: UUID) -> LessonProgress | None:
+        """
+        Đánh dấu duy nhất bài học được chỉ định thành COMPLETED mà KHÔNG tự động mở khóa bài học tiếp theo.
+        """
+        # 1. Chuyển đổi kiểu dữ liệu sang UUID nếu đầu vào là chuỗi str
+        if isinstance(user_id, str):
+            user_id = UUID(user_id)
+        if isinstance(lesson_id, str):
+            lesson_id = UUID(lesson_id)
+
+        # 2. Lấy tiến độ bài học của học viên
+        progress = self.get_by_lesson(db, user_id=user_id, lesson_id=lesson_id)
+        if not progress:
+            return None
+
+        # Nếu đã ở trạng thái COMPLETED thì giữ nguyên
+        if progress.status == LessonStatus.COMPLETED:
+            return progress
+
+        # 3. Cập nhật trạng thái
+        progress.status = LessonStatus.COMPLETED
+        progress.updated_at = datetime.now(timezone.utc)
+        db.add(progress)
+        db.commit()
+        db.refresh(progress)
+        return progress
+
 crud_lesson_progress = CRUDLessonProgress(LessonProgress)

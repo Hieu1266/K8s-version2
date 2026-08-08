@@ -22,6 +22,12 @@ class CRUDCourseEnrollment(CRUDBase[CourseEnrollment, CourseEnrollmentCreate, Co
         return result is not None
     
     def get_by_user_and_course(self, db: Session, user_id: UUID, course_id: UUID) -> CourseEnrollment | None:
+        # Ép kiểu UUID an toàn để tránh truy vấn trả về None do sai kiểu dữ liệu
+        if isinstance(user_id, str):
+            user_id = UUID(user_id)
+        if isinstance(course_id, str):
+            course_id = UUID(course_id)
+
         statement = select(CourseEnrollment).where(
             CourseEnrollment.user_id == user_id, 
             CourseEnrollment.course_id == course_id
@@ -87,71 +93,70 @@ class CRUDCourseEnrollment(CRUDBase[CourseEnrollment, CourseEnrollmentCreate, Co
         return db_obj
     
     def update_overall_progress(
-    self, db: Session, db_obj: CourseEnrollment, progress: float, is_completed: bool
-) -> CourseEnrollment:
-        # 1. Cập nhật tiến độ học tập như bình thường
-        db_obj.current_overall_progress = progress
+        self, db: Session, db_obj: CourseEnrollment, progress: float, is_completed: bool
+    ) -> CourseEnrollment:
+        # 1. Cập nhật tiến độ học tập và cờ hoàn thành
+        db_obj.current_overall_progress = min(max(progress, 0.0), 100.0)
         db_obj.is_completed = is_completed
+        
+        # Nếu đạt 100% hoặc cờ hoàn thành bật, cập nhật thời gian hoàn thành
+        if is_completed or db_obj.current_overall_progress >= 100.0:
+            db_obj.is_completed = True
+            if not db_obj.completed_at:
+                db_obj.completed_at = datetime.now(timezone.utc)
+
         db.add(db_obj)
         db.commit()
         db.refresh(db_obj)
         
-        # 2. Điều kiện: Tiến độ đạt >= 100 hoặc cờ hoàn thành được đánh dấu là True
-        if progress >= 100 or is_completed:
+        # 2. Tự động cấp chứng chỉ nếu đã hoàn thành khóa học
+        if db_obj.is_completed:
             try:
-                # Import cục bộ để tránh vòng lặp import (Circular Import)
                 from app.crud.certificate import crud_certificate 
                 from app.schemas.certificate import CertificateCreate 
                 
                 enrollment_id = db_obj.enrollment_id 
                 user_id = db_obj.user_id
-                course_id = self.get_course_id(db, enrollment_id)
+                course_id = db_obj.course_id
 
-                # Kiểm tra xem lượt đăng ký này đã từng được cấp chứng chỉ chưa để tránh trùng lặp
                 existing_cert = crud_certificate.get_by_enrollment_id(db, enrollment_id=enrollment_id)
                 
                 if not existing_cert:
-                    # Thiết lập các giá trị mặc định dự phòng nếu gọi API thất bại
                     full_name = "Thành viên hệ thống"
                     course_name = "Khóa học trực tuyến"
 
-                    # Sử dụng HTTPX Client để gọi API liên service (Inter-service communication)
                     with httpx.Client(timeout=5.0) as client:
-                        # 2.1. Gọi API lấy tên người dùng từ USER SERVICE
+                        # Lấy tên người dùng
                         try:
                             user_api_url = f"{settings.BACKEND_USER_URL.rstrip('/')}/get-name/{user_id}"
                             user_response = client.get(user_api_url)
                             if user_response.status_code == 200:
-                                # Đảm bảo API trả về chuỗi trực tiếp hoặc JSON chứa tên, ví dụ: "Nguyễn Văn A" 
-                                # Nếu API trả về dạng JSON {"name": "..."} thì sửa thành user_response.json().get("name")
-                                full_name = user_response.json() if isinstance(user_response.json(), str) else user_response.json().get("name", "Thành viên hệ thống")
+                                res_json = user_response.json()
+                                full_name = res_json if isinstance(res_json, str) else res_json.get("name", full_name)
                         except Exception as e_user:
-                            print(f"[CẢNH BÁO] Không lấy được tên user từ User Service: {str(e_user)}")
+                            print(f"[CẢNH BÁO] Không lấy được tên user: {str(e_user)}")
 
-                        # 2.2. Gọi API lấy tên khóa học từ COURSE SERVICE
+                        # Lấy tên khóa học
                         try:
                             course_api_url = f"{settings.BACKEND_COURSE_URL.rstrip('/')}/courses/title/{course_id}"
                             course_response = client.get(course_api_url)
                             if course_response.status_code == 200:
-                                # Tương tự, nếu API trả về chuỗi trực tiếp hoặc JSON
-                                course_name = course_response.json() if isinstance(course_response.json(), str) else course_response.json().get("course_title", "Khóa học trực tuyến")
+                                res_json = course_response.json()
+                                course_name = res_json if isinstance(res_json, str) else res_json.get("course_title", course_name)
                         except Exception as e_course:
-                            print(f"[CẢNH BÁO] Không lấy được tên khóa học từ Course Service: {str(e_course)}")
+                            print(f"[CẢNH BÁO] Không lấy được tên khóa học: {str(e_course)}")
 
-                    # 3. Tạo payload data cho chứng chỉ mới với đầy đủ các trường bắt buộc
+                    # Lưu chứng chỉ mới
                     new_cert_data = CertificateCreate(
                         enrollment_id=enrollment_id,
                         user_id=user_id,
                         full_name=full_name,
                         course_name=course_name
                     )
-                    
-                    # Gọi hàm lưu chứng chỉ vào database
                     crud_certificate.create(db, new_cert_data)
-                    print(f"--- [HỆ THỐNG CRITICAL] Tự động cấp chứng chỉ thành công cho User {user_id} ({full_name}) ---")
+                    print(f"--- Tự động cấp chứng chỉ thành công cho User {user_id} ---")
                     
             except Exception as e:
-                # Tránh crash tiến trình chính nếu tầng chứng chỉ gặp sự cố
                 print(f"Lỗi hệ thống khi tự động cấp chứng chỉ: {str(e)}")
 
         return db_obj
