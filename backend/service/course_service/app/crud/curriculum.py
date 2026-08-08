@@ -12,8 +12,7 @@ class CRUDCurriculum(CRUDBase[Curriculum, CurriculumCreate, CurriculumUpdate, UU
             select(self.model)
             .where(self.model.curriculum_id == id)
             .options(
-                # Nạp Course, đồng thời nạp tiếp danh sách Subject thuộc Course đó
-                selectinload(Curriculum.course).selectinload(Course.subjects) # Hoặc tên relationship trong Course model
+                selectinload(Curriculum.course).selectinload(Course.subjects)
             )
         )
         db_obj = db.exec(statement).first()
@@ -21,6 +20,9 @@ class CRUDCurriculum(CRUDBase[Curriculum, CurriculumCreate, CurriculumUpdate, UU
         if db_obj:
             db.delete(db_obj)
             db.commit()
+            return db_obj 
+
+        return None
 
 # Khởi tạo instance cho router gọi đến
 crud_curriculum = CRUDCurriculum(Curriculum)

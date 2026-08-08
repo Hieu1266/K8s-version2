@@ -19,5 +19,5 @@ class Module(SQLModel, table=True):
     subject: Optional["Subject"] = Relationship(back_populates="modules")
     lessons: List["Lesson"] = Relationship(
         back_populates="module",
-        sa_relationship_kwargs={"order_by": "Lesson.order_index"}
+        sa_relationship_kwargs={"cascade": "all, delete-orphan", "order_by": "Lesson.order_index"}
     )

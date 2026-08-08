@@ -42,7 +42,10 @@ class Course(SQLModel, table=True):
 
     # Quan hệ
     # Một khóa học có thể không có hoặc có nhiều giảng viên
-    course_instructors: List["CourseInstructorLink"] = Relationship(back_populates="course")
+    course_instructors: List["CourseInstructorLink"] = Relationship(
+        back_populates="course",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
     # Một khóa học có một chương trình đào tạo
     curriculum: Optional["Curriculum"] = Relationship(back_populates="course")
     # Một khóa học có một hoặc nhiều tag

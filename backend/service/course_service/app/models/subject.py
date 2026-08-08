@@ -32,7 +32,7 @@ class Subject(SQLModel, table=True):
     # Một môn học thuộc về một khóa học
     course: Optional["Course"] = Relationship(back_populates="subjects")
     # Một môn học có một đề cương môn học
-    syllabus: Optional["Syllabus"] = Relationship(back_populates="subject")
+    syllabus: Optional["Syllabus"] = Relationship(back_populates="subject", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
     # Một môn học có 1 hoặc nhiều module
     modules: List["Module"] = Relationship(
         back_populates="subject",

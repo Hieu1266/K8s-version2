@@ -37,4 +37,7 @@ class Lesson(SQLModel, table=True):
     module: Optional["Module"] = Relationship(back_populates="lessons")
     
     # Một bài học có thể có một hoặc nhiều file tài nguyên
-    resources: List["LessonResource"] = Relationship(back_populates="lesson")
+    resources: List["LessonResource"] = Relationship(
+        back_populates="lesson",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
