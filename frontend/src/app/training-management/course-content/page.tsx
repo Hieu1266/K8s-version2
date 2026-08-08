@@ -15,9 +15,9 @@ import {
   createSyllabusAction,
   uploadFileAction,
   updateSyllabusAction,
-  deleteSyllabusAction,
   getInstructorsAction,
-  InstructorUser
+  InstructorUser,
+  deleteSyllabusAction
 } from "@/actions/getSyllabus";
 import { getCurriculumsAction } from "@/actions/getCurriculum";
 
@@ -83,6 +83,7 @@ export default function CourseContentPage() {
   const [selectedCourse, setSelectedCourse] = useState<any | null>(null);
   const [curriculumFile, setCurriculumFile] = useState<string | null>(null);
 
+  const [editingSyllabus, setEditingSyllabus] = useState<any | null>(null);
   const [subjects, setSubjects] = useState<any[]>([]);
   const [selectedSubject, setSelectedSubject] = useState<any | null>(null);
 
@@ -95,7 +96,6 @@ export default function CourseContentPage() {
   const [showSubjectModal, setShowSubjectModal] = useState<boolean>(false);
   const [showSyllabusModal, setShowSyllabusModal] = useState<boolean>(false);
 
-  const [editingSyllabus, setEditingSyllabus] = useState<any | null>(null);
   // Form State
   const [subjectForm, setSubjectForm] = useState({ title: "", description: "", order_index: 1 });
   const [syllabusForm, setSyllabusForm] = useState({ description: "", instructor_id: "" });
@@ -188,49 +188,6 @@ export default function CourseContentPage() {
     }
   };
 
-  const handleDeleteSubject = async (subject: any) => {
-    const confirmed = window.confirm(
-      `Bạn có chắc muốn xóa môn học "${subject.title}"? Hành động này không thể hoàn tác.`
-    );
-    if (!confirmed) return;
-
-    setIsLoading(true);
-    try {
-      await deleteSubject(subject.subject_id);
-      alert("Xóa môn học thành công!");
-
-      // Nếu đang xem đúng subject vừa xóa thì reset selection
-      if (selectedSubject?.subject_id === subject.subject_id) {
-        setSelectedSubject(null);
-        setSyllabuses([]);
-      }
-      await handleSelectCourse(selectedCourse); // reload lại danh sách subject
-    } catch (error: any) {
-      alert(`Lỗi khi xóa môn học: ${error?.message || "Không xác định"}`);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleDeleteSyllabus = async (syl: any) => {
-    const confirmed = window.confirm(
-      `Bạn có chắc muốn xóa đề cương này? Hành động này không thể hoàn tác.`
-    );
-    if (!confirmed) return;
-
-    setIsLoading(true);
-    try {
-      const syllabusId = syl.syllabus_id || syl.id;
-      await deleteSyllabusAction(syllabusId);
-      alert("Xóa đề cương thành công!");
-      await handleSelectSubject(selectedSubject); // reload lại đề cương của môn đang chọn
-    } catch (error: any) {
-      alert(`Lỗi khi xóa đề cương: ${error?.message || "Không xác định"}`);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const handleCreateSyllabus = async () => {
     if (!selectedSubject) return alert("Vui lòng chọn môn học trước!");
     if (!syllabusForm.instructor_id) return alert("Vui lòng chọn Giảng viên phụ trách!");
@@ -254,7 +211,7 @@ export default function CourseContentPage() {
         await updateSyllabusAction(syllabusId, {
           description: syllabusForm.description.trim(),
           instructor_id: syllabusForm.instructor_id,
-          syllabus_file_path: filePath ?? undefined,
+          syllabus_file_path: filePath,
         });
         alert("Cập nhật đề cương thành công!");
       } else {
@@ -279,7 +236,6 @@ export default function CourseContentPage() {
       setIsLoading(false);
     }
   };
-
 
   const filteredCourses = courses.filter((c) =>
     c.title?.toLowerCase().includes(keyword.toLowerCase())
@@ -502,7 +458,7 @@ export default function CourseContentPage() {
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation(); // tránh trigger handleSelectSubject khi bấm xóa
-                                  handleDeleteSubject(sub);
+                                  deleteSubject(sub);
                                 }}
                                 className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
                                 title="Xóa môn học"
@@ -611,7 +567,7 @@ export default function CourseContentPage() {
                                   <Edit3 size={14} /> Chỉnh sửa
                                 </button>
                                 <button
-                                  onClick={() => handleDeleteSyllabus(syl)}
+                                  onClick={() => deleteSubject(syl)}
                                   className="px-4 py-2 bg-white hover:bg-red-50 text-red-500 border border-red-200 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all shadow-sm"
                                 >
                                   <Trash2 size={14} /> Xóa
