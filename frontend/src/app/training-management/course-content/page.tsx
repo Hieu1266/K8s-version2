@@ -14,10 +14,13 @@ import {
   getSyllabusBySubjectAction,
   createSyllabusAction,
   uploadFileAction,
+  updateSyllabusAction, 
   getInstructorsAction,
   InstructorUser
 } from "@/actions/getSyllabus";
 import { getCurriculumsAction } from "@/actions/getCurriculum";
+
+const [editingSyllabus, setEditingSyllabus] = useState<any | null>(null);
 
 const URL_NGINX = process.env.NEXT_PUBLIC_NGINX_URL || "";
 
@@ -184,19 +187,34 @@ export default function CourseContentPage() {
     }
   };
 
-  const handleCreateSyllabus = async () => {
-    if (!selectedSubject) return alert("Vui lòng chọn môn học trước!");
-    if (!syllabusForm.instructor_id) return alert("Vui lòng chọn Giảng viên phụ trách!");
-    if (!syllabusForm.description.trim()) return alert("Vui lòng nhập mô tả đề cương!");
-    setIsLoading(true);
-    try {
-      let filePath: string | null = null;
-      if (selectedFile) {
-        const uploadData = new FormData();
-        uploadData.append("file", selectedFile);
-        const uploadRes = await uploadFileAction(uploadData);
-        filePath = uploadRes.file_path;
-      }
+const handleCreateSyllabus = async () => {
+  if (!selectedSubject) return alert("Vui lòng chọn môn học trước!");
+  if (!syllabusForm.instructor_id) return alert("Vui lòng chọn Giảng viên phụ trách!");
+  if (!syllabusForm.description.trim()) return alert("Vui lòng nhập mô tả đề cương!");
+  setIsLoading(true);
+  try {
+    // Giữ file cũ nếu không chọn file mới (chỉ áp dụng khi đang edit)
+    let filePath: string | null =
+      editingSyllabus?.syllabus_file_path || editingSyllabus?.file_path || null;
+
+    if (selectedFile) {
+      const uploadData = new FormData();
+      uploadData.append("file", selectedFile);
+      const uploadRes = await uploadFileAction(uploadData);
+      filePath = uploadRes.file_path;
+    }
+
+    if (editingSyllabus) {
+      // 🟢 CẬP NHẬT
+      const syllabusId = editingSyllabus.syllabus_id || editingSyllabus.id;
+      await updateSyllabusAction(syllabusId, {
+        description: syllabusForm.description.trim(),
+        instructor_id: syllabusForm.instructor_id,
+        syllabus_file_path: filePath,
+      });
+      alert("Cập nhật đề cương thành công!");
+    } else {
+      // 🟡 TẠO MỚI
       await createSyllabusAction({
         subject_id: String(selectedSubject.subject_id),
         description: syllabusForm.description.trim(),
@@ -204,16 +222,19 @@ export default function CourseContentPage() {
         instructor_id: syllabusForm.instructor_id,
       });
       alert("Tạo đề cương và phân công giảng viên thành công!");
-      setShowSyllabusModal(false);
-      setSyllabusForm({ description: "", instructor_id: "" });
-      setSelectedFile(null);
-      await handleSelectSubject(selectedSubject);
-    } catch (error: any) {
-      alert(`Lỗi khi tạo đề cương: ${error?.message || "Không xác định"}`);
-    } finally {
-      setIsLoading(false);
     }
-  };
+
+    setShowSyllabusModal(false);
+    setSyllabusForm({ description: "", instructor_id: "" });
+    setSelectedFile(null);
+    setEditingSyllabus(null);
+    await handleSelectSubject(selectedSubject);
+  } catch (error: any) {
+    alert(`Lỗi khi lưu đề cương: ${error?.message || "Không xác định"}`);
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const filteredCourses = courses.filter((c) =>
     c.title?.toLowerCase().includes(keyword.toLowerCase())
@@ -287,7 +308,7 @@ export default function CourseContentPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                 {filteredCourses.map((course) => (
                   <div
-                    key={course.course_id}
+                    key={course.courseId}
                     onClick={() => handleSelectCourse(course)}
                     className="group bg-white border border-slate-200 hover:border-[#0066FF]/50 rounded-3xl p-6 cursor-pointer shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] hover:shadow-[0_15px_35px_-5px_rgba(6,81,237,0.15)] transition-all duration-300 relative overflow-hidden flex flex-col h-full hover:-translate-y-1"
                   >
@@ -298,7 +319,7 @@ export default function CourseContentPage() {
                         <BookOpen size={24} />
                       </div>
                       <span className="text-[10px] bg-slate-100 text-slate-500 px-2.5 py-1 rounded-lg font-bold border border-slate-200 tracking-wider">
-                        ID: {course.course_id}
+                        ID: {course.courseId}
                       </span>
                     </div>
 
@@ -457,6 +478,7 @@ export default function CourseContentPage() {
                   {selectedSubject && (
                     <button
                       onClick={() => {
+                        setEditingSyllabus(null);
                         setSyllabusForm({ description: "", instructor_id: "" });
                         setSelectedFile(null);
                         setShowSyllabusModal(true);
@@ -516,6 +538,7 @@ export default function CourseContentPage() {
 
                               <button
                                 onClick={() => {
+                                  setEditingSyllabus(syl);
                                   setSyllabusForm({
                                     description: syl.description || "",
                                     instructor_id: String(syl.instructor_id || "")

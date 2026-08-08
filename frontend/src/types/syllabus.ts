@@ -30,7 +30,7 @@ export interface SyllabusCreatePayload {
 }
 
 export interface SyllabusUpdatePayload {
-  syllabus_file_path?: string;
+  syllabus_file_path?: string | null;
   status_id?: SyllabusStatus | string;
   instructor_id?: string;
   assigner_id?: string;
