@@ -11,6 +11,7 @@ from app.crud.quiz import crud_quiz
 from app.crud.question import crud_question
 from app.crud.quiz_submission import crud_quiz_submission
 from app.crud.submission_detail import crud_submission_detail
+from app.crud.quiz import crud_quiz
 from app.core.security import get_current_user_role, oauth2_scheme, RoleChecker
 from app.core.config import settings
 from typing import List
@@ -202,28 +203,38 @@ async def submit_quiz(
         submission_id=submission_id
     )
     
-    # 2. Kiểm tra điều kiện bài thi ĐẠT (is_passed == True hoặc đang đợi chấm điểm) và có gắn lesson_id
+    # 2. Xử lý gọi API sang Progress Service dựa theo trạng thái
     next_unlocked = False
-    if (submitted_quiz.is_passed or submitted_quiz.status == SubmissionStatus.SUBMITTED) and submitted_quiz.quiz and submitted_quiz.quiz.target_lesson_id:
+    
+    if submitted_quiz.quiz and submitted_quiz.quiz.target_lesson_id:
         lesson_id = submitted_quiz.quiz.target_lesson_id
-        
-        # Tạo URL và Header để gọi trực tiếp sang Progress Service
-        progress_url = f"{settings.BACKEND_LEARNING_PROGRESS_URL}/lesson_progress/lesson/{lesson_id}/complete"
         headers = {
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/json"
         }
         
-        # Thực hiện request PUT liên dịch vụ trực tiếp trong Router
-        try:
-            async with httpx.AsyncClient() as client:
-                response = await client.put(progress_url, headers=headers, timeout=5.0)
-                if response.status_code == 200:
-                    next_unlocked = True
-                else:
-                    print(f"Progress Service phản hồi lỗi ({response.status_code}): {response.text}")
-        except httpx.RequestError as exc:
-            print(f"Lỗi kết nối tới Progress Service: {exc}")
+        endpoint_path = None
+
+        # TH 1: Đợi chấm điểm (SUBMITTED) -> CHỈ MỞ KHÓA bài học tiếp theo
+        if submitted_quiz.status == SubmissionStatus.SUBMITTED:
+            endpoint_path = f"/lesson_progress/lesson/{lesson_id}/unlock-next"
+
+        # TH 2: Đã chấm (GRADED) VÀ ĐẠT (is_passed == True) -> HOÀN THÀNH bài học và MỞ KHÓA bài tiếp theo
+        elif submitted_quiz.status == SubmissionStatus.GRADED and submitted_quiz.is_passed:
+            endpoint_path = f"/lesson_progress/lesson/{lesson_id}/complete"
+
+        # Thực hiện gọi request nếu thỏa mãn 1 trong 2 điều kiện trên
+        if endpoint_path:
+            progress_url = f"{settings.BACKEND_LEARNING_PROGRESS_URL}{endpoint_path}"
+            try:
+                async with httpx.AsyncClient() as client:
+                    response = await client.put(progress_url, headers=headers, timeout=5.0)
+                    if response.status_code == 200:
+                        next_unlocked = True
+                    else:
+                        print(f"Progress Service phản hồi lỗi ({response.status_code}): {response.text}")
+            except httpx.RequestError as exc:
+                print(f"Lỗi kết nối tới Progress Service: {exc}")
 
     # 3. Trả về kết quả cho Client
     return {
@@ -410,12 +421,6 @@ def get_user_submissions_for_quiz(
 @router.get(
     "/{submission_id}/detail",
     response_model=QuizSubmissionDetailResponse,
-    summary="Xem chi tiết nội dung bài làm của lượt nộp"
-)
-
-@router.get(
-    "/{submission_id}/detail",
-    response_model=QuizSubmissionDetailResponse,
     summary="Xem chi tiết nội dung bài làm"
 )
 def get_submission_detail(
@@ -439,13 +444,60 @@ def get_submission_detail(
     return detail
 
 @router.put("/{submission_id}/grade")
-def grade_submission(
+async def grade_submission(
     submission_id: UUID,
     payload: GradeSubmissionRequest,
     db: SessionDep,
-    current_user = Depends(RoleChecker(["Instructor"])), # Đảm bảo quyền Giảng viên
+    token: str = Depends(oauth2_scheme),               
+    current_user = Depends(RoleChecker(["Instructor"])), 
 ):
+    # 1. Cập nhật điểm cho bài nộp
     updated_submission = crud_quiz_submission.update_teacher_grading(
         db=db, submission_id=submission_id, gradings=payload.gradings
     )
-    return {"message": "Cập nhật điểm thành công", "status": updated_submission.status}
+
+    next_unlocked = False
+
+    # 2. Nếu bài nộp đạt (is_passed = True) và bài thi gắn liền với bài học (target_lesson_id)
+    if (
+        updated_submission.status == SubmissionStatus.GRADED
+        and updated_submission.is_passed
+        and updated_submission.quiz
+        and updated_submission.quiz.target_lesson_id
+    ):
+        lesson_id = updated_submission.quiz.target_lesson_id
+        student_user_id = updated_submission.user_id  # Lấy ID của học viên làm bài
+        print(student_user_id)
+        print(lesson_id)
+
+        # 🔄 CẬP NHẬT: Gọi sang API mới dành riêng cho giáo viên chấm điểm
+        progress_url = f"{settings.BACKEND_LEARNING_PROGRESS_URL}/lesson_progress/teacher/lesson/{lesson_id}/grade-complete"
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json"
+        }
+        params = {
+            "user_id": str(student_user_id)  # Truyền user_id của học viên vào Query Parameter
+        }
+
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.put(
+                    progress_url, 
+                    headers=headers, 
+                    params=params, 
+                    timeout=5.0
+                )
+                if response.status_code == 200:
+                    next_unlocked = True
+                else:
+                    print(f"Progress Service phản hồi lỗi ({response.status_code}): {response.text}")
+        except httpx.RequestError as exc:
+            print(f"Lỗi kết nối tới Progress Service: {exc}")
+
+    return {
+        "message": "Cập nhật điểm thành công",
+        "status": updated_submission.status,
+        "is_passed": updated_submission.is_passed,
+        "next_lesson_unlocked": next_unlocked,
+    }

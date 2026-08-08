@@ -132,7 +132,9 @@ export default function UserSubmissionsPage({
                                                 {renderStatusBadge(item.status)}
                                             </td>
                                             <td className="py-4 px-6 font-bold text-slate-800 text-sm">
-                                                {item.total_score !== null ? `${item.total_score} / ${item.max_score}` : "--"}
+                                                {item.total_score !== null
+                                                    ? `${item.total_score} / ${item.max_score === 0 ? '--' : item.max_score}`
+                                                    : "--"}
                                             </td>
                                             <td className="py-4 px-6 text-right">
                                                 <Link
