@@ -19,7 +19,7 @@ class Subject(SQLModel, table=True):
         index=True,
         nullable=False
     )
-    course_id: UUID = Field(foreign_key="course.course_id",ondelete="CASCADE", nullable=False)
+    course_id: UUID = Field(foreign_key="course.course_id", nullable=False)
     title: str = Field(nullable=False, max_length=255)
     description: str = Field(nullable=False)
     order_index: int = Field(default=1, nullable=False)

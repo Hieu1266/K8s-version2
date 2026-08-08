@@ -27,7 +27,6 @@ class Course(SQLModel, table=True):
         foreign_key="curriculum.curriculum_id", 
         nullable=False, 
         unique=True,
-        ondelete="CASCADE"
     )
     instructor_id: Optional[UUID] = Field(default=None, nullable=True)
     title: str = Field(nullable=False, max_length=255)
@@ -53,7 +52,6 @@ class Course(SQLModel, table=True):
         back_populates="course",
         sa_relationship_kwargs={
             "cascade": "all, delete-orphan",  # Khi xóa Course -> Tự động xóa sạch các Subject liên quan
-            "passive_deletes": True,
             "order_by": "Subject.order_index"
         }
     )

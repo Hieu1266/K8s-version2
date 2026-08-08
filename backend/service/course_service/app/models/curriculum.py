@@ -39,7 +39,6 @@ class Curriculum(SQLModel, table=True):
     course: Optional["Course"] = Relationship(
         back_populates="curriculum",
         sa_relationship_kwargs={
-        "cascade": "all, delete-orphan",
-        "passive_deletes": True  
+        "cascade": "all, delete-orphan", 
     }
         )
