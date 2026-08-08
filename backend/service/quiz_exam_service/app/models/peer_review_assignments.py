@@ -17,7 +17,7 @@ class PeerReviewAssignment(SQLModel, table=True):
     quiz_id: UUID = Field(foreign_key="quiz.quiz_id", nullable=False, ondelete="CASCADE")# Định danh đề thi tự luận được chấm chéo
     
     reviewer_id: UUID = Field(nullable=False, index=True)     # Định danh học viên đóng vai trò là người đi chấm bài
-    submission_id: UUID = Field(foreign_key="quiz_submission.submission_id", index=True) # Định danh bài nộp được giao để chấm
+    submission_id: UUID = Field(foreign_key="quiz_submission.submission_id", index=True, ondelete="CASCADE") # Định danh bài nộp được giao để chấm
     
     status: ReviewStatus = Field(default=ReviewStatus.PENDING) # Trạng thái của lượt phân công chấm chéo
     final_score_given: Optional[float] = Field(default=None)   # Tổng điểm số người chấm đưa ra sau khi hoàn tất

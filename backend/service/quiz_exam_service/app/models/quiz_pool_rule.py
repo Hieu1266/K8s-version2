@@ -16,8 +16,8 @@ class QuizPoolRule(SQLModel, table=True):
     rule_id: UUID = Field(default_factory=uuid.uuid4, primary_key=True, index=True)
     
     # Khóa ngoại liên kết tới Quiz và QuestionPool
-    quiz_id: UUID = Field(foreign_key="quiz.quiz_id", nullable=False, index=True)
-    pool_id: UUID = Field(foreign_key="question_pool.pool_id", nullable=False, index=True)
+    quiz_id: UUID = Field(foreign_key="quiz.quiz_id", nullable=False, index=True, ondelete="CASCADE")
+    pool_id: UUID = Field(foreign_key="question_pool.pool_id", nullable=False, index=True, ondelete="CASCADE")
     
     quantity: int = Field(default=1, nullable=False)          # Số lượng câu hỏi cần bốc ngẫu nhiên từ pool này
     

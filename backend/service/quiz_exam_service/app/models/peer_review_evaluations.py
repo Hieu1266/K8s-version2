@@ -11,8 +11,8 @@ class PeerReviewEvaluation(SQLModel, table=True):
     __tablename__ = "peer_review_evaluations"
 
     evaluation_id: UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    assignment_id: UUID = Field(foreign_key="peer_review_assignments.assignment_id", nullable=False)
-    criteria_id: UUID = Field(foreign_key="rubric_criteria.criteria_id", nullable=False)
+    assignment_id: UUID = Field(foreign_key="peer_review_assignments.assignment_id", nullable=False, ondelete="CASCADE")
+    criteria_id: UUID = Field(foreign_key="rubric_criteria.criteria_id", nullable=False, ondelete="CASCADE")
     
     score: float = Field(nullable=False)             # Điểm số cho riêng tiêu chí này
     feedback: Optional[str] = Field(default=None)    # Nhận xét cho riêng tiêu chí này

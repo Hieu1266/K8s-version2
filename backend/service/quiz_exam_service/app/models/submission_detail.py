@@ -13,8 +13,8 @@ class SubmissionDetail(SQLModel, table=True):
     __tablename__ = "submission_detail"
 
     detail_id: UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    submission_id: UUID = Field(foreign_key="quiz_submission.submission_id", nullable=False)
-    question_id: UUID = Field(foreign_key="question.question_id", nullable=False)
+    submission_id: UUID = Field(foreign_key="quiz_submission.submission_id", nullable=False, ondelete="CASCADE")
+    question_id: UUID = Field(foreign_key="question.question_id", nullable=False, ondelete="CASCADE")
     
     # Trường hợp Trắc nghiệm: Lưu ID của lựa chọn được chọn
     selected_option_id: Optional[UUID] = Field(default=None)

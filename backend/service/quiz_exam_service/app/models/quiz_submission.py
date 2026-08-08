@@ -15,7 +15,7 @@ class QuizSubmission(SQLModel, table=True):
     __tablename__ = "quiz_submission"
 
     submission_id: UUID = Field(default_factory=uuid.uuid4, primary_key=True, index=True)
-    quiz_id: UUID = Field(foreign_key="quiz.quiz_id", nullable=False)
+    quiz_id: UUID = Field(foreign_key="quiz.quiz_id", nullable=False, ondelete="CASCADE")
     user_id: UUID = Field(nullable=False, index=True) # Khóa ngoại logic từ User Service (Học viên)
     
     attempt_number: int = Field(default=1, nullable=False) # Làm bài lần thứ mấy
