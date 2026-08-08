@@ -34,3 +34,6 @@ class VideoProgressResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class AddScoreRequest(BaseModel):
+    adding_score: float = Field(gt=0, description="Số điểm muốn cộng thêm (phải lớn hơn 0)")

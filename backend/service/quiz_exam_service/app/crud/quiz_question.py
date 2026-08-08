@@ -102,4 +102,11 @@ class CRUDQuizQuestion(CRUDBase[QuizQuestion, QuizQuestionCreate, QuizQuestionUp
                 db.add(qq)
         db.commit()
 
+    def get_trigger_seconds(self, db, quiz_id: UUID, question_id: UUID) -> int:
+        statement = select(QuizQuestion.video_trigger_seconds).where(
+            QuizQuestion.quiz_id == quiz_id,
+            QuizQuestion.question_id == question_id
+        )
+        return db.exec(statement).first()
+
 crud_quiz_question = CRUDQuizQuestion(QuizQuestion)

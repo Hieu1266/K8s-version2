@@ -20,3 +20,7 @@ class QuestionOptionItem(BaseModel):
     option_id: UUID
     option_text: str
     is_correct: bool
+
+class OptionDisplay(BaseModel):
+    option_id: UUID
+    option_text: str

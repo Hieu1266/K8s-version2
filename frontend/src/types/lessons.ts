@@ -1,6 +1,7 @@
 import { Quiz } from "./quizzes";
 import { VideoCheckpointQuestion } from "./progresses";
 import { LessonStatus } from "./statuses";
+import { SubmissionStatus } from "./statuses";
 
 export interface LessonResource {
     resourceId: string;
@@ -31,7 +32,9 @@ export interface LessonLearningStructure {
     content_body?: string | null;
     duration_seconds: number;
     is_optional: boolean;
+    had_quiz: boolean;
     is_quiz: boolean;
+    submit_status: SubmissionStatus | null;
 }
 
 export interface LessonStatusResponse {

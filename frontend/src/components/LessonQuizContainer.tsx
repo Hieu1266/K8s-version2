@@ -1,0 +1,423 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import {
+    startQuizSubmissionAction,
+    updateSubmissionDetailAction,
+    submitQuizAction,
+    getQuizStatusByLessonAction,
+} from '@/actions/getQuizSubmission';
+import {
+    QuizTakeResponse,
+    QuestionType,
+    QuizSubmitResponse,
+    QuizSubmissionStatusResponse,
+} from '@/types/quiz-submission';
+import { SubmissionStatus } from '@/types/statuses';
+
+type AnswersMap = Record<string, { optionId?: string; essayText?: string }>;
+
+export function QuizSection({ lessonId, onQuizPassed }: { lessonId: string; onQuizPassed?: (status?: string) => void }) {
+    // Trạng thái đã lưu (fetch từ server khi vào bài học)
+    const [initialStatus, setInitialStatus] = useState<QuizSubmissionStatusResponse | null>(null);
+    const [statusLoading, setStatusLoading] = useState(true);
+    const [statusError, setStatusError] = useState<string | null>(null);
+
+    // Trạng thái đang làm bài (dùng chung cho case bắt đầu mới hoặc tiếp tục IN_PROGRESS)
+    const [quizData, setQuizData] = useState<QuizTakeResponse | null>(null);
+    const [answers, setAnswers] = useState<AnswersMap>({});
+    const [loading, setLoading] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
+    const [savingDetailId, setSavingDetailId] = useState<string | null>(null);
+    const [result, setResult] = useState<QuizSubmitResponse | null>(null);
+    const [error, setError] = useState<string | null>(null);
+
+    // ---- 0. Fetch trạng thái bài thi đã lưu khi vào bài học ----
+    useEffect(() => {
+        let cancelled = false;
+
+        async function fetchStatus() {
+            setStatusLoading(true);
+            setStatusError(null);
+            setResult(null);
+            setQuizData(null);
+            setAnswers({});
+
+            const res = await getQuizStatusByLessonAction(lessonId);
+            if (cancelled) return;
+
+            if (!res.success) {
+                setStatusError(res.error || 'Không thể tải trạng thái bài thi.');
+                setInitialStatus(null);
+            } else {
+                setInitialStatus(res.data ?? null);
+
+                // Nếu đang làm dở -> prefill sẵn để hiển thị tiến trình đã lưu
+                if (res.data?.status === SubmissionStatus.IN_PROGRESS) {
+                    const prefilledAnswers: AnswersMap = {};
+                    res.data.questions.forEach((q) => {
+                        prefilledAnswers[q.detail_id] = {
+                            optionId: q.selected_option_id ?? undefined,
+                            essayText: q.essay_answer_text ?? undefined,
+                        };
+                    });
+
+                    setAnswers(prefilledAnswers);
+                    setQuizData({
+                        submission_id: res.data.submission_id,
+                        quiz_id: res.data.quiz_id,
+                        title: res.data.title || '',
+                        quiz_type: res.data.quiz_type as any,
+                        attempt_number: res.data.attempt_number,
+                        questions: res.data.questions.map((q) => ({
+                            detail_id: q.detail_id,
+                            question_id: q.question_id,
+                            question_title: q.question_title,
+                            question_type: q.question_type,
+                            body_content: q.body_content ?? null,
+                            max_points: q.max_points ?? null,
+                            options: q.options.map((o) => ({
+                                option_id: o.option_id,
+                                option_text: o.option_text,
+                            })),
+                        })),
+                    });
+                }
+            }
+            setStatusLoading(false);
+        }
+
+        if (lessonId) fetchStatus();
+        return () => {
+            cancelled = true;
+        };
+    }, [lessonId]);
+
+    // 1. Bắt đầu làm bài thi (dùng cho lần đầu hoặc "Làm lại")
+    const handleStartQuiz = async () => {
+        setLoading(true);
+        setError(null);
+        setResult(null);
+        const res = await startQuizSubmissionAction(lessonId);
+        setLoading(false);
+
+        if (res.success && res.data) {
+            setQuizData(res.data);
+            setAnswers({});
+            setInitialStatus(null); // Chuyển hẳn sang chế độ đang làm bài mới
+        } else {
+            setError(res.error || 'Không thể tải đề thi.');
+        }
+    };
+
+    // 2. Chọn đáp án Trắc nghiệm / Đúng Sai
+    const handleSelectOption = async (detailId: string, optionId: string) => {
+        setAnswers((prev) => ({ ...prev, [detailId]: { ...prev[detailId], optionId } }));
+        setSavingDetailId(detailId);
+        await updateSubmissionDetailAction(detailId, { selected_option_id: optionId });
+        setSavingDetailId(null);
+    };
+
+    // 3. Nhập câu trả lời Tự luận
+    const handleEssayBlur = async (detailId: string, text: string) => {
+        setSavingDetailId(detailId);
+        await updateSubmissionDetailAction(detailId, { essay_answer_text: text });
+        setSavingDetailId(null);
+    };
+
+    // 4. Nộp bài
+    const handleSubmit = async () => {
+        if (!quizData) return;
+        setSubmitting(true);
+        setError(null);
+
+        const res = await submitQuizAction(quizData.submission_id);
+        setSubmitting(false);
+
+        if (res.success && res.data) {
+            setResult(res.data);
+            if (res.data.next_lesson_unlocked && onQuizPassed) {
+                onQuizPassed(res.data.status);
+            }
+        } else {
+            setError(res.error || 'Nộp bài thất bại.');
+        }
+    };
+
+    // ---------------- LOADING TRẠNG THÁI BAN ĐẦU ----------------
+    if (statusLoading) {
+        return (
+            <div className="bg-white border border-[#ECEAF0] rounded-2xl p-6 text-center">
+                <div className="w-5 h-5 mx-auto rounded-full border-2 border-[#E7E9F0] border-t-[#5B5FEF] animate-spin" />
+                <p className="text-xs text-[#8A8FA3] mt-3">Đang kiểm tra trạng thái bài thi...</p>
+            </div>
+        );
+    }
+
+    // ---------------- MÀN HÌNH KẾT QUẢ (vừa nộp trong phiên hiện tại) ----------------
+    if (result) {
+        const isPendingGrading = result.status === 'SUBMITTED' || result.total_score === null || result.total_score === undefined;
+
+        if (isPendingGrading) {
+            return (
+                <div className="bg-white border border-[#ECEAF0] rounded-2xl p-6 text-center space-y-4">
+                    <div className="w-16 h-16 rounded-full bg-[#FEF3C7] text-[#D97706] flex items-center justify-center mx-auto text-2xl font-bold">⏳</div>
+                    <h3 className="font-display text-xl font-bold text-[#161826]">Đã nộp bài thành công!</h3>
+                    <p className="text-xs text-[#565A70] max-w-md mx-auto leading-relaxed">
+                        Bài làm của bạn chứa câu hỏi tự luận và đang chờ giảng viên chấm điểm. Kết quả sẽ được cập nhật sau khi hoàn tất.
+                    </p>
+                    <div className="pt-2">
+                        <span className="inline-block text-[11px] font-semibold text-[#D97706] bg-[#FFFBEB] border border-[#FDE68A] px-3 py-1.5 rounded-full">
+                            Trạng thái: Đang chờ chấm điểm
+                        </span>
+                    </div>
+                </div>
+            );
+        }
+
+        return (
+            <div className="bg-white border border-[#ECEAF0] rounded-2xl p-6 text-center space-y-4">
+                <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto text-2xl font-bold ${result.is_passed ? 'bg-[#E6F8F3] text-[#12B886]' : 'bg-[#FDE8E8] text-[#E5484D]'}`}>
+                    {result.is_passed ? '✓' : '✕'}
+                </div>
+                <h3 className="font-display text-xl font-bold text-[#161826]">
+                    {result.is_passed ? 'Chúc mừng! Bạn đã đạt bài kiểm tra' : 'Chưa đạt yêu cầu'}
+                </h3>
+                <p className="text-sm text-[#565A70]">
+                    Điểm số của bạn: <strong className="text-[#161826]">{result.total_score}</strong>
+                </p>
+                {result.next_lesson_unlocked && (
+                    <p className="text-xs text-[#12B886] font-bold">🎉 Bài học tiếp theo đã được mở khóa!</p>
+                )}
+
+                {/* NÚT LÀM LẠI BÀI THI KHI CHƯA ĐẠT (VỪA NỘP XONG) */}
+                {!result.is_passed && (
+                    <div className="pt-2">
+                        {error && <p className="text-xs text-[#E5484D] font-medium mb-2">{error}</p>}
+                        <button
+                            onClick={handleStartQuiz}
+                            disabled={loading}
+                            className="w-full bg-[#5B5FEF] hover:bg-[#4B4FEF] text-white text-xs font-bold py-3 rounded-full transition-transform hover:scale-[1.01] disabled:opacity-50"
+                        >
+                            {loading ? 'Đang chuẩn bị đề thi...' : 'Làm lại bài thi'}
+                        </button>
+                    </div>
+                )}
+            </div>
+        );
+    }
+
+    // ---------------- CHẾ ĐỘ CHỈ XEM: đã SUBMITTED hoặc GRADED ----------------
+    if (initialStatus && (initialStatus.status === SubmissionStatus.SUBMITTED || initialStatus.status === SubmissionStatus.GRADED)) {
+        const isGraded = initialStatus.status === SubmissionStatus.GRADED;
+
+        return (
+            <div className="bg-white border border-[#ECEAF0] rounded-2xl p-6 space-y-6">
+                <div className="border-b border-[#ECEAF0] pb-4 flex justify-between items-center">
+                    <div>
+                        <h3 className="font-display text-lg font-bold text-[#161826]">{initialStatus.title}</h3>
+                        <span className="text-[11px] text-[#8A8FA3]">Lần thử: #{initialStatus.attempt_number}</span>
+                    </div>
+                    <span
+                        className={`text-[11px] font-semibold px-3 py-1.5 rounded-full ${isGraded
+                            ? initialStatus.is_passed
+                                ? 'text-[#12B886] bg-[#E6F8F3] border border-[#B7EBDD]'
+                                : 'text-[#E5484D] bg-[#FDE8E8] border border-[#F6C1C3]'
+                            : 'text-[#D97706] bg-[#FFFBEB] border border-[#FDE68A]'
+                            }`}
+                    >
+                        {isGraded ? (initialStatus.is_passed ? 'Đã đạt' : 'Chưa đạt') : 'Đang chờ chấm điểm'}
+                    </span>
+                </div>
+
+                {isGraded && (
+                    <p className="text-sm text-[#565A70]">
+                        Điểm tổng: <strong className="text-[#161826]">{initialStatus.total_score}</strong>
+                    </p>
+                )}
+
+                <div className="space-y-6">
+                    {initialStatus.questions.map((q, idx) => (
+                        <div key={q.detail_id} className="p-4 rounded-xl border border-[#F0F0F5] bg-[#FBFBFD] space-y-3">
+                            <div className="flex justify-between items-center">
+                                <span className="text-xs font-bold text-[#161826]">
+                                    Câu {idx + 1}: {q.question_title}
+                                </span>
+                                {isGraded && q.score_earned !== null && q.score_earned !== undefined && (
+                                    <span className="text-[11px] font-bold text-[#5B5FEF]">
+                                        {q.score_earned}/{q.max_points} điểm
+                                    </span>
+                                )}
+                            </div>
+
+                            {q.body_content && (
+                                <div className="text-xs text-[#565A70]" dangerouslySetInnerHTML={{ __html: q.body_content }} />
+                            )}
+
+                            {(q.question_type === QuestionType.MULTIPLE_CHOICE || q.question_type === QuestionType.TRUE_FALSE) && (
+                                <div className="space-y-2 pt-1">
+                                    {q.options.map((opt) => {
+                                        const isSelected = q.selected_option_id === opt.option_id;
+                                        let styleClass = 'border-[#ECEAF0] bg-white text-[#2B2D3D]';
+                                        if (isGraded && opt.is_correct) {
+                                            styleClass = 'border-[#12B886] bg-[#E6F8F3] text-[#0B8F63]';
+                                        } else if (isGraded && isSelected && !opt.is_correct) {
+                                            styleClass = 'border-[#E5484D] bg-[#FDE8E8] text-[#C4292E]';
+                                        } else if (!isGraded && isSelected) {
+                                            styleClass = 'border-[#5B5FEF] bg-[#EEF0FE] text-[#3F3FC9]';
+                                        }
+
+                                        return (
+                                            <label
+                                                key={opt.option_id}
+                                                className={`flex items-center gap-3 p-3 rounded-lg border text-xs font-medium ${styleClass}`}
+                                            >
+                                                <input type="radio" checked={isSelected} disabled readOnly className="accent-[#5B5FEF]" />
+                                                <span>{opt.option_text}</span>
+                                                {isGraded && opt.is_correct && (
+                                                    <span className="ml-auto text-[10px] font-bold text-[#12B886]">Đáp án đúng</span>
+                                                )}
+                                            </label>
+                                        );
+                                    })}
+                                </div>
+                            )}
+
+                            {q.question_type === QuestionType.ESSAY && (
+                                <textarea
+                                    rows={4}
+                                    readOnly
+                                    disabled
+                                    value={q.essay_answer_text || 'Bạn chưa trả lời câu này.'}
+                                    className="w-full text-xs p-3 bg-[#F7F8FB] border border-[#ECEAF0] rounded-xl text-[#565A70]"
+                                />
+                            )}
+
+                            {isGraded && q.teacher_feedback && (
+                                <div className="text-[11px] text-[#565A70] bg-[#F7F8FB] border border-[#ECEAF0] rounded-lg p-2.5">
+                                    <span className="font-bold text-[#161826]">Nhận xét của giảng viên: </span>
+                                    {q.teacher_feedback}
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                </div>
+
+                {/* NÚT LÀM LẠI BÀI THI KHI XEM TRẠNG THÁI CŨ LÀ CHƯA ĐẠT */}
+                {isGraded && !initialStatus.is_passed && (
+                    <div className="pt-4 border-t border-[#ECEAF0]">
+                        {error && <p className="text-xs text-[#E5484D] font-medium mb-2">{error}</p>}
+                        <button
+                            onClick={handleStartQuiz}
+                            disabled={loading}
+                            className="w-full bg-[#5B5FEF] hover:bg-[#4B4FEF] text-white text-xs font-bold py-3 rounded-full transition-transform hover:scale-[1.01] disabled:opacity-50"
+                        >
+                            {loading ? 'Đang chuẩn bị đề thi...' : 'Làm lại bài thi'}
+                        </button>
+                    </div>
+                )}
+            </div>
+        );
+    }
+
+    // ---------------- MÀN HÌNH CHƯA LÀM BÀI (status = null) ----------------
+    if (!quizData) {
+        return (
+            <div className="bg-white border border-[#ECEAF0] rounded-2xl p-6 space-y-4">
+                <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-[#FDF3DA] text-[#9A6B00] inline-block">
+                    Bài kiểm tra đánh giá
+                </span>
+                <h3 className="font-display text-lg font-bold text-[#161826]">Sẵn sàng làm bài kiểm tra</h3>
+                {(error || statusError) && (
+                    <p className="text-xs text-[#E5484D] font-medium">{error || statusError}</p>
+                )}
+                <button
+                    onClick={handleStartQuiz}
+                    disabled={loading}
+                    className="w-full bg-[#5B5FEF] hover:bg-[#4B4FEF] text-white text-xs font-bold py-3 rounded-full transition-transform hover:scale-[1.01] disabled:opacity-50"
+                >
+                    {loading ? 'Đang chuẩn bị đề thi...' : 'Bắt đầu làm bài'}
+                </button>
+            </div>
+        );
+    }
+
+    // ---------------- MÀN HÌNH ĐANG LÀM BÀI (mới bắt đầu hoặc IN_PROGRESS được khôi phục) ----------------
+    return (
+        <div className="bg-white border border-[#ECEAF0] rounded-2xl p-6 space-y-6">
+            <div className="border-b border-[#ECEAF0] pb-4 flex justify-between items-center">
+                <div>
+                    <h3 className="font-display text-lg font-bold text-[#161826]">{quizData.title}</h3>
+                    <span className="text-[11px] text-[#8A8FA3]">Lần thử: #{quizData.attempt_number}</span>
+                </div>
+                {submitting && <span className="text-xs text-[#5B5FEF] font-bold animate-pulse">Đang nộp bài...</span>}
+            </div>
+
+            <div className="space-y-6">
+                {quizData.questions.map((q, idx) => (
+                    <div key={q.detail_id} className="p-4 rounded-xl border border-[#F0F0F5] bg-[#FBFBFD] space-y-3">
+                        <div className="flex justify-between items-center">
+                            <span className="text-xs font-bold text-[#161826]">
+                                Câu {idx + 1}: {q.question_title}
+                            </span>
+                            {savingDetailId === q.detail_id && (
+                                <span className="text-[10px] text-[#5B5FEF] font-semibold animate-pulse">Đang lưu...</span>
+                            )}
+                        </div>
+
+                        {q.body_content && (
+                            <div className="text-xs text-[#565A70]" dangerouslySetInnerHTML={{ __html: q.body_content }} />
+                        )}
+
+                        {(q.question_type === QuestionType.MULTIPLE_CHOICE || q.question_type === QuestionType.TRUE_FALSE) && (
+                            <div className="space-y-2 pt-1">
+                                {q.options.map((opt) => {
+                                    const isChecked = answers[q.detail_id]?.optionId === opt.option_id;
+                                    return (
+                                        <label
+                                            key={opt.option_id}
+                                            className={`flex items-center gap-3 p-3 rounded-lg border text-xs font-medium cursor-pointer transition-all ${isChecked
+                                                ? 'border-[#5B5FEF] bg-[#EEF0FE] text-[#3F3FC9]'
+                                                : 'border-[#ECEAF0] bg-white text-[#2B2D3D] hover:bg-[#FAFAFD]'
+                                                }`}
+                                        >
+                                            <input
+                                                type="radio"
+                                                name={q.detail_id}
+                                                value={opt.option_id}
+                                                checked={isChecked}
+                                                onChange={() => handleSelectOption(q.detail_id, opt.option_id)}
+                                                className="accent-[#5B5FEF]"
+                                            />
+                                            <span>{opt.option_text}</span>
+                                        </label>
+                                    );
+                                })}
+                            </div>
+                        )}
+
+                        {q.question_type === QuestionType.ESSAY && (
+                            <textarea
+                                rows={4}
+                                placeholder="Nhập câu trả lời của bạn vào đây..."
+                                className="w-full text-xs p-3 bg-white border border-[#ECEAF0] rounded-xl focus:outline-none focus:border-[#5B5FEF]"
+                                defaultValue={answers[q.detail_id]?.essayText || ''}
+                                onBlur={(e) => handleEssayBlur(q.detail_id, e.target.value)}
+                            />
+                        )}
+                    </div>
+                ))}
+            </div>
+
+            {error && <p className="text-xs text-[#E5484D] font-medium text-center">{error}</p>}
+
+            <button
+                onClick={handleSubmit}
+                disabled={submitting}
+                className="w-full bg-[#12B886] hover:bg-[#0EA275] text-white text-xs font-bold py-3 rounded-full transition-all disabled:opacity-50"
+            >
+                {submitting ? 'Đang gửi bài làm...' : 'Nộp bài thi'}
+            </button>
+        </div>
+    );
+}

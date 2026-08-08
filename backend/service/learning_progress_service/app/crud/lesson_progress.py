@@ -94,6 +94,9 @@ class CRUDLessonProgress(CRUDBase[LessonProgress, LessonProgressCreate, LessonPr
         if not current_progress:
             return None
 
+        if current_progress.status == LessonStatus.COMPLETED:
+            return current_progress
+
         # Đánh dấu bài hiện tại thành COMPLETED
         current_progress.status = LessonStatus.COMPLETED
         current_progress.updated_at = datetime.now(timezone.utc)
@@ -129,9 +132,10 @@ class CRUDLessonProgress(CRUDBase[LessonProgress, LessonProgressCreate, LessonPr
         db.refresh(current_progress)
         return current_progress
     
-    def get_lesson_progress_status(self, db: Session, lesson_id: UUID) -> LessonStatus:
+    def get_lesson_progress_status(self, db: Session, lesson_id: UUID, user_id: UUID) -> LessonStatus:
         statement = select(LessonProgress.status).where(
-            LessonProgress.lesson_id == lesson_id
+            LessonProgress.lesson_id == lesson_id,
+            LessonProgress.user_id == user_id
         )
         return db.exec(statement).first()
     

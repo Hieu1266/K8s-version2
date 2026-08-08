@@ -149,5 +149,15 @@ class CRUDVideoProgress(CRUDBase[VideoProgress, VideoProgressCreate, VideoProgre
         db.commit()
         db.refresh(db_obj)
         return db_obj
+    
+    def get_by_user_and_lesson(
+        self, db: Session, user_id: UUID, lesson_id: UUID
+    ) -> Optional[VideoProgress]:
+        """Lấy tiến độ video dựa trên user_id và lesson_id"""
+        statement = select(VideoProgress).where(
+            VideoProgress.user_id == user_id,
+            VideoProgress.lesson_id == lesson_id
+        )
+        return db.exec(statement).first()
 
 crud_video_progress = CRUDVideoProgress(VideoProgress)

@@ -3,6 +3,7 @@ from uuid import UUID
 from typing import Optional, List
 from datetime import date
 from app.schemas.lesson_resource import LessonResourceResponse
+from app.schemas.enums import SubmissionStatus
 from enum import Enum
 
 class LessonCreate(BaseModel):
@@ -32,7 +33,9 @@ class LessonLearningStructure(BaseModel):
     content_body: Optional[str] = None
     duration_seconds: int = 0 # Nếu thời gian bằng 0 nghĩa là bài giảng ko có video
     is_optional: bool
-    is_quiz: bool
+    had_quiz: bool = False
+    is_quiz: bool = False
+    submit_status: Optional[SubmissionStatus] = None
 
 # 🆕 Schema trả về cho trang Quản lý bài học (Instructor) - kèm danh sách tài nguyên đính kèm
 class LessonManagementOut(BaseModel):

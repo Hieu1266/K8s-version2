@@ -32,6 +32,14 @@ export default function TeacherDashboard() {
       tag: "Kiểm tra",
       badgeColor: "bg-emerald-50 text-emerald-600 border-emerald-100",
     },
+    {
+      title: "Chấm điểm & Bài nộp",
+      desc: "Quản lý lượt nộp bài thi của sinh viên, chấm bài tự luận và xem ảnh đồ thị.",
+      route: "/instructor-management/submission-manage",
+      icon: "📊",
+      tag: "Chấm điểm",
+      badgeColor: "bg-blue-50 text-blue-600 border-blue-100",
+    }
   ];
 
   return (

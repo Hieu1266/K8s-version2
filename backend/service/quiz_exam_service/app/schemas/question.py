@@ -1,33 +1,8 @@
-# from pydantic import BaseModel
-# from uuid import UUID
-# from app.models.question import Question
-# from app.models.enum import QuestionType
-
-# class QuestionCreate(BaseModel):
-#     subject_id: UUID
-#     question_title: str
-#     question_type: QuestionType
-#     body_content: str | None = None
-#     max_points: float
-
-# class QuestionUpdate(BaseModel):
-#     question_title: str | None = None
-#     body_content: str | None = None
-#     max_points: float | None = None
-
-# class QuestionItem(BaseModel):
-#     question_id: UUID
-#     question_title: str 
-#     question_type: QuestionType
-#     body_content: str | None = None
-#     max_points: float | None = None
-
-
-
-
 from uuid import UUID
 from pydantic import BaseModel, Field
 from app.models.enum import QuestionType
+from app.schemas.question_option import OptionDisplay
+from typing import Optional, List
 
 class RubricCreate(BaseModel):
     title: str
@@ -66,3 +41,20 @@ class QuestionItem(BaseModel):
 
     class Config:
         from_attributes = True
+
+class QuestionDisplay(BaseModel):
+    detail_id: UUID          # ID của SubmissionDetail dùng để gọi API PATCH đáp án
+    question_id: UUID
+    question_title: str
+    question_type: QuestionType
+    body_content: Optional[str] = None
+    max_points: float        # Hiển thị điểm tối đa của câu hỏi
+    options: List[OptionDisplay] = []
+
+    # 🆕 Dùng cho câu hỏi chèn giữa video (Quiz.placement_type == IN_VIDEO)
+    # Mốc giây trong video mà câu hỏi này sẽ được kích hoạt (None nếu quiz không phải IN_VIDEO)
+    video_trigger_seconds: Optional[int] = None
+    # 🆕 Prefill khi resume lại submission IN_PROGRESS đang dang dở (vd load lại trang giữa video)
+    selected_option_id: Optional[UUID] = None
+    # 🆕 True/False nếu câu này đã được chấm và trả lời đúng/sai, None nếu chưa trả lời hoặc là ESSAY
+    is_answered_correct: Optional[bool] = None

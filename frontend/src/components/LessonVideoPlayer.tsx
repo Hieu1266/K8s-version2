@@ -1,23 +1,30 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from "react";
 import { VideoProgress } from "@/types/video";
 import { extractYoutubeId, loadYoutubeApi } from "@/lib/youtube";
 
+export interface VideoPlayerRef {
+    pause: () => void;
+    play: () => void;
+}
+
 interface LessonVideoPlayerProps {
-    lessonId: string; // Dùng làm khóa lưu trữ sessionStorage (không phải ID thật để gọi API)
-    videoProgressId: string; // video_progress_id THẬT lấy từ getOrCreateVideoProgressAction, dùng để PATCH Backend
+    lessonId: string;
+    videoProgressId: string;
     url: string;
     title?: string;
-    initialProgress?: VideoProgress; // Tiến độ đã đồng bộ từ Backend (nếu có)
-    onProgressUpdate?: (updatedProgress: VideoProgress) => void; // Đồng bộ tiến độ về DB
-    onTimeUpdate?: (seconds: number) => void; // Dùng để lấy timestamp hiện tại khi tạo note
-    seekToSeconds?: number | null; // Set giá trị để tua video (vd: bấm vào 1 note)
+    initialProgress?: VideoProgress;
+    onProgressUpdate?: (updatedProgress: VideoProgress) => void;
+    onTimeUpdate?: (seconds: number) => void;
+    seekToSeconds?: number | null;
     onSeeked?: () => void;
+    onVideoEnded?: () => void;
+    isPaused?: boolean; // THÊM THUỘC TÍNH NÀY
 }
 
 const SESSION_KEY_PREFIX = "lesson_video_progress:";
-const MAX_FORWARD_JUMP = 2; // giây - chênh lệch tối đa được coi là phát tự nhiên, không phải hành vi tua
+const MAX_FORWARD_JUMP = 2; // Nới lỏng khoảng cách tua cho phép
 const YOUTUBE_POLL_MS = 1000;
 
 function readSessionProgress(lessonId: string): VideoProgress | null {
@@ -34,12 +41,10 @@ function writeSessionProgress(lessonId: string, progress: VideoProgress) {
     if (typeof window === "undefined") return;
     try {
         window.sessionStorage.setItem(SESSION_KEY_PREFIX + lessonId, JSON.stringify(progress));
-    } catch {
-        // sessionStorage có thể bị chặn (chế độ ẩn danh, quota đầy...) -> bỏ qua, không chặn luồng chính
-    }
+    } catch { }
 }
 
-export default function LessonVideoPlayer({
+const LessonVideoPlayer = forwardRef<VideoPlayerRef, LessonVideoPlayerProps>(({
     lessonId,
     videoProgressId,
     url,
@@ -49,7 +54,9 @@ export default function LessonVideoPlayer({
     onTimeUpdate,
     seekToSeconds,
     onSeeked,
-}: LessonVideoPlayerProps) {
+    onVideoEnded,
+    isPaused, // LẤY PROPS isPaused TỪ COMPONENT CHA
+}, ref) => {
     const youtubeId = extractYoutubeId(url);
     const nativeVideoRef = useRef<HTMLVideoElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -57,9 +64,13 @@ export default function LessonVideoPlayer({
     const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const [ytReady, setYtReady] = useState(false);
 
-    // Nguồn tiến độ ban đầu: ưu tiên sessionStorage (mới nhất trong phiên hiện tại của trình duyệt),
-    // fallback về dữ liệu Backend truyền từ component cha.
-    // Dùng lazy init (chỉ chạy 1 lần khi mount) để tránh đọc sessionStorage lặp lại mỗi lần render.
+    // Lưu các callback vào Ref để tránh re-trigger useEffect khi component cha re-render
+    const callbacksRef = useRef({ onProgressUpdate, onTimeUpdate, onVideoEnded });
+    useEffect(() => {
+        callbacksRef.current = { onProgressUpdate, onTimeUpdate, onVideoEnded };
+    });
+
+    // Kho tiến trình
     const startingProgressRef = useRef<VideoProgress>(
         readSessionProgress(lessonId) ||
         initialProgress || {
@@ -70,45 +81,87 @@ export default function LessonVideoPlayer({
             is_finished: false,
         }
     );
-    const startingProgress = startingProgressRef.current;
 
-    const maxTimeRef = useRef<number>(startingProgress.max_watched_second || 0);
-    const isFinishedRef = useRef<boolean>(startingProgress.is_finished || false);
+    const maxTimeRef = useRef<number>(startingProgressRef.current.max_watched_second || 0);
+    const isFinishedRef = useRef<boolean>(startingProgressRef.current.is_finished || false);
     const hasRestoredPositionRef = useRef(false);
     const isPausedBySystemRef = useRef(false);
 
     const [displayMaxTime, setDisplayMaxTime] = useState(maxTimeRef.current);
     const [displayFinished, setDisplayFinished] = useState(isFinishedRef.current);
 
-    // Đẩy tiến độ mới ra ngoài: lưu sessionStorage + gọi callback đồng bộ Backend
+    // EXPOSE HÀM ĐIỀU KHIỂN CHO COMPONENT CHA (CÁCH CŨ DÙNG REF)
+    useImperativeHandle(ref, () => ({
+        pause: () => {
+            if (youtubeId && ytPlayerRef.current?.pauseVideo) {
+                ytPlayerRef.current.pauseVideo();
+            } else if (nativeVideoRef.current) {
+                nativeVideoRef.current.pause();
+            }
+        },
+        play: () => {
+            if (youtubeId && ytPlayerRef.current?.playVideo) {
+                ytPlayerRef.current.playVideo();
+            } else if (nativeVideoRef.current) {
+                nativeVideoRef.current.play().catch(() => { });
+            }
+        }
+    }));
+
+    // ============================================
+    // THEO DÕI PROP isPaused TỪ IN-VIDEO QUIZ
+    // ============================================
+    useEffect(() => {
+        if (isPaused) {
+            // Khi InVideoQuizWrapper yêu cầu dừng
+            if (youtubeId && ytReady && ytPlayerRef.current?.pauseVideo) {
+                ytPlayerRef.current.pauseVideo();
+            } else if (!youtubeId && nativeVideoRef.current) {
+                nativeVideoRef.current.pause();
+            }
+        } else if (isPaused === false) {
+            // Khi InVideoQuizWrapper yêu cầu phát tiếp
+            if (youtubeId && ytReady && ytPlayerRef.current?.playVideo) {
+                ytPlayerRef.current.playVideo();
+            } else if (!youtubeId && nativeVideoRef.current) {
+                nativeVideoRef.current.play().catch(() => { });
+            }
+        }
+    }, [isPaused, youtubeId, ytReady]);
+
+    // Reset trôi chảy khi đổi bài học
+    useEffect(() => {
+        const currentProg = readSessionProgress(lessonId) || initialProgress || {
+            video_progress_id: videoProgressId,
+            last_watched_second: 0,
+            max_watched_second: 0,
+            completion_percentage: 0,
+            is_finished: false,
+        };
+
+        startingProgressRef.current = currentProg;
+        maxTimeRef.current = currentProg.max_watched_second || 0;
+        isFinishedRef.current = currentProg.is_finished || false;
+        hasRestoredPositionRef.current = false;
+        isPausedBySystemRef.current = false;
+
+        setDisplayMaxTime(maxTimeRef.current);
+        setDisplayFinished(isFinishedRef.current);
+    }, [lessonId, url, videoProgressId]);
+
     const emitProgress = useCallback(
         (currentTime: number, duration: number) => {
             if (isFinishedRef.current) return;
             if (currentTime <= maxTimeRef.current) return;
 
-            // LƯU Ý: KHÔNG chặn "bước nhảy lớn" ở đây nữa.
-            // Với <video> gốc, việc chặn tua vượt đã được xử lý riêng ở `handleSeeking` (snap-back tức thì).
-            // Nếu vẫn chặn ở đây, một lần `timeupdate` bị trình duyệt trì hoãn (>2s) do máy chậm/buffer
-            // sẽ khiến maxTimeRef không bao giờ tăng được nữa -> tiến độ bị khóa cứng vĩnh viễn.
-            // Với YouTube, việc phát hiện tua vượt được xử lý riêng ở vòng poll bên dưới (có seekTo tự sửa lại).
-
             maxTimeRef.current = currentTime;
             const percentage = duration > 0 ? Math.min((currentTime / duration) * 100, 100) : 0;
-            // Chỉ coi là "đã hoàn thành" khi thực sự xem gần hết video (khớp đúng điều kiện Backend:
-            // max_watched_second >= duration_seconds). Trước đây dùng ngưỡng tùy tiện 95% khiến FE tự khóa
-            // (isFinishedRef=true) quá sớm và ngừng gửi cập nhật, nên Backend không bao giờ nhận đủ dữ liệu
-            // để tự đạt điều kiện is_finished=true của chính nó -> tiến độ bị kẹt ở ~95%, không bao giờ lên 100%.
             const finished = duration > 0 && currentTime >= duration - 0.5;
             isFinishedRef.current = finished;
 
             setDisplayMaxTime(currentTime);
             setDisplayFinished(finished);
 
-            // Backend khai báo last_watched_second/max_watched_second là kiểu int (Optional[int]),
-            // trong khi video.currentTime luôn là số thập phân (vd 12.345s) -> phải làm tròn trước khi
-            // gửi đi, nếu không Pydantic sẽ trả lỗi 422 Unprocessable Content ở MỌI lần gọi.
-            // Khi đã thực sự hoàn thành, chốt đúng bằng duration để Backend tính completion_percentage = 100%
-            // chính xác (tránh lệch 1 giây do Math.floor làm tròn xuống ở những giây cuối).
             const roundedTime = finished ? Math.round(duration) : Math.floor(currentTime);
 
             const updated: VideoProgress = {
@@ -117,19 +170,17 @@ export default function LessonVideoPlayer({
                 max_watched_second: roundedTime,
                 completion_percentage: finished ? 100 : parseFloat(percentage.toFixed(2)),
                 is_finished: finished,
-                // Gửi kèm duration THẬT (đo từ chính video) để Backend tự sửa lại nếu duration_seconds
-                // lúc khởi tạo video_progress bị sai/bằng 0 (tránh bug tự set is_finished=true quá sớm).
                 duration_seconds: duration > 0 ? Math.round(duration) : undefined,
             };
 
             writeSessionProgress(lessonId, updated);
-            onProgressUpdate?.(updated);
+            callbacksRef.current.onProgressUpdate?.(updated);
         },
-        [lessonId, videoProgressId, onProgressUpdate]
+        [lessonId, videoProgressId]
     );
 
     // ============================================
-    // 1. VIDEO MP4 (thẻ <video> gốc)
+    // 1. VIDEO MP4 GỐC
     // ============================================
     useEffect(() => {
         if (youtubeId) return;
@@ -137,46 +188,46 @@ export default function LessonVideoPlayer({
         if (!video) return;
 
         const handleLoadedMetadata = () => {
-            // Khôi phục mốc thời gian xem gần nhất nếu chưa hoàn thành video
-            if (!hasRestoredPositionRef.current && startingProgress.last_watched_second > 0 && !isFinishedRef.current) {
-                video.currentTime = startingProgress.last_watched_second;
+            if (!hasRestoredPositionRef.current && startingProgressRef.current.last_watched_second > 0 && !isFinishedRef.current) {
+                video.currentTime = startingProgressRef.current.last_watched_second;
             }
             hasRestoredPositionRef.current = true;
         };
 
         const handleTimeUpdate = () => {
-            onTimeUpdate?.(video.currentTime);
+            callbacksRef.current.onTimeUpdate?.(video.currentTime);
             if (isFinishedRef.current || video.seeking) return;
             emitProgress(video.currentTime, video.duration || 0);
         };
 
-        // Lớp bảo hiểm: đảm bảo luôn ghi nhận đủ 100% khi video phát xong thật sự,
-        // phòng trường hợp lần `timeupdate` cuối cùng không kịp chạm đúng ngưỡng (duration - 0.5)
         const handleEnded = () => {
-            if (isFinishedRef.current) return;
-            const finalDuration = video.duration || maxTimeRef.current;
-            maxTimeRef.current = finalDuration;
-            isFinishedRef.current = true;
-            setDisplayMaxTime(finalDuration);
-            setDisplayFinished(true);
+            if (!isFinishedRef.current) {
+                const finalDuration = video.duration || maxTimeRef.current;
+                maxTimeRef.current = finalDuration;
+                isFinishedRef.current = true;
+                setDisplayMaxTime(finalDuration);
+                setDisplayFinished(true);
 
-            const updated: VideoProgress = {
-                video_progress_id: videoProgressId,
-                last_watched_second: Math.round(finalDuration),
-                max_watched_second: Math.round(finalDuration),
-                completion_percentage: 100,
-                is_finished: true,
-                duration_seconds: video.duration ? Math.round(video.duration) : undefined,
-            };
+                const updated: VideoProgress = {
+                    video_progress_id: videoProgressId,
+                    last_watched_second: Math.round(finalDuration),
+                    max_watched_second: Math.round(finalDuration),
+                    completion_percentage: 100,
+                    is_finished: true,
+                    duration_seconds: video.duration ? Math.round(video.duration) : undefined,
+                };
 
-            writeSessionProgress(lessonId, updated);
-            onProgressUpdate?.(updated);
+                writeSessionProgress(lessonId, updated);
+                callbacksRef.current.onProgressUpdate?.(updated);
+            }
+
+            callbacksRef.current.onVideoEnded?.();
         };
 
+        // Chặn tua vượt mốc nhưng cho phép buffer nới lỏng 2s
         const handleSeeking = () => {
             if (isFinishedRef.current) return;
-            // Nếu người dùng cố tình tua vọt qua phân đoạn chưa từng xem qua -> giật thanh điều hướng về mốc cũ
-            if (video.currentTime > maxTimeRef.current + 0.5) {
+            if (video.currentTime > maxTimeRef.current + MAX_FORWARD_JUMP) {
                 video.currentTime = maxTimeRef.current;
             }
         };
@@ -187,12 +238,14 @@ export default function LessonVideoPlayer({
                 isPausedBySystemRef.current = true;
             }
         };
+
         const handleGainFocus = () => {
             if (video && video.paused && isPausedBySystemRef.current) {
                 video.play().catch(() => { });
                 isPausedBySystemRef.current = false;
             }
         };
+
         const handleVisibilityChange = () => {
             if (document.hidden) handleLoseFocus();
             else handleGainFocus();
@@ -215,11 +268,10 @@ export default function LessonVideoPlayer({
             window.removeEventListener("blur", handleLoseFocus);
             window.removeEventListener("focus", handleGainFocus);
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [youtubeId, emitProgress, onTimeUpdate]);
+    }, [lessonId, url, youtubeId, emitProgress]);
 
     // ============================================
-    // 2. YOUTUBE - khởi tạo YT.Player
+    // 2. YOUTUBE
     // ============================================
     useEffect(() => {
         if (!youtubeId) return;
@@ -227,40 +279,41 @@ export default function LessonVideoPlayer({
 
         loadYoutubeApi().then(() => {
             if (cancelled || !containerRef.current) return;
+
             ytPlayerRef.current = new window.YT.Player(containerRef.current, {
                 videoId: youtubeId,
-                playerVars: { rel: 0 },
+                playerVars: { rel: 0, playsinline: 1 },
                 events: {
                     onReady: () => {
                         setYtReady(true);
-                        // Khôi phục mốc thời gian xem gần nhất nếu chưa hoàn thành video
-                        if (startingProgress.last_watched_second > 0 && !isFinishedRef.current) {
-                            ytPlayerRef.current.seekTo(startingProgress.last_watched_second, true);
+                        if (startingProgressRef.current.last_watched_second > 0 && !isFinishedRef.current) {
+                            ytPlayerRef.current.seekTo(startingProgressRef.current.last_watched_second, true);
                         }
                     },
                     onStateChange: (event: any) => {
-                        // 0 = YT.PlayerState.ENDED
-                        // Lớp bảo hiểm: đảm bảo luôn ghi nhận đủ 100% khi video phát xong thật sự,
-                        // phòng trường hợp lần poll cuối cùng không kịp chạm đúng ngưỡng (duration - 0.5)
-                        if (event.data === 0 && !isFinishedRef.current) {
-                            const player = ytPlayerRef.current;
-                            const finalDuration = player?.getDuration?.() || maxTimeRef.current;
-                            maxTimeRef.current = finalDuration;
-                            isFinishedRef.current = true;
-                            setDisplayMaxTime(finalDuration);
-                            setDisplayFinished(true);
+                        if (event.data === 0) { // Kết thúc
+                            if (!isFinishedRef.current) {
+                                const player = ytPlayerRef.current;
+                                const finalDuration = player?.getDuration?.() || maxTimeRef.current;
+                                maxTimeRef.current = finalDuration;
+                                isFinishedRef.current = true;
+                                setDisplayMaxTime(finalDuration);
+                                setDisplayFinished(true);
 
-                            const updated: VideoProgress = {
-                                video_progress_id: videoProgressId,
-                                last_watched_second: Math.round(finalDuration),
-                                max_watched_second: Math.round(finalDuration),
-                                completion_percentage: 100,
-                                is_finished: true,
-                                duration_seconds: finalDuration ? Math.round(finalDuration) : undefined,
-                            };
+                                const updated: VideoProgress = {
+                                    video_progress_id: videoProgressId,
+                                    last_watched_second: Math.round(finalDuration),
+                                    max_watched_second: Math.round(finalDuration),
+                                    completion_percentage: 100,
+                                    is_finished: true,
+                                    duration_seconds: finalDuration ? Math.round(finalDuration) : undefined,
+                                };
 
-                            writeSessionProgress(lessonId, updated);
-                            onProgressUpdate?.(updated);
+                                writeSessionProgress(lessonId, updated);
+                                callbacksRef.current.onProgressUpdate?.(updated);
+                            }
+
+                            callbacksRef.current.onVideoEnded?.();
                         }
                     },
                 },
@@ -274,11 +327,9 @@ export default function LessonVideoPlayer({
             ytPlayerRef.current = null;
             setYtReady(false);
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [youtubeId]);
+    }, [lessonId, url, youtubeId]);
 
-    // YouTube không có sự kiện timeupdate/seeking như <video> gốc
-    // -> poll mỗi giây để vừa lấy currentTime (cho note), vừa phát hiện & chặn hành vi tua vượt
+    // Poll thời gian YouTube
     useEffect(() => {
         if (!youtubeId || !ytReady) return;
 
@@ -289,12 +340,11 @@ export default function LessonVideoPlayer({
             const currentTime: number = player.getCurrentTime();
             const duration: number = player.getDuration?.() || 0;
 
-            onTimeUpdate?.(currentTime);
+            callbacksRef.current.onTimeUpdate?.(currentTime);
 
             if (isFinishedRef.current) return;
 
             if (currentTime > maxTimeRef.current + MAX_FORWARD_JUMP) {
-                // Bước nhảy giữa 2 lần poll lớn hơn ngưỡng cho phép -> coi là tua vượt, giật về mốc cũ
                 player.seekTo(maxTimeRef.current, true);
                 return;
             }
@@ -305,45 +355,12 @@ export default function LessonVideoPlayer({
         return () => {
             if (pollRef.current) clearInterval(pollRef.current);
         };
-    }, [youtubeId, ytReady, emitProgress, onTimeUpdate]);
+    }, [youtubeId, ytReady, emitProgress]);
 
-    // Tạm dừng/tiếp tục YouTube khi người dùng chuyển tab hoặc ẩn trình duyệt
-    useEffect(() => {
-        if (!youtubeId) return;
-
-        const handleVisibilityOrFocusChange = () => {
-            const player = ytPlayerRef.current;
-            if (!player) return;
-            const isHidden = document.hidden;
-            if (isHidden) {
-                if (player.getPlayerState?.() === 1 /* PLAYING */) {
-                    player.pauseVideo?.();
-                    isPausedBySystemRef.current = true;
-                }
-            } else if (isPausedBySystemRef.current) {
-                player.playVideo?.();
-                isPausedBySystemRef.current = false;
-            }
-        };
-
-        document.addEventListener("visibilitychange", handleVisibilityOrFocusChange);
-        window.addEventListener("blur", handleVisibilityOrFocusChange);
-        window.addEventListener("focus", handleVisibilityOrFocusChange);
-        return () => {
-            document.removeEventListener("visibilitychange", handleVisibilityOrFocusChange);
-            window.removeEventListener("blur", handleVisibilityOrFocusChange);
-            window.removeEventListener("focus", handleVisibilityOrFocusChange);
-        };
-    }, [youtubeId]);
-
-    // ============================================
-    // 3. TUA VIDEO THEO YÊU CẦU NGOÀI (vd: bấm vào 1 note trong danh sách)
-    // ============================================
+    // Tua video khi có yêu cầu từ bên ngoài
     useEffect(() => {
         if (seekToSeconds === null || seekToSeconds === undefined) return;
 
-        // Note là mốc do chính người dùng tạo trong quá khứ -> luôn nằm trong phạm vi đã xem.
-        // Vẫn cập nhật maxTime phòng trường hợp lệch nhẹ, tránh bị anti-cheat giật ngược lại ngay sau khi tua.
         maxTimeRef.current = Math.max(maxTimeRef.current, seekToSeconds);
 
         if (youtubeId) {
@@ -357,7 +374,6 @@ export default function LessonVideoPlayer({
             nativeVideoRef.current.play().catch(() => { });
             onSeeked?.();
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [seekToSeconds, ytReady]);
 
     const formatTime = (seconds: number) => {
@@ -368,7 +384,6 @@ export default function LessonVideoPlayer({
 
     return (
         <div className="w-full space-y-2">
-            {/* Thanh trạng thái tiến độ - dùng chung cho cả MP4 và YouTube */}
             <div className="flex items-center justify-between text-[11px] font-medium text-[#8A8FA3] px-0.5">
                 <div className="flex items-center gap-2">
                     <span className={`h-2 w-2 rounded-full ${displayFinished ? "bg-[#12B886]" : "bg-[#F2A93B] animate-pulse"}`} />
@@ -388,23 +403,27 @@ export default function LessonVideoPlayer({
             </div>
 
             {youtubeId ? (
-                <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-black shadow-sm">
+                <div key={lessonId} className="relative w-full aspect-video rounded-2xl overflow-hidden bg-black shadow-sm">
                     <div ref={containerRef} className="w-full h-full" data-lesson-id={lessonId} />
                 </div>
             ) : (
-                <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-black shadow-sm">
+                <div key={lessonId} className="relative w-full aspect-video rounded-2xl overflow-hidden bg-black shadow-sm">
                     <video
+                        key={url}
                         ref={nativeVideoRef}
+                        src={url}
                         controls
                         controlsList="nodownload"
                         className="w-full h-full object-contain"
                         data-lesson-id={lessonId}
                     >
-                        <source src={url} type="video/mp4" />
                         Trình duyệt của bạn không hỗ trợ xem video trực tiếp.
                     </video>
                 </div>
             )}
         </div>
     );
-}
+});
+
+LessonVideoPlayer.displayName = "LessonVideoPlayer";
+export default LessonVideoPlayer;

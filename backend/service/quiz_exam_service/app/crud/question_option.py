@@ -89,5 +89,7 @@ class CRUDQuestionOption(CRUDBase[QuestionOption, QuestionOptionCreate, Question
             db.refresh(opt)
             
         return db_options
+
+
 crud_question_option = CRUDQuestionOption(QuestionOption)
 
