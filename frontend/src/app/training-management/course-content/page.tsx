@@ -4,23 +4,23 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import {
-  Search, ArrowLeft, ChevronRight, BookOpen, Layers, FileText, Plus, X, Paperclip, ExternalLink, Info, UserCheck, UserPlus, Edit3, FolderOpen, Inbox, LayoutGrid, Download, GraduationCap, Clock
+  Search, ArrowLeft, ChevronRight, BookOpen, Layers, FileText, Plus, Trash2, X, Paperclip, ExternalLink, Info, UserCheck, UserPlus, Edit3, FolderOpen, Inbox, LayoutGrid, Download, GraduationCap, Clock
 } from "lucide-react";
 
 import { Course } from "@/types/course";
 import { getCoursesAction } from "@/actions/getCourse";
-import { getSubjectsByCourseAction, createSubjectAction } from "@/actions/getSubject";
+import { getSubjectsByCourseAction, createSubjectAction, deleteSubject } from "@/actions/getSubject";
 import {
   getSyllabusBySubjectAction,
   createSyllabusAction,
   uploadFileAction,
-  updateSyllabusAction, 
+  updateSyllabusAction,
+  deleteSyllabusAction,
   getInstructorsAction,
   InstructorUser
 } from "@/actions/getSyllabus";
 import { getCurriculumsAction } from "@/actions/getCurriculum";
 
-const [editingSyllabus, setEditingSyllabus] = useState<any | null>(null);
 
 const URL_NGINX = process.env.NEXT_PUBLIC_NGINX_URL || "";
 
@@ -95,6 +95,7 @@ export default function CourseContentPage() {
   const [showSubjectModal, setShowSubjectModal] = useState<boolean>(false);
   const [showSyllabusModal, setShowSyllabusModal] = useState<boolean>(false);
 
+  const [editingSyllabus, setEditingSyllabus] = useState<any | null>(null);
   // Form State
   const [subjectForm, setSubjectForm] = useState({ title: "", description: "", order_index: 1 });
   const [syllabusForm, setSyllabusForm] = useState({ description: "", instructor_id: "" });
@@ -187,54 +188,98 @@ export default function CourseContentPage() {
     }
   };
 
-const handleCreateSyllabus = async () => {
-  if (!selectedSubject) return alert("Vui lòng chọn môn học trước!");
-  if (!syllabusForm.instructor_id) return alert("Vui lòng chọn Giảng viên phụ trách!");
-  if (!syllabusForm.description.trim()) return alert("Vui lòng nhập mô tả đề cương!");
-  setIsLoading(true);
-  try {
-    // Giữ file cũ nếu không chọn file mới (chỉ áp dụng khi đang edit)
-    let filePath: string | null =
-      editingSyllabus?.syllabus_file_path || editingSyllabus?.file_path || null;
+  const handleDeleteSubject = async (subject: any) => {
+    const confirmed = window.confirm(
+      `Bạn có chắc muốn xóa môn học "${subject.title}"? Hành động này không thể hoàn tác.`
+    );
+    if (!confirmed) return;
 
-    if (selectedFile) {
-      const uploadData = new FormData();
-      uploadData.append("file", selectedFile);
-      const uploadRes = await uploadFileAction(uploadData);
-      filePath = uploadRes.file_path;
+    setIsLoading(true);
+    try {
+      await deleteSubject(subject.subject_id);
+      alert("Xóa môn học thành công!");
+
+      // Nếu đang xem đúng subject vừa xóa thì reset selection
+      if (selectedSubject?.subject_id === subject.subject_id) {
+        setSelectedSubject(null);
+        setSyllabuses([]);
+      }
+      await handleSelectCourse(selectedCourse); // reload lại danh sách subject
+    } catch (error: any) {
+      alert(`Lỗi khi xóa môn học: ${error?.message || "Không xác định"}`);
+    } finally {
+      setIsLoading(false);
     }
+  };
 
-    if (editingSyllabus) {
-      // 🟢 CẬP NHẬT
-      const syllabusId = editingSyllabus.syllabus_id || editingSyllabus.id;
-      await updateSyllabusAction(syllabusId, {
-        description: syllabusForm.description.trim(),
-        instructor_id: syllabusForm.instructor_id,
-        syllabus_file_path: filePath,
-      });
-      alert("Cập nhật đề cương thành công!");
-    } else {
-      // 🟡 TẠO MỚI
-      await createSyllabusAction({
-        subject_id: String(selectedSubject.subject_id),
-        description: syllabusForm.description.trim(),
-        syllabus_file_path: filePath,
-        instructor_id: syllabusForm.instructor_id,
-      });
-      alert("Tạo đề cương và phân công giảng viên thành công!");
+  const handleDeleteSyllabus = async (syl: any) => {
+    const confirmed = window.confirm(
+      `Bạn có chắc muốn xóa đề cương này? Hành động này không thể hoàn tác.`
+    );
+    if (!confirmed) return;
+
+    setIsLoading(true);
+    try {
+      const syllabusId = syl.syllabus_id || syl.id;
+      await deleteSyllabusAction(syllabusId);
+      alert("Xóa đề cương thành công!");
+      await handleSelectSubject(selectedSubject); // reload lại đề cương của môn đang chọn
+    } catch (error: any) {
+      alert(`Lỗi khi xóa đề cương: ${error?.message || "Không xác định"}`);
+    } finally {
+      setIsLoading(false);
     }
+  };
 
-    setShowSyllabusModal(false);
-    setSyllabusForm({ description: "", instructor_id: "" });
-    setSelectedFile(null);
-    setEditingSyllabus(null);
-    await handleSelectSubject(selectedSubject);
-  } catch (error: any) {
-    alert(`Lỗi khi lưu đề cương: ${error?.message || "Không xác định"}`);
-  } finally {
-    setIsLoading(false);
-  }
-};
+  const handleCreateSyllabus = async () => {
+    if (!selectedSubject) return alert("Vui lòng chọn môn học trước!");
+    if (!syllabusForm.instructor_id) return alert("Vui lòng chọn Giảng viên phụ trách!");
+    if (!syllabusForm.description.trim()) return alert("Vui lòng nhập mô tả đề cương!");
+    setIsLoading(true);
+    try {
+      // Giữ file cũ nếu không chọn file mới (chỉ áp dụng khi đang edit)
+      let filePath: string | null =
+        editingSyllabus?.syllabus_file_path || editingSyllabus?.file_path || null;
+
+      if (selectedFile) {
+        const uploadData = new FormData();
+        uploadData.append("file", selectedFile);
+        const uploadRes = await uploadFileAction(uploadData);
+        filePath = uploadRes.file_path;
+      }
+
+      if (editingSyllabus) {
+        // 🟢 CẬP NHẬT
+        const syllabusId = editingSyllabus.syllabus_id || editingSyllabus.id;
+        await updateSyllabusAction(syllabusId, {
+          description: syllabusForm.description.trim(),
+          instructor_id: syllabusForm.instructor_id,
+          syllabus_file_path: filePath ?? undefined,
+        });
+        alert("Cập nhật đề cương thành công!");
+      } else {
+        // 🟡 TẠO MỚI
+        await createSyllabusAction({
+          subject_id: String(selectedSubject.subject_id),
+          description: syllabusForm.description.trim(),
+          syllabus_file_path: filePath,
+          instructor_id: syllabusForm.instructor_id,
+        });
+        alert("Tạo đề cương và phân công giảng viên thành công!");
+      }
+
+      setShowSyllabusModal(false);
+      setSyllabusForm({ description: "", instructor_id: "" });
+      setSelectedFile(null);
+      setEditingSyllabus(null);
+      await handleSelectSubject(selectedSubject);
+    } catch (error: any) {
+      alert(`Lỗi khi lưu đề cương: ${error?.message || "Không xác định"}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
 
   const filteredCourses = courses.filter((c) =>
     c.title?.toLowerCase().includes(keyword.toLowerCase())
@@ -451,7 +496,21 @@ const handleCreateSyllabus = async () => {
                                 )}
                               </div>
                             </div>
-                            <ChevronRight size={18} className={`shrink-0 transition-all ${isSelected ? 'text-amber-500 translate-x-1' : 'text-slate-300 group-hover:text-amber-300'}`} />
+
+                            {/* Nhóm nút Xóa + Chevron */}
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation(); // tránh trigger handleSelectSubject khi bấm xóa
+                                  handleDeleteSubject(sub);
+                                }}
+                                className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                                title="Xóa môn học"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                              <ChevronRight size={18} className={`shrink-0 transition-all ${isSelected ? 'text-amber-500 translate-x-1' : 'text-slate-300 group-hover:text-amber-300'}`} />
+                            </div>
                           </div>
 
                           {subjectFile && (
@@ -536,19 +595,28 @@ const handleCreateSyllabus = async () => {
                                 </div>
                               </div>
 
-                              <button
-                                onClick={() => {
-                                  setEditingSyllabus(syl);
-                                  setSyllabusForm({
-                                    description: syl.description || "",
-                                    instructor_id: String(syl.instructor_id || "")
-                                  });
-                                  setShowSyllabusModal(true);
-                                }}
-                                className="px-4 py-2 bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all shadow-sm shrink-0"
-                              >
-                                <Edit3 size={14} /> Chỉnh sửa
-                              </button>
+                              {/* Nhóm nút Chỉnh sửa + Xóa */}
+                              <div className="flex items-center gap-2 shrink-0">
+                                <button
+                                  onClick={() => {
+                                    setEditingSyllabus(syl);
+                                    setSyllabusForm({
+                                      description: syl.description || "",
+                                      instructor_id: String(syl.instructor_id || "")
+                                    });
+                                    setShowSyllabusModal(true);
+                                  }}
+                                  className="px-4 py-2 bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all shadow-sm"
+                                >
+                                  <Edit3 size={14} /> Chỉnh sửa
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteSyllabus(syl)}
+                                  className="px-4 py-2 bg-white hover:bg-red-50 text-red-500 border border-red-200 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all shadow-sm"
+                                >
+                                  <Trash2 size={14} /> Xóa
+                                </button>
+                              </div>
                             </div>
 
                             <div className="space-y-3">
@@ -656,9 +724,15 @@ const handleCreateSyllabus = async () => {
             <div className="flex justify-between items-center pb-4 border-b border-slate-100">
               <h3 className="font-black text-xl text-slate-800 flex items-center gap-2">
                 <div className="p-2 bg-emerald-100 text-emerald-600 rounded-xl"><UserPlus size={20} /></div>
-                Thiết Lập Đề Cương
+                {editingSyllabus ? "Cập Nhật Đề Cương" : "Thiết Lập Đề Cương"}
               </h3>
-              <button onClick={() => setShowSyllabusModal(false)} className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700 transition-colors">
+              <button
+                onClick={() => {
+                  setShowSyllabusModal(false);
+                  setEditingSyllabus(null);
+                }}
+                className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700 transition-colors"
+              >
                 <X size={18} />
               </button>
             </div>
@@ -711,15 +785,26 @@ const handleCreateSyllabus = async () => {
                     className="w-full text-xs text-slate-600 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-white file:text-emerald-600 file:shadow-sm hover:file:bg-emerald-50 cursor-pointer"
                   />
                 </div>
+                {editingSyllabus && (editingSyllabus.syllabus_file_path || editingSyllabus.file_path) && !selectedFile && (
+                  <p className="text-[11px] text-slate-400 mt-1.5 italic">
+                    Đang giữ file hiện có. Chọn file mới ở trên nếu muốn thay thế.
+                  </p>
+                )}
               </div>
             </div>
 
             <div className="flex justify-end gap-3 pt-5 border-t border-slate-100">
-              <button onClick={() => setShowSyllabusModal(false)} className="px-5 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl text-sm font-bold text-slate-600 transition-colors">
+              <button
+                onClick={() => {
+                  setShowSyllabusModal(false);
+                  setEditingSyllabus(null);
+                }}
+                className="px-5 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl text-sm font-bold text-slate-600 transition-colors"
+              >
                 Hủy bỏ
               </button>
               <button onClick={handleCreateSyllabus} disabled={isLoading} className="px-6 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-sm font-bold shadow-[0_4px_15px_-3px_rgba(16,185,129,0.4)] transition-all disabled:opacity-70 flex items-center gap-2">
-                {isLoading ? "Đang xử lý..." : <><UserPlus size={16} /> Lưu Hệ Thống</>}
+                {isLoading ? "Đang xử lý..." : <><UserPlus size={16} /> {editingSyllabus ? "Cập Nhật" : "Lưu Hệ Thống"}</>}
               </button>
             </div>
           </div>

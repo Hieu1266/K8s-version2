@@ -368,3 +368,39 @@ export async function downloadSyllabusFileAction(
     throw new Error(error.message || "Lỗi khi tải file đề cương");
   }
 }
+
+/**
+ * 11. Xóa Đề cương (Syllabus) theo ID
+ */
+export async function deleteSyllabusAction(syllabusId: string) {
+  try {
+    const baseUrl = userBackendUrl || "";
+    const url = `${baseUrl.replace(/\/$/, "")}/syllabus/${syllabusId}`;
+
+    const token = await getTokenFromCookie();
+
+    const res = await fetch(url, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { "Authorization": `Bearer ${token}` } : {})
+      }
+    });
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      let errorMessage = `Lỗi máy chủ (${res.status})`;
+      try {
+        const errorJson = JSON.parse(errorText);
+        errorMessage = errorJson.detail || errorMessage;
+      } catch {
+        errorMessage = errorText || errorMessage;
+      }
+      throw new Error(errorMessage);
+    }
+
+    return await res.json();
+  } catch (error: any) {
+    throw new Error(error.message || "Lỗi xóa đề cương");
+  }
+}

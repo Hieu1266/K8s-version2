@@ -135,3 +135,17 @@ def download_syllabus_file(
         filename=file_name,
         media_type="application/pdf"
     )
+
+# 🔴 5. API: Xóa đề cương theo ID
+@router.delete("/{syllabus_id}", status_code=status.HTTP_200_OK)
+def delete_syllabus(
+    syllabus_id: UUID,
+    db: SessionDep,
+    current_user: dict = Depends(RoleChecker(["Admin", "Manager"]))
+):
+    db_obj = crud_syllabus.get_by_id(db=db, id=syllabus_id)
+    if not db_obj:
+        raise HTTPException(status_code=404, detail="Không tìm thấy đề cương yêu cầu.")
+
+    crud_syllabus.delete(db=db, id=syllabus_id)
+    return {"msg": "Xóa đề cương thành công"}
