@@ -157,7 +157,15 @@ export async function deleteSubject(subjectId: string) {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || "Xóa môn học thất bại");
+      let message = "Xóa môn học thất bại";
+      if (typeof errorData.detail === "string") {
+        message = errorData.detail;
+      } else if (Array.isArray(errorData.detail)) {
+        message = errorData.detail.map((e: any) => e.msg || JSON.stringify(e)).join(" | ");
+      } else if (errorData.detail) {
+        message = JSON.stringify(errorData.detail);
+      }
+      throw new Error(message);
     }
     return await response.json();
   } catch (error: any) {
