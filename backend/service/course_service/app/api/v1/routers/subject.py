@@ -208,10 +208,18 @@ def delete_subject(
     subject_id: UUID,
     current_user: dict = Depends(RoleChecker(["Manager"]))
 ):
+    existing_modules = crud_module.get_by_subject(db, subject_id)  # cần có hàm này trong crud_module
+    if existing_modules:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Không thể xóa môn học vì còn {len(existing_modules)} chương/module liên quan. Vui lòng xóa các module trước."
+        )
+
     db_obj = crud_subject.delete(db, subject_id)
     if not db_obj:
         raise HTTPException(status_code=404, detail="Subject not found")
     return {"msg": "Subject deleted successfully"}
+
 
 @router.get("/instructor/statistic", response_model=InstructorStatictisSubject)
 def instructor_statistic(

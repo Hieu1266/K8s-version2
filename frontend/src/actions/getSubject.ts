@@ -267,28 +267,56 @@ export const getInstructorSubjectsWithQuestionsAction = async (
   }
 };
 // 7. Cập nhật môn học
+
+// 7. Cập nhật môn học
 export async function updateSubjectAction(
   subjectId: string,
   payload: SubjectUpdateInput
 ): Promise<SubjectData> {
-  const token = await getServerToken();
+  try {
+    const token = await getServerToken();
 
-  const response = await fetch(`${BACKEND_URL}/subjects/${subjectId}`, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify(payload),
-  });
+    if (!token) {
+      throw new Error("Bạn chưa đăng nhập hoặc phiên làm việc đã hết hạn!");
+    }
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.detail || "Cập nhật môn học thất bại.");
+    const response = await fetch(`${BACKEND_URL}/subjects/${subjectId}`, {
+      method: "PUT", // Nếu Backend dùng PATCH thì đổi thành "PATCH"
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      
+      let errorMessage = `Lỗi Server (${response.status})`;
+      if (typeof errorData.detail === "string") {
+        errorMessage = errorData.detail;
+      } else if (Array.isArray(errorData.detail)) {
+        errorMessage = errorData.detail
+          .map((e: any) => `${e.loc?.slice(1).join(".") || "Lỗi"}: ${e.msg}`)
+          .join(" | ");
+      } else if (errorData.detail) {
+        errorMessage = JSON.stringify(errorData.detail);
+      }
+
+      throw new Error(errorMessage);
+    }
+
+    return await response.json();
+  } catch (error: any) {
+    console.error("❌ Lỗi updateSubjectAction:", error.message);
+    throw new Error(error.message || "Lỗi khi cập nhật môn học");
   }
-
-  return response.json();
 }
+
+
+
+
+
 
 // 8. 🆕 Lấy chi tiết 1 môn học theo ID (Cho SubjectPage.tsx)
 export async function getSubjectByIdAction(

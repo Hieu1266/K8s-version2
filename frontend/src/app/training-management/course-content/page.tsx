@@ -4,25 +4,46 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import {
-  Search, ArrowLeft, ChevronRight, BookOpen, Layers, FileText, Plus, Trash2, X, Paperclip, ExternalLink, Info, UserCheck, UserPlus, Edit3, FolderOpen, Inbox, LayoutGrid, Download, GraduationCap, Clock
+  Search, ArrowLeft, ChevronRight, BookOpen, Layers, FileText, Plus, Trash2, X, Paperclip, ExternalLink, Info, UserCheck, UserPlus, Edit3, FolderOpen, Inbox, LayoutGrid, Download, GraduationCap, Clock, GripVertical
 } from "lucide-react";
 
 import { Course } from "@/types/course";
 import { getCoursesAction } from "@/actions/getCourse";
-import { getSubjectsByCourseAction, createSubjectAction, deleteSubject } from "@/actions/getSubject";
+import { getSubjectsByCourseAction, createSubjectAction, deleteSubject, updateSubjectAction } from "@/actions/getSubject";
 import {
   getSyllabusBySubjectAction,
   createSyllabusAction,
   uploadFileAction,
   updateSyllabusAction,
+  deleteSyllabusAction,
   getInstructorsAction,
-  InstructorUser,
-  deleteSyllabusAction
+  InstructorUser
 } from "@/actions/getSyllabus";
 import { getCurriculumsAction } from "@/actions/getCurriculum";
 
 
 const URL_NGINX = process.env.NEXT_PUBLIC_NGINX_URL || "";
+
+// 🛠️ Một số backend (vd: lỗi validate từ Zod/Joi) trả về error.message là OBJECT
+// chứ không phải string. Nếu nhét thẳng vào template string sẽ ra "[object Object]".
+// Hàm này luôn trả về một chuỗi có thể đọc được để hiển thị/alert.
+const getErrorMessage = (error: any): string => {
+  const raw = error?.response?.data?.message ?? error?.data?.message ?? error?.message ?? error?.error ?? error;
+  if (typeof raw === "string") return raw;
+  if (Array.isArray(raw)) {
+    return raw
+      .map((item) => (typeof item === "string" ? item : item?.message || JSON.stringify(item)))
+      .join("; ");
+  }
+  if (raw && typeof raw === "object") {
+    try {
+      return JSON.stringify(raw);
+    } catch {
+      return "Không xác định";
+    }
+  }
+  return "Không xác định";
+};
 
 const getFullAssetUrl = (path?: string | null): string => {
   if (!path) return "#";
@@ -83,7 +104,6 @@ export default function CourseContentPage() {
   const [selectedCourse, setSelectedCourse] = useState<any | null>(null);
   const [curriculumFile, setCurriculumFile] = useState<string | null>(null);
 
-  const [editingSyllabus, setEditingSyllabus] = useState<any | null>(null);
   const [subjects, setSubjects] = useState<any[]>([]);
   const [selectedSubject, setSelectedSubject] = useState<any | null>(null);
 
@@ -92,10 +112,13 @@ export default function CourseContentPage() {
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [keyword, setKeyword] = useState<string>("");
-
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const [showSubjectModal, setShowSubjectModal] = useState<boolean>(false);
   const [showSyllabusModal, setShowSyllabusModal] = useState<boolean>(false);
 
+  const [editingSubject, setEditingSubject] = useState<any | null>(null);
+  const [editingSyllabus, setEditingSyllabus] = useState<any | null>(null);
   // Form State
   const [subjectForm, setSubjectForm] = useState({ title: "", description: "", order_index: 1 });
   const [syllabusForm, setSyllabusForm] = useState({ description: "", instructor_id: "" });
@@ -130,15 +153,15 @@ export default function CourseContentPage() {
 
     if (course?.curriculum_id) {
       try {
-        const currRes: any = await getCurriculumsAction();
-        const curriculumList = Array.isArray(currRes) ? currRes : currRes?.data || [];
-        const currData = curriculumList.find((c: any) => (c.curriculum_id || c.id) === course.curriculum_id);
-        if (currData) {
-          const filePath = currData?.file_path || currData?.curriculum_file_path || currData?.file_url || currData?.syllabus_file_path;
-          setCurriculumFile(filePath || null);
-        }
+        const res: any = await getSubjectsByCourseAction(course.course_id);
+        const subjectList = Array.isArray(res) ? res : res?.data || [];
+        // 👇 luôn sort theo order_index để hiển thị đúng thứ tự đã lưu
+        subjectList.sort((a: any, b: any) => (a.order_index ?? 0) - (b.order_index ?? 0));
+        setSubjects(subjectList);
+        if (subjectList.length > 0) handleSelectSubject(subjectList[0]);
       } catch (error) {
-        console.error("Lỗi khi tải thông tin Curriculum:", error);
+        console.error("Lỗi khi tải danh sách môn học:", error);
+        setSubjects([]);
       }
     }
 
@@ -153,6 +176,109 @@ export default function CourseContentPage() {
     }
   };
 
+
+
+const handleDragStart = (index: number) => {
+  setDraggedIndex(index);
+};
+
+const handleDragOver = (e: React.DragEvent, index: number) => {
+  e.preventDefault(); // bắt buộc để cho phép drop
+  if (draggedIndex !== null && draggedIndex !== index) {
+    setDragOverIndex(index);
+  }
+};
+
+const handleDragLeave = () => {
+  setDragOverIndex(null);
+};
+
+const handleDragEnd = () => {
+  setDraggedIndex(null);
+  setDragOverIndex(null);
+};
+
+const saveSubjectOrder = async (orderedSubjects: any[]) => {
+  const updated = orderedSubjects.map((sub, idx) => ({
+    ...sub,
+    order_index: idx + 1,
+  }));
+
+  setSubjects(updated);
+
+  try {
+    await Promise.all(
+      updated.map((sub, idx) => {
+        const original = subjects.find(
+          (item) => item.subject_id === sub.subject_id
+        );
+
+        if (
+          original &&
+          original.order_index !== idx + 1
+        ) {
+          return updateSubjectAction(
+            sub.subject_id,
+            {
+              title: sub.title,
+              description: sub.description || sub.title,
+              order_index: idx + 1,
+
+              // QUAN TRỌNG
+              status_id: sub.status_id,
+            }
+          );
+        }
+
+        return Promise.resolve();
+      })
+    );
+
+    if (selectedSubject) {
+      const current = updated.find(
+        (sub) =>
+          sub.subject_id === selectedSubject.subject_id
+      );
+
+      if (current) {
+        setSelectedSubject(current);
+      }
+    }
+
+  } catch (error: any) {
+    console.error(
+      "Lỗi khi lưu thứ tự môn học:",
+      error
+    );
+
+    alert(
+      `Lỗi khi lưu thứ tự môn học: ${
+        getErrorMessage(error)
+      }`
+    );
+
+    await handleSelectCourse(selectedCourse);
+  }
+};
+
+const handleDrop = async (e: React.DragEvent, dropIndex: number) => {
+  e.preventDefault();
+  setDragOverIndex(null);
+
+  if (draggedIndex === null || draggedIndex === dropIndex) {
+    setDraggedIndex(null);
+    return;
+  }
+
+  const reordered = [...subjects];
+  const [movedItem] = reordered.splice(draggedIndex, 1);
+  reordered.splice(dropIndex, 0, movedItem);
+
+  setDraggedIndex(null);
+  await saveSubjectOrder(reordered);
+};
+
+
   const handleSelectSubject = async (subject: any) => {
     setSelectedSubject(subject);
     try {
@@ -166,23 +292,142 @@ export default function CourseContentPage() {
     }
   };
 
-  const handleCreateSubject = async () => {
+  const handleEditSubject = (subject: any) => {
+    setEditingSubject(subject);
+    setSubjectForm({
+      title: subject.title || "",
+      description: subject.description || "",
+      order_index: Number(subject.order_index) || 1,
+    });
+    setShowSubjectModal(true);
+  };
+
+  const handleSaveSubject = async () => {
     if (!selectedCourse) return alert("Vui lòng chọn khóa học trước!");
     if (!subjectForm.title.trim()) return alert("Vui lòng nhập tên môn học!");
+
     setIsLoading(true);
+
     try {
-      await createSubjectAction({
-        course_id: selectedCourse.course_id,
-        title: subjectForm.title.trim(),
-        description: subjectForm.description.trim() || subjectForm.title.trim(),
-        order_index: Number(subjectForm.order_index) || 1,
-      });
-      alert("Tạo môn học thành công!");
+      const title = subjectForm.title.trim();
+      const description = subjectForm.description.trim() || title;
+
+      if (editingSubject) {
+        const oldIndex = subjects.findIndex(
+          (sub) => sub.subject_id === editingSubject.subject_id
+        );
+
+        let newIndex = Number(subjectForm.order_index) - 1;
+        if (!Number.isFinite(newIndex)) newIndex = oldIndex;
+        if (newIndex < 0) newIndex = 0;
+        if (newIndex >= subjects.length) newIndex = subjects.length - 1;
+
+        // Cập nhật nội dung trước. Order sẽ được chuẩn hóa bên dưới.
+        await updateSubjectAction(editingSubject.subject_id, {
+          title,
+          description,
+          order_index: oldIndex + 1,
+          status_id: editingSubject.status_id,
+        });
+
+        if (oldIndex !== -1 && oldIndex !== newIndex) {
+          const reordered = [...subjects];
+          const [movedSubject] = reordered.splice(oldIndex, 1);
+          reordered.splice(newIndex, 0, {
+            ...movedSubject,
+            title,
+            description,
+          });
+
+          // Lưu lại toàn bộ thứ tự để luôn có STT 1..N, không trùng.
+          // Gửi kèm title/description phòng trường hợp backend yêu cầu đủ trường khi update
+          await Promise.all(
+            reordered.map((sub, idx) =>
+              updateSubjectAction(sub.subject_id, {
+                title: sub.title,
+                description: sub.description,
+                order_index: idx + 1,
+                status_id: sub.status_id,
+              })
+            )
+          );
+        } else {
+          await updateSubjectAction(editingSubject.subject_id, {
+            title,
+            description,
+            order_index: newIndex + 1,
+            status_id: editingSubject.status_id,
+          });
+        }
+
+        alert("Cập nhật môn học thành công!");
+      } else {
+        // Môn mới luôn được thêm vào cuối danh sách.
+        await createSubjectAction({
+          course_id: selectedCourse.course_id,
+          title,
+          description,
+          order_index: subjects.length + 1,
+        });
+
+        alert("Tạo môn học thành công!");
+      }
+
       setShowSubjectModal(false);
-      setSubjectForm({ title: "", description: "", order_index: subjects.length + 1 });
+      setEditingSubject(null);
+      setSubjectForm({
+        title: "",
+        description: "",
+        order_index: subjects.length + 1,
+      });
+
       await handleSelectCourse(selectedCourse);
     } catch (error: any) {
-      alert(`Lỗi khi tạo môn học: ${error?.message || "Lỗi chưa xác định"}`);
+      console.error("Lỗi khi lưu môn học:", error);
+      alert(`Lỗi khi lưu môn học: ${getErrorMessage(error)}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeleteSubject = async (subject: any) => {
+    const confirmed = window.confirm(
+      `Bạn có chắc muốn xóa môn học "${subject.title}"? Hành động này không thể hoàn tác.`
+    );
+    if (!confirmed) return;
+
+    setIsLoading(true);
+    try {
+      await deleteSubject(subject.subject_id);
+      alert("Xóa môn học thành công!");
+
+      // Nếu đang xem đúng subject vừa xóa thì reset selection
+      if (selectedSubject?.subject_id === subject.subject_id) {
+        setSelectedSubject(null);
+        setSyllabuses([]);
+      }
+      await handleSelectCourse(selectedCourse); // reload lại danh sách subject
+    } catch (error: any) {
+      alert(`Lỗi khi xóa môn học: ${getErrorMessage(error)}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeleteSyllabus = async (syl: any) => {
+    const confirmed = window.confirm(
+      `Bạn có chắc muốn xóa đề cương này? Hành động này không thể hoàn tác.`
+    );
+    if (!confirmed) return;
+
+    setIsLoading(true);
+    try {
+      const syllabusId = syl.syllabus_id || syl.id;
+      await deleteSyllabusAction(syllabusId);
+      alert("Xóa đề cương thành công!");
+      await handleSelectSubject(selectedSubject); // reload lại đề cương của môn đang chọn
+    } catch (error: any) {
+      alert(`Lỗi khi xóa đề cương: ${getErrorMessage(error)}`);
     } finally {
       setIsLoading(false);
     }
@@ -211,7 +456,7 @@ export default function CourseContentPage() {
         await updateSyllabusAction(syllabusId, {
           description: syllabusForm.description.trim(),
           instructor_id: syllabusForm.instructor_id,
-          syllabus_file_path: filePath,
+          syllabus_file_path: filePath ?? undefined,
         });
         alert("Cập nhật đề cương thành công!");
       } else {
@@ -231,11 +476,12 @@ export default function CourseContentPage() {
       setEditingSyllabus(null);
       await handleSelectSubject(selectedSubject);
     } catch (error: any) {
-      alert(`Lỗi khi lưu đề cương: ${error?.message || "Không xác định"}`);
+      alert(`Lỗi khi lưu đề cương: ${getErrorMessage(error)}`);
     } finally {
       setIsLoading(false);
     }
   };
+
 
   const filteredCourses = courses.filter((c) =>
     c.title?.toLowerCase().includes(keyword.toLowerCase())
@@ -406,6 +652,7 @@ export default function CourseContentPage() {
                   </h3>
                   <button
                     onClick={() => {
+                      setEditingSubject(null);
                       setSubjectForm({ title: "", description: "", order_index: subjects.length + 1 });
                       setShowSubjectModal(true);
                     }}
@@ -425,21 +672,32 @@ export default function CourseContentPage() {
                     subjects.map((sub: any, index: number) => {
                       const isSelected = selectedSubject?.subject_id === sub.subject_id;
                       const subjectFile = sub.file_url || sub.file_path || sub.syllabus_file;
+                      const isDragging = draggedIndex === index;
+                      const isDragOver = dragOverIndex === index && draggedIndex !== index;
 
                       return (
                         <div
                           key={sub.subject_id}
+                          draggable
+                          onDragStart={() => handleDragStart(index)}
+                          onDragOver={(e) => handleDragOver(e, index)}
+                          onDragLeave={handleDragLeave}
+                          onDrop={(e) => handleDrop(e, index)}
+                          onDragEnd={handleDragEnd}
                           onClick={() => handleSelectSubject(sub)}
                           className={`p-4 rounded-2xl cursor-pointer transition-all duration-300 group flex flex-col gap-3 ${isSelected
                             ? "border border-amber-400 bg-gradient-to-r from-amber-50 to-white shadow-[0_4px_20px_-5px_rgba(245,158,11,0.15)]"
                             : "border border-slate-100 bg-white hover:border-amber-200 hover:bg-amber-50/20 hover:shadow-md"
-                            }`}
+                            } ${isDragging ? "opacity-40 scale-[0.98]" : ""} ${isDragOver ? "border-t-4 border-t-[#0066FF] -translate-y-0.5" : ""}`}
                         >
                           <div className="flex justify-between items-start gap-4">
                             <div className="flex gap-3.5 flex-1 min-w-0">
-                              <div className={`w-10 h-10 shrink-0 rounded-xl flex items-center justify-center text-sm font-black shadow-sm transition-colors ${isSelected ? "bg-amber-500 text-white" : "bg-slate-50 text-slate-400 border border-slate-200 group-hover:text-amber-500"
-                                }`}>
-                                {sub.order_index || index + 1}
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <GripVertical size={16} className="text-slate-300 group-hover:text-amber-400 cursor-grab active:cursor-grabbing transition-colors" />
+                                <div className={`w-10 h-10 shrink-0 rounded-xl flex items-center justify-center text-sm font-black shadow-sm transition-colors ${isSelected ? "bg-amber-500 text-white" : "bg-slate-50 text-slate-400 border border-slate-200 group-hover:text-amber-500"
+                                  }`}>
+                                  {sub.order_index || index + 1}
+                                </div>
                               </div>
                               <div className="flex-1 min-w-0 pt-0.5">
                                 <span className={`font-extrabold text-sm block mb-1 truncate transition-colors ${isSelected ? 'text-amber-700' : 'text-slate-800 group-hover:text-amber-600'}`}>
@@ -453,12 +711,22 @@ export default function CourseContentPage() {
                               </div>
                             </div>
 
-                            {/* Nhóm nút Xóa + Chevron */}
+                            {/* Nhóm nút Chỉnh sửa + Xóa + Chevron */}
                             <div className="flex items-center gap-1 shrink-0">
                               <button
                                 onClick={(e) => {
-                                  e.stopPropagation(); // tránh trigger handleSelectSubject khi bấm xóa
-                                  deleteSubject(sub);
+                                  e.stopPropagation();
+                                  handleEditSubject(sub);
+                                }}
+                                className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-blue-500 hover:bg-blue-50 transition-colors"
+                                title="Chỉnh sửa môn học"
+                              >
+                                <Edit3 size={16} />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteSubject(sub);
                                 }}
                                 className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
                                 title="Xóa môn học"
@@ -567,7 +835,7 @@ export default function CourseContentPage() {
                                   <Edit3 size={14} /> Chỉnh sửa
                                 </button>
                                 <button
-                                  onClick={() => deleteSubject(syl)}
+                                  onClick={() => handleDeleteSyllabus(syl)}
                                   className="px-4 py-2 bg-white hover:bg-red-50 text-red-500 border border-red-200 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all shadow-sm"
                                 >
                                   <Trash2 size={14} /> Xóa
@@ -616,17 +884,22 @@ export default function CourseContentPage() {
           <div className="bg-white rounded-[2rem] max-w-md w-full p-8 space-y-6 shadow-2xl relative">
             <div className="flex justify-between items-center pb-4 border-b border-slate-100">
               <h3 className="font-black text-xl text-slate-800 flex items-center gap-2">
-                <div className="p-2 bg-amber-100 text-amber-600 rounded-xl"><BookOpen size={20} /></div>
-                Tạo Môn Học Mới
+                <div className="p-2 bg-amber-100 text-amber-600 rounded-xl">
+                  {editingSubject ? <Edit3 size={20} /> : <BookOpen size={20} />}
+                </div>
+                {editingSubject ? "Chỉnh Sửa Môn Học" : "Tạo Môn Học Mới"}
               </h3>
-              <button onClick={() => setShowSubjectModal(false)} className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700 transition-colors">
+              <button onClick={() => { setShowSubjectModal(false); setEditingSubject(null); }} className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700 transition-colors">
                 <X size={18} />
               </button>
             </div>
 
             <div className="bg-amber-50/50 border border-amber-100 p-4 rounded-2xl">
               <p className="text-xs text-amber-800 font-medium">
-                Sẽ được thêm vào: <strong className="font-bold block text-sm mt-1">{selectedCourse?.title}</strong>
+                {editingSubject ? "Đang chỉnh sửa môn học:" : "Sẽ được thêm vào:"}
+                <strong className="font-bold block text-sm mt-1">
+                  {editingSubject ? editingSubject.title : selectedCourse?.title}
+                </strong>
               </p>
             </div>
 
@@ -651,22 +924,47 @@ export default function CourseContentPage() {
                 />
               </div>
               <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1.5 uppercase tracking-wide">Thứ Tự (STT)</label>
+                <label className="text-xs font-bold text-slate-700 block mb-1.5 uppercase tracking-wide">Vị trí môn học</label>
                 <input
                   type="number"
+                  min={1}
+                  max={Math.max(subjects.length, 1)}
                   value={subjectForm.order_index}
-                  onChange={(e) => setSubjectForm({ ...subjectForm, order_index: Number(e.target.value) })}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-sm font-medium focus:outline-none focus:bg-white focus:ring-4 focus:ring-amber-500/10 focus:border-amber-400 transition-all shadow-sm"
+                  onChange={(e) =>
+                    setSubjectForm({
+                      ...subjectForm,
+                      order_index: Number(e.target.value),
+                    })
+                  }
+                  disabled={!editingSubject}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-sm font-medium focus:outline-none focus:bg-white focus:ring-4 focus:ring-amber-500/10 focus:border-amber-400 transition-all shadow-sm disabled:text-slate-400 disabled:cursor-not-allowed"
                 />
+                <p className="text-[11px] text-slate-400 mt-1.5">
+                  {editingSubject
+                    ? "Bạn có thể nhập vị trí mới hoặc kéo thả trực tiếp ngoài danh sách."
+                    : "Môn học mới sẽ tự động được thêm vào cuối danh sách."}
+                </p>
               </div>
             </div>
 
             <div className="flex justify-end gap-3 pt-5 border-t border-slate-100">
-              <button onClick={() => setShowSubjectModal(false)} className="px-5 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl text-sm font-bold text-slate-600 transition-colors">
+              <button onClick={() => { setShowSubjectModal(false); setEditingSubject(null); }} className="px-5 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl text-sm font-bold text-slate-600 transition-colors">
                 Hủy bỏ
               </button>
-              <button onClick={handleCreateSubject} disabled={isLoading} className="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-sm font-bold shadow-[0_4px_15px_-3px_rgba(245,158,11,0.4)] transition-all disabled:opacity-70">
-                {isLoading ? "Đang xử lý..." : "Lưu Môn Học"}
+              <button onClick={handleSaveSubject} disabled={isLoading} className="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-sm font-bold shadow-[0_4px_15px_-3px_rgba(245,158,11,0.4)] transition-all disabled:opacity-70 flex items-center gap-2">
+                {isLoading ? (
+                  "Đang xử lý..."
+                ) : editingSubject ? (
+                  <>
+                    <Edit3 size={16} />
+                    Cập Nhật Môn
+                  </>
+                ) : (
+                  <>
+                    <Plus size={16} />
+                    Lưu Môn Học
+                  </>
+                )}
               </button>
             </div>
           </div>
