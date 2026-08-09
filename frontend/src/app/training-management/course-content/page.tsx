@@ -145,36 +145,68 @@ export default function CourseContentPage() {
     loadInitialData();
   }, []);
 
-  const handleSelectCourse = async (course: any) => {
-    setSelectedCourse(course);
-    setSelectedSubject(null);
-    setSyllabuses([]);
-    setCurriculumFile(null);
+const handleSelectCourse = async (course: any) => {
+  setSelectedCourse(course);
+  setSelectedSubject(null);
+  setSyllabuses([]);
+  setCurriculumFile(null);
 
-    if (course?.curriculum_id) {
-      try {
-        const res: any = await getSubjectsByCourseAction(course.course_id);
-        const subjectList = Array.isArray(res) ? res : res?.data || [];
-        // 👇 luôn sort theo order_index để hiển thị đúng thứ tự đã lưu
-        subjectList.sort((a: any, b: any) => (a.order_index ?? 0) - (b.order_index ?? 0));
-        setSubjects(subjectList);
-        if (subjectList.length > 0) handleSelectSubject(subjectList[0]);
-      } catch (error) {
-        console.error("Lỗi khi tải danh sách môn học:", error);
-        setSubjects([]);
-      }
+  // ==============================
+  // 1. LẤY FILE KHUNG CHƯƠNG TRÌNH
+  // ==============================
+  try {
+    const curriculumRes: any = await getCurriculumsAction();
+
+    const curriculumList = Array.isArray(curriculumRes)
+      ? curriculumRes
+      : curriculumRes?.data || [];
+
+    const curriculum = curriculumList.find(
+      (item: any) =>
+        String(item.curriculum_id) === String(course.curriculum_id)
+    );
+
+    if (curriculum) {
+      const filePath =
+        curriculum.curriculum_file_path ||
+        curriculum.file_path ||
+        curriculum.file_url ||
+        curriculum.file;
+
+      setCurriculumFile(filePath || null);
     }
+  } catch (error) {
+    console.error("Lỗi khi tải file khung chương trình:", error);
+    setCurriculumFile(null);
+  }
 
+  // ==============================
+  // 2. LẤY DANH SÁCH MÔN HỌC
+  // ==============================
+  if (course?.curriculum_id) {
     try {
       const res: any = await getSubjectsByCourseAction(course.course_id);
-      const subjectList = Array.isArray(res) ? res : res?.data || [];
+
+      const subjectList = Array.isArray(res)
+        ? res
+        : res?.data || [];
+
+      subjectList.sort(
+        (a: any, b: any) =>
+          (a.order_index ?? 0) - (b.order_index ?? 0)
+      );
+
       setSubjects(subjectList);
-      if (subjectList.length > 0) handleSelectSubject(subjectList[0]);
+
+      if (subjectList.length > 0) {
+        handleSelectSubject(subjectList[0]);
+      }
     } catch (error) {
       console.error("Lỗi khi tải danh sách môn học:", error);
       setSubjects([]);
     }
-  };
+  }
+};
 
 
 
