@@ -67,7 +67,9 @@ async function probeVideoDuration(url: string): Promise<number | null> {
 
     videoEl.onloadedmetadata = () => {
       const duration = videoEl.duration;
-      finish(Number.isFinite(duration) && duration > 0 ? Math.round(duration) : null);
+      finish(
+        Number.isFinite(duration) && duration > 0 ? Math.round(duration) : null,
+      );
     };
     videoEl.onerror = () => finish(null);
 
@@ -95,7 +97,9 @@ export default function ModuleDetailPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [showModal, setShowModal] = useState(false);
-  const [editingLesson, setEditingLesson] = useState<LessonManagement | null>(null);
+  const [editingLesson, setEditingLesson] = useState<LessonManagement | null>(
+    null,
+  );
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -105,20 +109,28 @@ export default function ModuleDetailPage() {
   const [durationSeconds, setDurationSeconds] = useState<number>(0);
   const [content, setContent] = useState("");
   const [isOptional, setIsOptional] = useState(false);
+  const [isSlidePresentation, setIsSlidePresentation] = useState(false);
   const [isQuiz, setIsQuiz] = useState(false);
   const [detectingDuration, setDetectingDuration] = useState(false);
-  const [durationAutoDetected, setDurationAutoDetected] = useState<boolean | null>(null);
+  const [durationAutoDetected, setDurationAutoDetected] = useState<
+    boolean | null
+  >(null);
 
   // Resource upload states
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingResource, setUploadingResource] = useState(false);
 
   // --- CONFIRM MODAL STATES ---
-  const [deletingResourceId, setDeletingResourceId] = useState<string | null>(null);
-  const [confirmDeleteResourceId, setConfirmDeleteResourceId] = useState<string | null>(null);
+  const [deletingResourceId, setDeletingResourceId] = useState<string | null>(
+    null,
+  );
+  const [confirmDeleteResourceId, setConfirmDeleteResourceId] = useState<
+    string | null
+  >(null);
 
   const [deletingLessonId, setDeletingLessonId] = useState<string | null>(null);
-  const [confirmDeleteLesson, setConfirmDeleteLesson] = useState<LessonManagement | null>(null);
+  const [confirmDeleteLesson, setConfirmDeleteLesson] =
+    useState<LessonManagement | null>(null);
 
   // Drag & Drop
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
@@ -183,6 +195,7 @@ export default function ModuleDetailPage() {
     setDurationSeconds(0);
     setContent("");
     setIsOptional(false);
+    setIsSlidePresentation(false);
     setIsQuiz(false);
     setDurationAutoDetected(null);
     setFormError(null);
@@ -202,8 +215,11 @@ export default function ModuleDetailPage() {
     setDurationSeconds(lesson.duration_seconds || 0);
     setContent(lesson.content_body || "");
     setIsOptional(lesson.is_optional);
+    setIsSlidePresentation(lesson.is_slide_presentation);
     setIsQuiz(lesson.is_quiz);
-    setDurationAutoDetected(lesson.video_url && lesson.duration_seconds > 0 ? true : null);
+    setDurationAutoDetected(
+      lesson.video_url && lesson.duration_seconds > 0 ? true : null,
+    );
     setFormError(null);
     setShowModal(true);
   };
@@ -235,6 +251,7 @@ export default function ModuleDetailPage() {
         duration_seconds: durationSeconds || 0,
         content_body: content || null,
         is_optional: isOptional,
+        is_slide_presentation: isSlidePresentation,
       };
       const result = await updateLessonAction(editingLesson.lesson_id, payload);
       setSubmitting(false);
@@ -243,7 +260,11 @@ export default function ModuleDetailPage() {
         return;
       }
       setLessons((prev) =>
-        prev.map((l) => (l.lesson_id === editingLesson.lesson_id ? { ...l, ...result.data, resources: l.resources } : l))
+        prev.map((l) =>
+          l.lesson_id === editingLesson.lesson_id
+            ? { ...l, ...result.data, resources: l.resources }
+            : l,
+        ),
       );
     } else {
       const payload: LessonCreatePayload = {
@@ -254,6 +275,7 @@ export default function ModuleDetailPage() {
         content_body: isQuiz ? null : content || null,
         order_index: lessons.length + 1,
         is_optional: isQuiz ? false : isOptional,
+        is_slide_presentation: isQuiz ? false : isSlidePresentation,
         is_quiz: isQuiz,
       };
       const result = await createLessonAction(payload);
@@ -280,7 +302,9 @@ export default function ModuleDetailPage() {
         alert(result.error || "Xóa bài học thất bại.");
         return;
       }
-      setLessons((prev) => prev.filter((l) => l.lesson_id !== confirmDeleteLesson.lesson_id));
+      setLessons((prev) =>
+        prev.filter((l) => l.lesson_id !== confirmDeleteLesson.lesson_id),
+      );
       setConfirmDeleteLesson(null);
     } catch (err) {
       console.error("Lỗi xóa bài học:", err);
@@ -298,7 +322,10 @@ export default function ModuleDetailPage() {
     formData.append("file", file);
     formData.append("lesson_id", editingLesson.lesson_id);
 
-    const result = await uploadLessonResourceAction(editingLesson.lesson_id, formData);
+    const result = await uploadLessonResourceAction(
+      editingLesson.lesson_id,
+      formData,
+    );
     setUploadingResource(false);
 
     if (!result.success || !result.data) {
@@ -307,11 +334,15 @@ export default function ModuleDetailPage() {
     }
 
     const newResource = result.data;
-    setEditingLesson((prev) => (prev ? { ...prev, resources: [...prev.resources, newResource] } : prev));
+    setEditingLesson((prev) =>
+      prev ? { ...prev, resources: [...prev.resources, newResource] } : prev,
+    );
     setLessons((prev) =>
       prev.map((l) =>
-        l.lesson_id === editingLesson.lesson_id ? { ...l, resources: [...l.resources, newResource] } : l
-      )
+        l.lesson_id === editingLesson.lesson_id
+          ? { ...l, resources: [...l.resources, newResource] }
+          : l,
+      ),
     );
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
@@ -329,15 +360,27 @@ export default function ModuleDetailPage() {
       }
 
       setEditingLesson((prev) =>
-        prev ? { ...prev, resources: prev.resources.filter((r) => r.resource_id !== confirmDeleteResourceId) } : prev
+        prev
+          ? {
+              ...prev,
+              resources: prev.resources.filter(
+                (r) => r.resource_id !== confirmDeleteResourceId,
+              ),
+            }
+          : prev,
       );
 
       setLessons((prev) =>
         prev.map((l) =>
           l.lesson_id === editingLesson.lesson_id
-            ? { ...l, resources: l.resources.filter((r) => r.resource_id !== confirmDeleteResourceId) }
-            : l
-        )
+            ? {
+                ...l,
+                resources: l.resources.filter(
+                  (r) => r.resource_id !== confirmDeleteResourceId,
+                ),
+              }
+            : l,
+        ),
       );
       setConfirmDeleteResourceId(null);
     } catch (err) {
@@ -420,8 +463,11 @@ export default function ModuleDetailPage() {
                 onDragStart={() => handleDragStart(index)}
                 onDragOver={handleDragOver}
                 onDrop={() => handleDrop(index)}
-                className={`py-4 space-y-3 transition ${draggedIndex === index ? "opacity-30 bg-blue-50 border-2 border-dashed border-blue-400 rounded-xl" : ""
-                  }`}
+                className={`py-4 space-y-3 transition ${
+                  draggedIndex === index
+                    ? "opacity-30 bg-blue-50 border-2 border-dashed border-blue-400 rounded-xl"
+                    : ""
+                }`}
               >
                 <div className="flex items-center justify-between gap-4 hover:bg-slate-50/80 p-2 rounded-xl transition">
                   <div className="flex items-center gap-3 min-w-0">
@@ -462,7 +508,8 @@ export default function ModuleDetailPage() {
                           <>
                             <span>•</span>
                             <span className="flex items-center gap-1">
-                              <Clock size={13} /> {formatSecondsToLabel(lesson.duration_seconds)}
+                              <Clock size={13} />{" "}
+                              {formatSecondsToLabel(lesson.duration_seconds)}
                             </span>
                           </>
                         )}
@@ -470,7 +517,8 @@ export default function ModuleDetailPage() {
                           <>
                             <span>•</span>
                             <span className="flex items-center gap-1">
-                              <Paperclip size={13} /> {lesson.resources.length} tài nguyên
+                              <Paperclip size={13} /> {lesson.resources.length}{" "}
+                              tài nguyên
                             </span>
                           </>
                         )}
@@ -482,22 +530,32 @@ export default function ModuleDetailPage() {
                     <button
                       onClick={() => handleOpenEditModal(lesson)}
                       disabled={lesson.is_quiz}
-                      title={lesson.is_quiz ? "Bài thi không thể chỉnh sửa qua giao diện này" : "Sửa bài học"}
-                      className={`p-2 rounded-lg transition ${lesson.is_quiz
+                      title={
+                        lesson.is_quiz
+                          ? "Bài thi không thể chỉnh sửa qua giao diện này"
+                          : "Sửa bài học"
+                      }
+                      className={`p-2 rounded-lg transition ${
+                        lesson.is_quiz
                           ? "text-slate-300 cursor-not-allowed"
                           : "text-slate-400 hover:text-blue-600 hover:bg-blue-50"
-                        }`}
+                      }`}
                     >
                       <Edit3 size={18} />
                     </button>
                     <button
                       onClick={() => setConfirmDeleteLesson(lesson)}
                       disabled={lesson.is_quiz}
-                      title={lesson.is_quiz ? "Bài thi không thể xóa qua giao diện này" : "Xóa bài học"}
-                      className={`p-2 rounded-lg transition ${lesson.is_quiz
+                      title={
+                        lesson.is_quiz
+                          ? "Bài thi không thể xóa qua giao diện này"
+                          : "Xóa bài học"
+                      }
+                      className={`p-2 rounded-lg transition ${
+                        lesson.is_quiz
                           ? "text-slate-300 cursor-not-allowed"
                           : "text-slate-400 hover:text-rose-600 hover:bg-rose-50"
-                        }`}
+                      }`}
                     >
                       <Trash2 size={18} />
                     </button>
@@ -538,7 +596,8 @@ export default function ModuleDetailPage() {
                 {lesson.is_quiz && (
                   <div className="ml-12 text-[11px] text-slate-400 italic flex items-center gap-1.5">
                     <Lock size={12} />
-                    Bài thi chỉ hiển thị thông tin cơ bản, chưa hỗ trợ chỉnh sửa qua giao diện này.
+                    Bài thi chỉ hiển thị thông tin cơ bản, chưa hỗ trợ chỉnh sửa
+                    qua giao diện này.
                   </div>
                 )}
               </div>
@@ -566,7 +625,10 @@ export default function ModuleDetailPage() {
             </div>
 
             {/* Form Body */}
-            <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+            <form
+              onSubmit={handleSubmit}
+              className="flex flex-col flex-1 overflow-hidden"
+            >
               <div className="p-4 space-y-4 overflow-y-auto flex-1">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -594,21 +656,56 @@ export default function ModuleDetailPage() {
                   </label>
 
                   <label
-                    className={`flex items-center gap-2 text-xs font-semibold cursor-pointer ${editingLesson ? "text-slate-300 cursor-not-allowed" : "text-slate-700"
-                      }`}
+                    className={`flex items-center gap-2 text-xs font-semibold cursor-pointer ${
+                      editingLesson
+                        ? "text-slate-300 cursor-not-allowed"
+                        : "text-slate-700"
+                    }`}
                   >
                     <input
                       type="checkbox"
                       checked={isQuiz}
                       disabled={!!editingLesson}
-                      onChange={(e) => setIsQuiz(e.target.checked)}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setIsQuiz(checked);
+
+                        if (checked) {
+                          setIsSlidePresentation(false);
+                          setIsOptional(false);
+                        }
+                      }}
                     />
                     Là bài thi (Quiz)
                   </label>
                 </div>
+
+                {!isQuiz && (
+                  <label className="flex items-start gap-3 rounded-xl border border-indigo-100 bg-indigo-50/60 p-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={isSlidePresentation}
+                      onChange={(e) => setIsSlidePresentation(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 accent-indigo-600"
+                    />
+
+                    <span>
+                      <span className="block text-xs font-semibold text-slate-800">
+                        Trình bày nội dung dưới dạng slide
+                      </span>
+
+                      <span className="mt-0.5 block text-[11px] leading-relaxed text-slate-500">
+                        Học viên sẽ xem nội dung theo từng trang trình chiếu. Bỏ
+                        chọn để hiển thị bài đọc thông thường.
+                      </span>
+                    </span>
+                  </label>
+                )}
+
                 {isQuiz && (
                   <p className="text-[11px] text-amber-600 -mt-2">
-                    Sau khi tạo, bài thi sẽ chỉ hiển thị thông tin cơ bản và không thể chỉnh sửa/xóa qua giao diện này.
+                    Sau khi tạo, bài thi sẽ chỉ hiển thị thông tin cơ bản và
+                    không thể chỉnh sửa/xóa qua giao diện này.
                   </p>
                 )}
 
@@ -635,11 +732,13 @@ export default function ModuleDetailPage() {
                       <div className="flex items-center gap-2 text-[11px] -mt-2">
                         {detectingDuration ? (
                           <span className="text-slate-400 flex items-center gap-1">
-                            <Loader2 size={11} className="animate-spin" /> Đang tự động lấy thời lượng video...
+                            <Loader2 size={11} className="animate-spin" /> Đang
+                            tự động lấy thời lượng video...
                           </span>
                         ) : durationAutoDetected === true ? (
                           <span className="text-emerald-600 flex items-center gap-1">
-                            <Clock size={11} /> Thời lượng: {formatSecondsToLabel(durationSeconds)}
+                            <Clock size={11} /> Thời lượng:{" "}
+                            {formatSecondsToLabel(durationSeconds)}
                           </span>
                         ) : durationAutoDetected === false ? (
                           <span className="text-amber-600 flex items-center gap-1">
@@ -653,7 +752,9 @@ export default function ModuleDetailPage() {
                             </button>
                           </span>
                         ) : (
-                          <span className="text-slate-400">Rời khỏi ô nhập để tự động lấy thời lượng.</span>
+                          <span className="text-slate-400">
+                            Rời khỏi ô nhập để tự động lấy thời lượng.
+                          </span>
                         )}
                       </div>
                     )}
@@ -663,7 +764,10 @@ export default function ModuleDetailPage() {
                         Nội dung chi tiết bài học (không bắt buộc)
                       </label>
                       <div className="border border-slate-200 rounded-lg overflow-hidden max-h-60 overflow-y-auto">
-                        <RichTextEditor value={content} onChange={(val: string) => setContent(val)} />
+                        <RichTextEditor
+                          value={content}
+                          onChange={(val: string) => setContent(val)}
+                        />
                       </div>
                     </div>
 
@@ -680,7 +784,9 @@ export default function ModuleDetailPage() {
                               className="inline-flex items-center gap-2 text-[11px] font-semibold bg-slate-100 px-2.5 py-1.5 rounded-lg"
                             >
                               <a
-                                href={buildLessonResourceDownloadUrl(res.resource_id)}
+                                href={buildLessonResourceDownloadUrl(
+                                  res.resource_id,
+                                )}
                                 target="_blank"
                                 rel="noreferrer"
                                 className="flex items-center gap-1.5 text-slate-700 hover:text-blue-600"
@@ -695,7 +801,9 @@ export default function ModuleDetailPage() {
                                   e.stopPropagation();
                                   setConfirmDeleteResourceId(res.resource_id);
                                 }}
-                                disabled={deletingResourceId === res.resource_id}
+                                disabled={
+                                  deletingResourceId === res.resource_id
+                                }
                                 className="text-rose-500 hover:text-rose-700 disabled:opacity-40 p-0.5 rounded hover:bg-rose-50"
                                 title="Xóa tài nguyên"
                               >
@@ -708,7 +816,9 @@ export default function ModuleDetailPage() {
                             </div>
                           ))}
                           {editingLesson.resources.length === 0 && (
-                            <span className="text-[11px] text-slate-400">Chưa có tài nguyên nào.</span>
+                            <span className="text-[11px] text-slate-400">
+                              Chưa có tài nguyên nào.
+                            </span>
                           )}
                         </div>
 
@@ -733,7 +843,9 @@ export default function ModuleDetailPage() {
                             ) : (
                               <FileUp size={14} />
                             )}
-                            {uploadingResource ? "Đang tải lên..." : "Tải lên tài nguyên (pdf, docx, zip...)"}
+                            {uploadingResource
+                              ? "Đang tải lên..."
+                              : "Tải lên tài nguyên (pdf, docx, zip...)"}
                           </button>
                         </div>
                       </div>
@@ -741,13 +853,16 @@ export default function ModuleDetailPage() {
 
                     {!editingLesson && (
                       <p className="text-[11px] text-slate-400 italic">
-                        Bạn cần tạo bài học trước, sau đó mở lại để tải lên tài nguyên đính kèm.
+                        Bạn cần tạo bài học trước, sau đó mở lại để tải lên tài
+                        nguyên đính kèm.
                       </p>
                     )}
                   </>
                 )}
 
-                {formError && <p className="text-xs text-rose-600">{formError}</p>}
+                {formError && (
+                  <p className="text-xs text-rose-600">{formError}</p>
+                )}
               </div>
 
               {/* Footer */}
@@ -764,7 +879,11 @@ export default function ModuleDetailPage() {
                   disabled={submitting}
                   className="px-5 py-2 text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition shadow-sm disabled:opacity-50"
                 >
-                  {submitting ? "Đang lưu..." : editingLesson ? "Lưu thay đổi" : "Tạo Lesson"}
+                  {submitting
+                    ? "Đang lưu..."
+                    : editingLesson
+                      ? "Lưu thay đổi"
+                      : "Tạo Lesson"}
                 </button>
               </div>
             </form>
@@ -780,10 +899,13 @@ export default function ModuleDetailPage() {
               <div className="p-2 bg-rose-50 rounded-lg">
                 <AlertTriangle size={20} />
               </div>
-              <h4 className="text-base font-bold text-slate-900">Xóa tài nguyên?</h4>
+              <h4 className="text-base font-bold text-slate-900">
+                Xóa tài nguyên?
+              </h4>
             </div>
             <p className="text-xs text-slate-600 leading-relaxed">
-              Bạn có chắc chắn muốn xóa tệp tài nguyên này khỏi bài học không? Thao tác này không thể hoàn tác.
+              Bạn có chắc chắn muốn xóa tệp tài nguyên này khỏi bài học không?
+              Thao tác này không thể hoàn tác.
             </p>
             <div className="flex justify-end gap-2 pt-2">
               <button
@@ -800,7 +922,9 @@ export default function ModuleDetailPage() {
                 disabled={deletingResourceId !== null}
                 className="px-3.5 py-1.5 text-xs font-semibold bg-rose-600 text-white hover:bg-rose-700 rounded-lg transition shadow-sm inline-flex items-center gap-1.5 disabled:opacity-50"
               >
-                {deletingResourceId ? <Loader2 size={13} className="animate-spin" /> : null}
+                {deletingResourceId ? (
+                  <Loader2 size={13} className="animate-spin" />
+                ) : null}
                 {deletingResourceId ? "Đang xóa..." : "Xóa vĩnh viễn"}
               </button>
             </div>
@@ -816,10 +940,17 @@ export default function ModuleDetailPage() {
               <div className="p-2.5 bg-rose-50 rounded-xl">
                 <AlertTriangle size={22} />
               </div>
-              <h4 className="text-base font-bold text-slate-900">Xác nhận xóa bài học</h4>
+              <h4 className="text-base font-bold text-slate-900">
+                Xác nhận xóa bài học
+              </h4>
             </div>
             <p className="text-xs text-slate-600 leading-relaxed">
-              Bạn có chắc chắn muốn xóa bài học <span className="font-bold text-slate-900">&quot;{confirmDeleteLesson.title}&quot;</span>? Toàn bộ nội dung và tài nguyên đính kèm thuộc bài học này cũng sẽ bị xóa vĩnh viễn.
+              Bạn có chắc chắn muốn xóa bài học{" "}
+              <span className="font-bold text-slate-900">
+                &quot;{confirmDeleteLesson.title}&quot;
+              </span>
+              ? Toàn bộ nội dung và tài nguyên đính kèm thuộc bài học này cũng
+              sẽ bị xóa vĩnh viễn.
             </p>
             <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
               <button
@@ -836,7 +967,9 @@ export default function ModuleDetailPage() {
                 disabled={deletingLessonId !== null}
                 className="px-4 py-2 text-xs font-semibold bg-rose-600 text-white hover:bg-rose-700 rounded-lg transition shadow-sm inline-flex items-center gap-1.5 disabled:opacity-50"
               >
-                {deletingLessonId ? <Loader2 size={13} className="animate-spin" /> : null}
+                {deletingLessonId ? (
+                  <Loader2 size={13} className="animate-spin" />
+                ) : null}
                 {deletingLessonId ? "Đang xóa..." : "Xóa bài học"}
               </button>
             </div>
