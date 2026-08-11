@@ -14,6 +14,7 @@ class LessonCreate(BaseModel):
     duration_seconds: int | None = None
     order_index: int
     is_optional: bool | None = None
+    is_slide_presentation: bool = False
     is_quiz: bool | None = None
 
 class LessonUpdate(BaseModel):
@@ -23,6 +24,7 @@ class LessonUpdate(BaseModel):
     content_body: str | None = None
     order_index: int | None = None
     is_optional: bool | None = None
+    is_slide_presentation: bool = False
     # ⚠️ Cố ý KHÔNG có field is_quiz: theo yêu cầu nghiệp vụ, một khi bài học đã được
     # tạo là bài thi (is_quiz=True) thì không được phép đổi lại qua API cập nhật.
 
@@ -33,6 +35,7 @@ class LessonLearningStructure(BaseModel):
     content_body: Optional[str] = None
     duration_seconds: int = 0 # Nếu thời gian bằng 0 nghĩa là bài giảng ko có video
     is_optional: bool
+    is_slide_presentation: bool = False
     had_quiz: bool = False
     is_quiz: bool = False
     submit_status: Optional[SubmissionStatus] = None
@@ -47,6 +50,7 @@ class LessonManagementOut(BaseModel):
     duration_seconds: int = 0
     order_index: int
     is_optional: bool
+    is_slide_presentation: bool = False
     is_quiz: bool
     resources: List[LessonResourceResponse] = []
 

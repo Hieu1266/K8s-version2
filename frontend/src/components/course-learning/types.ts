@@ -1,7 +1,7 @@
-import { LessonLearningStructure } from '@/types/lessons';
-import { LessonStatus } from '@/types/statuses';
+import { LessonLearningStructure } from "@/types/lessons";
+import { LessonStatus } from "@/types/statuses";
 
-export type TabKey = 'lecture' | 'resources' | 'notes' | 'quiz';
+export type TabKey = "lecture" | "resources" | "notes" | "quiz";
 
 export type LessonWithStatus = LessonLearningStructure & {
   status?: LessonStatus;
@@ -10,5 +10,6 @@ export type LessonWithStatus = LessonLearningStructure & {
   content_body?: string | null;
   submit_status?: string | null;
   is_optional?: boolean;
+  is_slide_presentation: boolean;
   had_quiz?: boolean;
 };

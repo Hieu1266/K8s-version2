@@ -1,8 +1,9 @@
-import { InVideoQuizWrapper } from '@/components/InVideoQuizWrapper';
-import { VideoProgress } from '@/types/video';
-import { LessonWithStatus } from './types';
-import QuickNoteBox from './QuickNoteBox';
-import CompleteLessonButton from './CompleteLessonButton';
+import { InVideoQuizWrapper } from "@/components/InVideoQuizWrapper";
+import { VideoProgress } from "@/types/video";
+import { LessonWithStatus } from "./types";
+import QuickNoteBox from "./QuickNoteBox";
+import CompleteLessonButton from "./CompleteLessonButton";
+import LessonSlideViewer from "@/components/LessonSlideViewer";
 
 type LectureTabContentProps = {
   currentLesson?: LessonWithStatus;
@@ -24,6 +25,11 @@ type LectureTabContentProps = {
 
   completing: boolean;
   onCompleteAndNext: () => void;
+
+  hasPreviousLesson: boolean;
+  hasNextLesson: boolean;
+  onPreviousLesson: () => void;
+  onNextLesson: () => void;
 };
 
 /** Nội dung tab "Bài giảng": video (hoặc nội dung bài đọc) + ghi chú nhanh + nút hoàn thành */
@@ -45,16 +51,23 @@ export default function LectureTabContent({
   onQuickNoteCancel,
   completing,
   onCompleteAndNext,
+  hasPreviousLesson,
+  hasNextLesson,
+  onPreviousLesson,
+  onNextLesson,
 }: LectureTabContentProps) {
   if (!currentLesson) {
     return (
       <div className="w-full aspect-video rounded-3xl flex flex-col items-center justify-center bg-[#12141C] text-white">
-        <p className="text-sm font-bold text-white/85">Vui lòng chọn một bài học ở danh sách bên trái</p>
+        <p className="text-sm font-bold text-white/85">
+          Vui lòng chọn một bài học ở danh sách bên trái
+        </p>
       </div>
     );
   }
 
-  const hasContentBody = !!currentLesson.content_body && currentLesson.content_body.trim() !== '';
+  const hasContentBody =
+    !!currentLesson.content_body && currentLesson.content_body.trim() !== "";
 
   return (
     <>
@@ -79,10 +92,10 @@ export default function LectureTabContent({
               onProgressUpdate={onProgressUpdate}
               onTimeUpdate={onTimeUpdate}
               onVideoEnded={onVideoEnded}
-            // Lưu ý: Nếu bạn có tính năng Seek (tua video khi bấm vào ghi chú cũ),
-            // bạn cần truyền thêm 2 props này và khai báo chúng bên trong InVideoQuizWrapperProps
-            // seekToSeconds={seekTarget}
-            // onSeeked={() => setSeekTarget(null)}
+              // Lưu ý: Nếu bạn có tính năng Seek (tua video khi bấm vào ghi chú cũ),
+              // bạn cần truyền thêm 2 props này và khai báo chúng bên trong InVideoQuizWrapperProps
+              // seekToSeconds={seekTarget}
+              // onSeeked={() => setSeekTarget(null)}
             />
 
             <QuickNoteBox
@@ -100,15 +113,30 @@ export default function LectureTabContent({
       ) : null}
 
       {hasContentBody ? (
-        <div className="bg-white border border-[#ECEAF0] rounded-3xl p-8 space-y-4 shadow-sm">
-          <div className="flex items-center gap-2 text-[#5B5FEF] font-bold text-sm uppercase tracking-wider">
-            <span>📖 Nội dung bài học</span>
-          </div>
-          <div
-            className="prose prose-base max-w-none text-[#2B2D3D] leading-relaxed font-normal"
-            dangerouslySetInnerHTML={{ __html: currentLesson.content_body as string }}
+        currentLesson.is_slide_presentation ? (
+          <LessonSlideViewer
+            lessonId={currentLesson.lesson_id}
+            lessonTitle={currentLesson.title}
+            content={currentLesson.content_body as string}
+            hasPreviousLesson={hasPreviousLesson}
+            hasNextLesson={hasNextLesson}
+            onPreviousLesson={onPreviousLesson}
+            onNextLesson={onNextLesson}
           />
-        </div>
+        ) : (
+          <div className="bg-white border border-[#ECEAF0] rounded-3xl p-8 space-y-4 shadow-sm">
+            <div className="flex items-center gap-2 text-[#5B5FEF] font-bold text-sm uppercase tracking-wider">
+              <span>📖 Nội dung bài học</span>
+            </div>
+
+            <div
+              className="prose prose-base max-w-none text-[#2B2D3D] leading-relaxed font-normal"
+              dangerouslySetInnerHTML={{
+                __html: currentLesson.content_body as string,
+              }}
+            />
+          </div>
+        )
       ) : (
         !hasVideo && (
           <div className="bg-white border border-[#ECEAF0] rounded-3xl p-8 text-center text-sm text-[#8A8FA3]">
@@ -118,14 +146,16 @@ export default function LectureTabContent({
       )}
 
       {/* NÚT HOÀN THÀNH BÀI ĐỌC: Chỉ hiển thị khi KHÔNG có video VÀ had_quiz == false */}
-      {!hasVideo && !currentLesson.had_quiz && (
-        <CompleteLessonButton
-          completing={completing}
-          isOptional={currentLesson.is_optional}
-          status={currentLesson.status}
-          onClick={onCompleteAndNext}
-        />
-      )}
+      {!hasVideo &&
+        !currentLesson.had_quiz &&
+        (!currentLesson.is_slide_presentation || !hasNextLesson) && (
+          <CompleteLessonButton
+            completing={completing}
+            isOptional={currentLesson.is_optional}
+            status={currentLesson.status}
+            onClick={onCompleteAndNext}
+          />
+        )}
     </>
   );
 }

@@ -29,6 +29,8 @@ class Lesson(SQLModel, table=True):
     
     # Bài học này là bắt buộc hay tự chọn
     is_optional: bool = Field(default=False, nullable=False)
+    # Có hiển thị nội dung bài học dưới dạng slide hay không
+    is_slide_presentation: bool = Field(default=False, nullable=False)
 
     # Có phải là bài thi/kiểm tra không
     is_quiz: bool = Field(default=False, nullable=False)
