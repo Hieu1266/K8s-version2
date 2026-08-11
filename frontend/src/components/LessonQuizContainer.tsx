@@ -100,11 +100,15 @@ export function QuizSection({
     courseId,
     isPeerReview,
     onQuizPassed,
+    onQuizIdResolved,
 }: {
     lessonId: string;
     courseId: string;
     isPeerReview: boolean;
     onQuizPassed?: (status?: string) => void;
+    /** Báo cho component cha biết quiz_id của đề thi hiện tại (dùng để hiển thị PeerReviewSection ở ngoài). */
+    /** Báo cho component cha biết quiz_id + trạng thái bài nộp hiện tại (dùng để hiển thị PeerReviewSection ở ngoài — chỉ hiện khi đã nộp bài). */
+    onQuizIdResolved?: (quizId: string | null, status?: string | null) => void;
 }) {
     // Trạng thái đã lưu (fetch từ server khi vào bài học)
     const [initialStatus, setInitialStatus] = useState<QuizSubmissionStatusResponse | null>(null);
@@ -163,6 +167,7 @@ export function QuizSection({
             setResult(null);
             setQuizData(null);
             setAnswers({});
+            onQuizIdResolved?.(null, null);
 
             const res = await getQuizStatusByLessonAction(lessonId);
             if (cancelled) return;
@@ -172,6 +177,7 @@ export function QuizSection({
                 setInitialStatus(null);
             } else {
                 setInitialStatus(res.data ?? null);
+                onQuizIdResolved?.(res.data?.quiz_id ?? null, res.data?.status ?? null);
 
                 // Nếu đang làm dở -> prefill sẵn để hiển thị tiến trình đã lưu
                 if (res.data?.status === SubmissionStatus.IN_PROGRESS) {
@@ -227,6 +233,7 @@ export function QuizSection({
             setAnswers({});
             setInitialStatus(null); // Chuyển hẳn sang chế độ đang làm bài mới
             setStartedAsPeerReview(choosePeerReview);
+            onQuizIdResolved?.(res.data.quiz_id, SubmissionStatus.IN_PROGRESS);
         } else {
             setError(res.error || 'Không thể tải đề thi.');
         }
@@ -258,6 +265,7 @@ export function QuizSection({
 
         if (res.success && res.data) {
             setResult(res.data);
+            onQuizIdResolved?.(quizData.quiz_id, res.data.status);
             if (res.data.next_lesson_unlocked && onQuizPassed) {
                 onQuizPassed(res.data.status);
             }

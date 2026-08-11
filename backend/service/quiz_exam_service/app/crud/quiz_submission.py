@@ -7,6 +7,7 @@ from sqlmodel import Session, select, func
 from fastapi import HTTPException, status
 
 from app.crud.base import CRUDBase
+from app.crud import peer_review as crud_peer_review
 from app.models.enum import SubmissionStatus, QuestionType
 from app.models.quiz_submission import QuizSubmission
 from app.models.quiz import Quiz
@@ -115,6 +116,12 @@ class CRUDQuizSubmission(CRUDBase[QuizSubmission, QuizSubmissionCreate, QuizSubm
         db.add(submission)
         db.commit()
         db.refresh(submission)
+
+        # 5. Nếu bài nộp có tham gia chấm chéo và vừa chuyển sang SUBMITTED (chờ chấm),
+        # kiểm tra xem đã đủ điều kiện (>= 3 người tham gia) để bắt đầu phân công chấm chéo chưa.
+        if has_essay and submission.is_peer_review and submission.status == SubmissionStatus.SUBMITTED:
+            crud_peer_review.try_create_assignments_for_quiz(db, submission.quiz_id)
+
         return submission
 
     def grade_essay_submission(self, db: Session, submission_id: UUID) -> QuizSubmission:

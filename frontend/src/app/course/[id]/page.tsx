@@ -1,27 +1,22 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import LessonNotesPanel from '@/components/LessonNotesPanel';
 import { QuizSection } from '@/components/LessonQuizContainer';
+import PeerReviewSection from '@/components/course-learning/PeerReviewSection';
 import { getLearningCourse } from '@/actions/getCourse';
 import { attachStatusToLessons, completeLessonAction } from '@/actions/getLesson';
 import { getLessonNotesAction, createNoteAction } from '@/actions/getNotes';
 import { getOrCreateVideoProgressAction, updateVideoProgressAction } from '@/actions/getVideoProgress';
 import { getLessonResourcesAction } from '@/actions/getLessonResource';
-import {
-  createStructureCommentAction,
-  getMyStructureCommentsAction,
-  deleteStructureCommentAction,
-  StructureComment,
-} from '@/actions/structureComment_action';
 import { LessonResourceItem } from '@/types/lessons';
 import { CourseLearningStructure } from '@/types/course';
 import { SubjectLearningStructure } from '@/types/subjects';
 import { ModuleLearningStructure } from '@/types/modules';
 import { UserLessonNote, NoteCreatePayload } from '@/types/progresses';
-import { LessonStatus } from '@/types/statuses';
+import { LessonStatus, SubmissionStatus } from '@/types/statuses';
 import { VideoProgress } from '@/types/video';
 
 import { TabKey, LessonWithStatus } from '@/components/course-learning/types';
@@ -46,21 +41,23 @@ const COURSE_URL = process.env.NEXT_PUBLIC_COURSE_BACKEND_URL;
 export default function CourseLearningPage() {
   const params = useParams();
   const router = useRouter();
-  const searchParams = useSearchParams();
   const id = params?.id as string;
-  const isTesterMode = searchParams?.get('tester') === '1';
 
+  // State quản lý dữ liệu lấy từ Backend API
   const [course, setCourse] = useState<CourseLearningStructure | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // State điều hướng cây thư mục bài học
   const [currentLesson, setCurrentLesson] = useState<LessonWithStatus | undefined>(undefined);
   const [currentSubject, setCurrentSubject] = useState<SubjectLearningStructure | undefined>(undefined);
 
+  // State quản lý thu gọn / mở rộng
   const [expandedSubjects, setExpandedSubjects] = useState<Record<string, boolean>>({});
   const [expandedModules, setExpandedModules] = useState<Record<string, boolean>>({});
   const [activeTab, setActiveTab] = useState<TabKey>('lecture');
 
+  // State thu gọn thanh sidebar bên trái (ghi nhớ lựa chọn của người dùng ở trình duyệt)
   const [sidebarCollapsed, setSidebarCollapsedState] = useState(false);
 
   useEffect(() => {
@@ -75,34 +72,37 @@ export default function CourseLearningPage() {
     });
   };
 
+  // State Ghi chú + Video
   const [notes, setNotes] = useState<UserLessonNote[]>([]);
   const [notesLoading, setNotesLoading] = useState(false);
   const [videoCurrentTime, setVideoCurrentTime] = useState(0);
   const [seekTarget, setSeekTarget] = useState<number | null>(null);
 
+  // Tiến độ video THẬT
   const [videoProgress, setVideoProgress] = useState<VideoProgress | null>(null);
   const [videoProgressLoading, setVideoProgressLoading] = useState(false);
 
+  // STATE TÀI LIỆU ĐÍNH KÈM (RESOURCES)
   const [resources, setResources] = useState<LessonResourceItem[]>([]);
   const [resourcesLoading, setResourcesLoading] = useState(false);
 
+  // Ô tạo ghi chú nhanh
   const [quickNoteOpen, setQuickNoteOpen] = useState(false);
   const [quickNoteContent, setQuickNoteContent] = useState('');
   const [quickNoteSaving, setQuickNoteSaving] = useState(false);
 
+  // State xử lý quá trình gửi API hoàn thành bài đọc
   const [completing, setCompleting] = useState(false);
 
-  // Cuộn khung nội dung bài học về đầu mỗi khi đổi bài
+  // quiz_id + trạng thái bài nộp hiện tại (do QuizSection resolve ra), dùng để hiển thị
+  // PeerReviewSection — CHỈ hiện khi học viên đã thực sự nộp bài (SUBMITTED/GRADED)
+  const [activeQuizId, setActiveQuizId] = useState<string | null>(null);
+  const [activeQuizStatus, setActiveQuizStatus] = useState<string | null>(null);
+
+  // Ref tới khung nội dung bài học bên phải, dùng để cuộn lên đầu mỗi khi đổi bài học
   const lessonContentScrollRef = useRef<HTMLDivElement>(null);
 
-  // ===== Nhận xét tester theo subject/module/lesson (chế độ Tester) =====
-  const [structureComments, setStructureComments] = useState<StructureComment[]>([]);
-  const [structureCommentsLoading, setStructureCommentsLoading] = useState(false);
-  const [feedbackOpen, setFeedbackOpen] = useState(false);
-  const [feedbackTitle, setFeedbackTitle] = useState('');
-  const [feedbackContent, setFeedbackContent] = useState('');
-  const [feedbackSaving, setFeedbackSaving] = useState(false);
-
+  // Call Server Action để lấy dữ liệu khóa học và status
   useEffect(() => {
     if (!id) return;
 
@@ -118,14 +118,24 @@ export default function CourseLearningPage() {
             const updatedModules = await Promise.all(
               subject.modules.map(async (mod) => {
                 const lessonsWithStatus = await attachStatusToLessons(mod.lessons);
-                return { ...mod, lessons: lessonsWithStatus };
+                return {
+                  ...mod,
+                  lessons: lessonsWithStatus,
+                };
               })
             );
-            return { ...subject, modules: updatedModules };
+            return {
+              ...subject,
+              modules: updatedModules,
+            };
           })
         );
 
-        const courseWithStatus: CourseLearningStructure = { ...rawCourse, subjects: updatedSubjects };
+        const courseWithStatus: CourseLearningStructure = {
+          ...rawCourse,
+          subjects: updatedSubjects,
+        };
+
         setCourse(courseWithStatus);
 
         const firstSubject = courseWithStatus.subjects[0];
@@ -141,9 +151,7 @@ export default function CourseLearningPage() {
         if (savedLessonId) {
           for (const subject of courseWithStatus.subjects) {
             for (const mod of subject.modules) {
-              const found = mod.lessons.find((les) => les.lesson_id === savedLessonId) as
-                | LessonWithStatus
-                | undefined;
+              const found = mod.lessons.find((les) => les.lesson_id === savedLessonId) as LessonWithStatus | undefined;
               if (found && found.status !== LessonStatus.LOCKED) {
                 targetSubject = subject;
                 targetModule = mod;
@@ -174,6 +182,7 @@ export default function CourseLearningPage() {
     fetchLearningData();
   }, [id]);
 
+  // Lấy danh sách ghi chú
   useEffect(() => {
     if (!currentLesson?.lesson_id) {
       setNotes([]);
@@ -193,15 +202,15 @@ export default function CourseLearningPage() {
     setSeekTarget(null);
     setQuickNoteOpen(false);
     setQuickNoteContent('');
-    setFeedbackOpen(false);
-    setFeedbackTitle('');
-    setFeedbackContent('');
+    setActiveQuizId(null);
+    setActiveQuizStatus(null);
 
     return () => {
       cancelled = true;
     };
   }, [currentLesson?.lesson_id]);
 
+  // EFFECT TẢI DANH SÁCH TÀI LIỆU KHI CHỌN BÀI HỌC
   useEffect(() => {
     if (!currentLesson?.lesson_id) {
       setResources([]);
@@ -222,28 +231,9 @@ export default function CourseLearningPage() {
     };
   }, [currentLesson?.lesson_id]);
 
-  // Tải toàn bộ nhận xét tester đã ghi cho khóa học này (chỉ khi mở ở chế độ tester)
-  useEffect(() => {
-    if (!isTesterMode || !id) return;
-
-    let cancelled = false;
-
-    (async () => {
-      setStructureCommentsLoading(true);
-      const result = await getMyStructureCommentsAction(id);
-      if (!cancelled && result.success) setStructureComments(result.data || []);
-      setStructureCommentsLoading(false);
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isTesterMode, id]);
-
   const flatLessons = useMemo(() => {
     if (!course) return [];
-    const flat: { subject: SubjectLearningStructure; module: ModuleLearningStructure; lesson: LessonWithStatus }[] =
-      [];
+    const flat: { subject: SubjectLearningStructure; module: ModuleLearningStructure; lesson: LessonWithStatus }[] = [];
     course.subjects.forEach((subject) => {
       subject.modules.forEach((mod) => {
         mod.lessons.forEach((lesson) => flat.push({ subject, module: mod, lesson: lesson as LessonWithStatus }));
@@ -252,12 +242,19 @@ export default function CourseLearningPage() {
     return flat;
   }, [course]);
 
-  const completedCount = flatLessons.filter((f) => f.lesson.status === LessonStatus.COMPLETED).length;
-  const progressPercent = flatLessons.length ? Math.round((completedCount / flatLessons.length) * 100) : 0;
+  const completedCount = flatLessons.filter(
+    (f) => f.lesson.status === LessonStatus.COMPLETED
+  ).length;
+
+  const progressPercent = flatLessons.length
+    ? Math.round((completedCount / flatLessons.length) * 100)
+    : 0;
 
   const findNextLockedLesson = (startIndex: number) => {
     for (let i = startIndex; i < flatLessons.length; i++) {
-      if (flatLessons[i].lesson.status === LessonStatus.LOCKED) return flatLessons[i];
+      if (flatLessons[i].lesson.status === LessonStatus.LOCKED) {
+        return flatLessons[i];
+      }
     }
     return null;
   };
@@ -272,7 +269,9 @@ export default function CourseLearningPage() {
       is_finished: updatedProgress.is_finished,
     });
 
-    if (!result.success) console.error('Đồng bộ tiến độ video thất bại:', result.error);
+    if (!result.success) {
+      console.error('Đồng bộ tiến độ video thất bại:', result.error);
+    }
   };
 
   const selectLesson = (subject: SubjectLearningStructure, lesson: LessonWithStatus) => {
@@ -280,7 +279,12 @@ export default function CourseLearningPage() {
     setCurrentSubject(subject);
     setCurrentLesson(lesson);
     setLastLessonId(id, lesson.lesson_id);
-    setActiveTab(lesson.is_quiz ? 'quiz' : 'lecture');
+
+    if (lesson.is_quiz) {
+      setActiveTab('quiz');
+    } else {
+      setActiveTab('lecture');
+    }
   };
 
   const handleQuizPassed = (submissionStatus?: string, isPass?: boolean) => {
@@ -288,13 +292,24 @@ export default function CourseLearningPage() {
 
     const isPendingGrading = submissionStatus === 'SUBMITTED';
     const isFailed = isPass === false;
+
     const shouldMarkCompleted = !isPendingGrading && !isFailed;
     const shouldUnlockNext = shouldMarkCompleted || isPendingGrading;
 
-    const currentIndex = flatLessons.findIndex((f) => f.lesson.lesson_id === currentLesson.lesson_id);
-    const nextItem = currentIndex !== -1 && currentIndex + 1 < flatLessons.length ? flatLessons[currentIndex + 1] : null;
+    const currentIndex = flatLessons.findIndex(
+      (f) => f.lesson.lesson_id === currentLesson.lesson_id
+    );
+
+    const nextItem =
+      currentIndex !== -1 && currentIndex + 1 < flatLessons.length
+        ? flatLessons[currentIndex + 1]
+        : null;
+
+    // Nếu bài kế tiếp đã mở sẵn (không LOCKED) và không phải bài tùy chọn
+    // -> không cần tìm/mở thêm gì (tránh mở nhầm bài xa hơn, sai thứ tự)
     const nextAlreadyAccessible =
       !!nextItem && nextItem.lesson.status !== LessonStatus.LOCKED && !nextItem.lesson.is_optional;
+
     const unlockTarget =
       shouldUnlockNext && currentIndex !== -1 && !nextAlreadyAccessible
         ? findNextLockedLesson(currentIndex + 1)
@@ -316,7 +331,9 @@ export default function CourseLearningPage() {
                   ...(shouldMarkCompleted ? { status: LessonStatus.COMPLETED } : {}),
                 };
               }
-              if (unlockTarget && les.lesson_id === unlockTarget.lesson.lesson_id) return { ...les, status: LessonStatus.UNLOCKED };
+              if (unlockTarget && les.lesson_id === unlockTarget.lesson.lesson_id) {
+                return { ...les, status: LessonStatus.UNLOCKED };
+              }
               return les;
             }),
           })),
@@ -346,10 +363,19 @@ export default function CourseLearningPage() {
       const result = await completeLessonAction(targetLessonId);
 
       if (result.success) {
-        const currentIndex = flatLessons.findIndex((f) => f.lesson.lesson_id === currentLesson.lesson_id);
+        const currentIndex = flatLessons.findIndex(
+          (f) => f.lesson.lesson_id === currentLesson.lesson_id
+        );
+
         const nextItem =
-          currentIndex !== -1 && currentIndex + 1 < flatLessons.length ? flatLessons[currentIndex + 1] : null;
-        const unlockTarget = !isOptionalLesson && currentIndex !== -1 ? findNextLockedLesson(currentIndex + 1) : null;
+          currentIndex !== -1 && currentIndex + 1 < flatLessons.length
+            ? flatLessons[currentIndex + 1]
+            : null;
+
+        const unlockTarget =
+          !isOptionalLesson && currentIndex !== -1
+            ? findNextLockedLesson(currentIndex + 1)
+            : null;
 
         setCourse((prevCourse) => {
           if (!prevCourse) return prevCourse;
@@ -360,9 +386,12 @@ export default function CourseLearningPage() {
               modules: sub.modules.map((mod) => ({
                 ...mod,
                 lessons: mod.lessons.map((les: any) => {
-                  if (les.lesson_id === currentLesson.lesson_id) return { ...les, status: LessonStatus.COMPLETED };
-                  if (unlockTarget && les.lesson_id === unlockTarget.lesson.lesson_id)
+                  if (les.lesson_id === currentLesson.lesson_id) {
+                    return { ...les, status: LessonStatus.COMPLETED };
+                  }
+                  if (unlockTarget && les.lesson_id === unlockTarget.lesson.lesson_id) {
                     return { ...les, status: LessonStatus.UNLOCKED };
+                  }
                   return les;
                 }),
               })),
@@ -374,12 +403,26 @@ export default function CourseLearningPage() {
 
         if (!isOptionalLesson && nextItem) {
           const updatedNextStatus =
-            nextItem.lesson.status === LessonStatus.LOCKED ? LessonStatus.UNLOCKED : nextItem.lesson.status;
+            nextItem.lesson.status === LessonStatus.LOCKED
+              ? LessonStatus.UNLOCKED
+              : nextItem.lesson.status;
+
           if (updatedNextStatus !== LessonStatus.LOCKED) {
-            const nextLessonUpdated: LessonWithStatus = { ...nextItem.lesson, status: updatedNextStatus };
+            const nextLessonUpdated: LessonWithStatus = {
+              ...nextItem.lesson,
+              status: updatedNextStatus,
+            };
+
             selectLesson(nextItem.subject, nextLessonUpdated);
-            setExpandedSubjects((prev) => ({ ...prev, [nextItem.subject.subject_id]: true }));
-            setExpandedModules((prev) => ({ ...prev, [nextItem.module.module_id]: true }));
+
+            setExpandedSubjects((prev) => ({
+              ...prev,
+              [nextItem.subject.subject_id]: true,
+            }));
+            setExpandedModules((prev) => ({
+              ...prev,
+              [nextItem.module.module_id]: true,
+            }));
           }
         }
       } else {
@@ -397,9 +440,20 @@ export default function CourseLearningPage() {
 
     const targetLessonId = currentLesson.lesson_id;
     const isOptionalLesson = Boolean(currentLesson.is_optional);
-    const currentIndex = flatLessons.findIndex((f) => f.lesson.lesson_id === currentLesson.lesson_id);
-    const nextItem = currentIndex !== -1 && currentIndex + 1 < flatLessons.length ? flatLessons[currentIndex + 1] : null;
-    const unlockTarget = !isOptionalLesson && currentIndex !== -1 ? findNextLockedLesson(currentIndex + 1) : null;
+
+    const currentIndex = flatLessons.findIndex(
+      (f) => f.lesson.lesson_id === currentLesson.lesson_id
+    );
+
+    const nextItem =
+      currentIndex !== -1 && currentIndex + 1 < flatLessons.length
+        ? flatLessons[currentIndex + 1]
+        : null;
+
+    const unlockTarget =
+      !isOptionalLesson && currentIndex !== -1
+        ? findNextLockedLesson(currentIndex + 1)
+        : null;
 
     setCourse((prevCourse) => {
       if (!prevCourse) return prevCourse;
@@ -410,8 +464,12 @@ export default function CourseLearningPage() {
           modules: sub.modules.map((mod) => ({
             ...mod,
             lessons: mod.lessons.map((les: any) => {
-              if (les.lesson_id === targetLessonId) return { ...les, status: LessonStatus.COMPLETED };
-              if (unlockTarget && les.lesson_id === unlockTarget.lesson.lesson_id) return { ...les, status: LessonStatus.UNLOCKED };
+              if (les.lesson_id === targetLessonId) {
+                return { ...les, status: LessonStatus.COMPLETED };
+              }
+              if (unlockTarget && les.lesson_id === unlockTarget.lesson.lesson_id) {
+                return { ...les, status: LessonStatus.UNLOCKED };
+              }
               return les;
             }),
           })),
@@ -423,18 +481,35 @@ export default function CourseLearningPage() {
 
     if (!isOptionalLesson && nextItem) {
       const updatedNextStatus =
-        nextItem.lesson.status === LessonStatus.LOCKED ? LessonStatus.UNLOCKED : nextItem.lesson.status;
+        nextItem.lesson.status === LessonStatus.LOCKED
+          ? LessonStatus.UNLOCKED
+          : nextItem.lesson.status;
+
       if (updatedNextStatus !== LessonStatus.LOCKED) {
-        const nextLessonUpdated: LessonWithStatus = { ...nextItem.lesson, status: updatedNextStatus };
+        const nextLessonUpdated: LessonWithStatus = {
+          ...nextItem.lesson,
+          status: updatedNextStatus,
+        };
+
         selectLesson(nextItem.subject, nextLessonUpdated);
-        setExpandedSubjects((prev) => ({ ...prev, [nextItem.subject.subject_id]: true }));
-        setExpandedModules((prev) => ({ ...prev, [nextItem.module.module_id]: true }));
+
+        setExpandedSubjects((prev) => ({
+          ...prev,
+          [nextItem.subject.subject_id]: true,
+        }));
+        setExpandedModules((prev) => ({
+          ...prev,
+          [nextItem.module.module_id]: true,
+        }));
       }
     }
   };
 
-  const toggleSubject = (subjectId: string) => setExpandedSubjects((prev) => ({ ...prev, [subjectId]: !prev[subjectId] }));
-  const toggleModule = (moduleId: string) => setExpandedModules((prev) => ({ ...prev, [moduleId]: !prev[moduleId] }));
+  const toggleSubject = (subjectId: string) =>
+    setExpandedSubjects((prev) => ({ ...prev, [subjectId]: !prev[subjectId] }));
+
+  const toggleModule = (moduleId: string) =>
+    setExpandedModules((prev) => ({ ...prev, [moduleId]: !prev[moduleId] }));
 
   const isAllExpanded = useMemo(() => {
     if (!course) return false;
@@ -461,13 +536,18 @@ export default function CourseLearningPage() {
 
   const hasVideo = Boolean(currentLesson?.video_url && currentLesson.video_url.trim() !== '');
 
+  // Danh sách Tab Động (Chỉ thêm tab 'Bài thi' khi had_quiz == true VÀ KHÔNG CÓ video)
   const lessonTabs = useMemo(() => {
     const tabs: [TabKey, string][] = [
       ['lecture', 'Bài giảng'],
       ['resources', `Tài liệu${resources.length ? ` (${resources.length})` : ''}`],
       ['notes', `Ghi chú${notes.length ? ` (${notes.length})` : ''}`],
     ];
-    if (currentLesson?.had_quiz && !hasVideo) tabs.push(['quiz', 'Bài thi']);
+
+    if (currentLesson?.had_quiz && !hasVideo) {
+      tabs.push(['quiz', 'Bài thi']);
+    }
+
     return tabs;
   }, [currentLesson?.had_quiz, hasVideo, resources.length, notes.length]);
 
@@ -480,7 +560,10 @@ export default function CourseLearningPage() {
     let cancelled = false;
     (async () => {
       setVideoProgressLoading(true);
-      const data = await getOrCreateVideoProgressAction(currentLesson.lesson_id, currentLesson.duration_seconds ?? 0);
+      const data = await getOrCreateVideoProgressAction(
+        currentLesson.lesson_id,
+        currentLesson.duration_seconds ?? 0
+      );
       if (!cancelled) setVideoProgress(data);
       setVideoProgressLoading(false);
     })();
@@ -490,6 +573,7 @@ export default function CourseLearningPage() {
     };
   }, [currentLesson?.lesson_id, hasVideo]);
 
+  // Cuộn khung nội dung bài học về đầu mỗi khi người dùng chuyển sang bài học khác
   useEffect(() => {
     lessonContentScrollRef.current?.scrollTo({ top: 0, behavior: 'auto' });
   }, [currentLesson?.lesson_id]);
@@ -516,46 +600,6 @@ export default function CourseLearningPage() {
     }
   };
 
-  // Nhận xét tester đã có sẵn cho đúng bài học đang xem (nếu có)
-  const existingLessonComment = useMemo(() => {
-    if (!currentLesson) return undefined;
-    return structureComments.find((c) => c.structure_part === 'LESSON' && c.part_id === currentLesson.lesson_id);
-  }, [structureComments, currentLesson]);
-
-  const handleCreateLessonFeedback = async () => {
-    if (!feedbackContent.trim() || !currentLesson) return;
-
-    setFeedbackSaving(true);
-    const result = await createStructureCommentAction({
-      courseId: id,
-      structurePart: 'LESSON',
-      partId: currentLesson.lesson_id,
-      title: feedbackTitle.trim() || currentLesson.title,
-      comment: feedbackContent.trim(),
-    });
-    setFeedbackSaving(false);
-
-    if (result.success && result.data) {
-      setStructureComments((prev) => [...prev, result.data as StructureComment]);
-      setFeedbackOpen(false);
-      setFeedbackTitle('');
-      setFeedbackContent('');
-    } else {
-      alert(result.message || 'Không thể lưu nhận xét.');
-    }
-  };
-
-  const handleDeleteLessonFeedback = async (commentId: string) => {
-    if (!confirm('Xóa nhận xét này?')) return;
-
-    const result = await deleteStructureCommentAction(commentId);
-    if (result.success) {
-      setStructureComments((prev) => prev.filter((c) => c.comment_id !== commentId));
-    } else {
-      alert(result.message || 'Không thể xóa nhận xét.');
-    }
-  };
-
   if (loading) {
     return <CourseLoadingScreen />;
   }
@@ -567,14 +611,6 @@ export default function CourseLearningPage() {
   return (
     <div className="h-screen overflow-hidden bg-[#F7F8FB] flex flex-col text-[#161826]" style={{ fontFamily: "'Inter', ui-sans-serif, system-ui, sans-serif" }}>
       <Navbar />
-
-      {isTesterMode && (
-        <div className="bg-amber-500/10 border-b border-amber-300/50 px-6 py-1.5 text-center">
-          <span className="text-[11px] font-extrabold uppercase tracking-wide text-amber-700">
-            Chế độ Tester đang bật
-          </span>
-        </div>
-      )}
 
       <CourseHeaderBar
         courseTitle={course.title}
@@ -599,6 +635,7 @@ export default function CourseLearningPage() {
           onToggleCollapse={toggleSidebarCollapsed}
         />
 
+        {/* Khung Hiển Thị Nội Dung Bài Học */}
         <div ref={lessonContentScrollRef} className="flex-1 min-h-0 overflow-y-auto bg-[#F7F8FB] flex flex-col">
           <div className="px-10 pt-8 space-y-6 flex-1 max-w-7xl">
             <LessonTitleHeader
@@ -608,75 +645,11 @@ export default function CourseLearningPage() {
               lessonTitle={currentLesson?.title}
             />
 
-            {isTesterMode && currentLesson && (
-              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 space-y-3">
-                <span className="text-xs font-extrabold uppercase tracking-wider text-amber-700">
-                  Khu vực Tester · Nhận xét bài học
-                </span>
-                {structureCommentsLoading ? (
-                  <p className="text-sm text-amber-700/70">Đang tải nhận xét...</p>
-                ) : existingLessonComment ? (
-                  <div className="bg-white border border-amber-100 rounded-xl p-4 space-y-2">
-                    <p className="text-sm font-bold text-[#161826]">{existingLessonComment.title}</p>
-                    <p className="text-sm text-[#4B4E60] whitespace-pre-wrap">{existingLessonComment.comment}</p>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteLessonFeedback(existingLessonComment.comment_id)}
-                      className="text-xs font-bold text-red-500 hover:text-red-600"
-                    >
-                      Xóa nhận xét
-                    </button>
-                  </div>
-                ) : !feedbackOpen ? (
-                  <button type="button" onClick={() => setFeedbackOpen(true)} className="text-sm font-bold text-amber-700 hover:text-amber-800">
-                    + Để lại nhận xét cho bài học này
-                  </button>
-                ) : (
-                  <div className="space-y-2">
-                    <input
-                      value={feedbackTitle}
-                      onChange={(e) => setFeedbackTitle(e.target.value)}
-                      placeholder={`Tiêu đề (mặc định: ${currentLesson.title})`}
-                      className="w-full text-sm bg-white border border-amber-200 rounded-xl px-4 py-2.5 focus:outline-none focus:border-amber-400"
-                    />
-                    <textarea
-                      autoFocus
-                      value={feedbackContent}
-                      onChange={(e) => setFeedbackContent(e.target.value)}
-                      placeholder="Nhập nhận xét về nội dung, chất lượng, lỗi phát hiện được ở bài học này..."
-                      rows={3}
-                      className="w-full text-sm bg-white border border-amber-200 rounded-xl px-4 py-2.5 focus:outline-none focus:border-amber-400"
-                    />
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={handleCreateLessonFeedback}
-                        disabled={feedbackSaving || !feedbackContent.trim()}
-                        className="text-white text-xs font-bold px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 disabled:opacity-50"
-                      >
-                        {feedbackSaving ? 'Đang lưu...' : 'Lưu nhận xét'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setFeedbackOpen(false);
-                          setFeedbackContent('');
-                          setFeedbackTitle('');
-                        }}
-                        className="text-xs font-bold px-3 text-[#565A70]"
-                      >
-                        Hủy
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
             {!currentLesson?.is_quiz && (
               <LessonTabsNav tabs={lessonTabs} activeTab={activeTab} onChange={setActiveTab} />
             )}
 
+            {/* TAB BÀI GIẢNG / BÀI ĐỌC */}
             {activeTab === 'lecture' && !currentLesson?.is_quiz && (
               <div key="lecture" className="anim-fade-up space-y-6 pb-12">
                 <LectureTabContent
@@ -694,22 +667,21 @@ export default function CourseLearningPage() {
                   onQuickNoteOpen={() => setQuickNoteOpen(true)}
                   onQuickNoteContentChange={setQuickNoteContent}
                   onQuickNoteSave={handleQuickCreateNote}
-                  onQuickNoteCancel={() => {
-                    setQuickNoteOpen(false);
-                    setQuickNoteContent('');
-                  }}
+                  onQuickNoteCancel={() => { setQuickNoteOpen(false); setQuickNoteContent(''); }}
                   completing={completing}
                   onCompleteAndNext={handleCompleteAndNext}
                 />
               </div>
             )}
 
+            {/* TAB TÀI LIỆU */}
             {activeTab === 'resources' && !currentLesson?.is_quiz && (
               <div key="resources" className="anim-fade-up space-y-3 pb-12">
                 <ResourcesTabContent loading={resourcesLoading} resources={resources} courseBackendUrl={COURSE_URL} />
               </div>
             )}
 
+            {/* TAB GHI CHÚ */}
             {activeTab === 'notes' && !currentLesson?.is_quiz && currentLesson && (
               <div key="notes" className="anim-fade-up pb-12">
                 <LessonNotesPanel
@@ -728,14 +700,28 @@ export default function CourseLearningPage() {
               </div>
             )}
 
+            {/* TAB BÀI THI / QUIZ SECTION */}
             {(activeTab === 'quiz' || currentLesson?.is_quiz) && currentLesson && (
-              <div key="quiz" className="anim-fade-up pb-12">
+              <div key="quiz" className="anim-fade-up space-y-6 pb-12">
                 <QuizSection
                   lessonId={currentLesson.lesson_id}
                   courseId={id}
                   onQuizPassed={handleQuizPassed}
                   isPeerReview={currentLesson.is_peer_review}
+                  onQuizIdResolved={(quizId, status) => {
+                    setActiveQuizId(quizId);
+                    setActiveQuizStatus(status ?? null);
+                  }}
                 />
+
+                {/* Các bài của học viên khác được giao cho mình chấm chéo —
+                    chỉ hiện sau khi học viên đã thực sự NỘP bài của chính mình */}
+                {currentLesson.is_peer_review &&
+                  activeQuizId &&
+                  (activeQuizStatus === SubmissionStatus.SUBMITTED ||
+                    activeQuizStatus === SubmissionStatus.GRADED) && (
+                    <PeerReviewSection quizId={activeQuizId} />
+                  )}
               </div>
             )}
           </div>

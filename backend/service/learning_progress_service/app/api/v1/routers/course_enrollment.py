@@ -300,15 +300,6 @@ def get_users_inprogress(
     return crud_course_enrollment.get_users_in_progress(db, course_id)
 
 
-
-
-
-
-
-
-
-
-
 @router.get("/admin/history/{user_id}/{is_completed}", response_model=List[CourseInProgress])
 async def get_progress_list_admin(
     request: Request,

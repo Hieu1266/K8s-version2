@@ -56,7 +56,7 @@ def get_assignment_detail(
 
 
 @router.post("/assignments/{assignment_id}/submit", response_model=SubmitEvaluationOut)
-def submit_evaluation(
+async def submit_evaluation(
     assignment_id: UUID,
     payload: SubmitEvaluationIn,
     db: SessionDep,
@@ -66,7 +66,7 @@ def submit_evaluation(
     reviewer_id = UUID(current_user["user_id"])
     assignment = crud_peer_review.get_assignment_for_reviewer(db, assignment_id, reviewer_id)
 
-    assignment, evaluations, submission_result = crud_peer_review.submit_evaluation(
+    assignment, evaluations, submission_result = await crud_peer_review.submit_evaluation(
         db, assignment, payload.evaluations, payload.general_comment
     )
 
