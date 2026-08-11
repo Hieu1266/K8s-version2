@@ -15,7 +15,7 @@ router = APIRouter()
 def get_user_list(
     session: SessionDep,
     query: UserListQuery = Depends(),
-    current_user: dict = Depends(RoleChecker(["Admin"]))
+    current_user: dict = Depends(RoleChecker(["Admin", "Manager"]))
 ):
     if query.status_id is not None and query.role_id is not None:
         raise HTTPException(

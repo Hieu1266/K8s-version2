@@ -260,3 +260,43 @@ def get_subject_owner(
     subject_id: UUID
 ):
     return crud_subject.get_owner(db, subject_id)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+@router.get("/admin/instructor/{instructor_id}", response_model=List[GeneralInfoInstructorSubject])
+def get_subject_general_info_by_instructor_admin(
+    db: SessionDep,
+    instructor_id: UUID,
+    search: Optional[str] = Query(None, description="Từ khóa tìm kiếm tên hoặc mô tả môn học"),
+    current_user: dict = Depends(RoleChecker(["Admin"]))
+):
+    """
+    API dành cho ADMIN: lấy danh sách môn học được phân công cho
+    MỘT giảng viên bất kỳ, dựa theo instructor_id truyền vào path
+    (không phải người đang đăng nhập).
+    """
+    subjects = crud_subject.get_instructor_subject_list(db, instructor_id, search=search)
+ 
+    response_data = []
+    for subject in subjects:
+        subject_dict = subject.model_dump()
+        subject_dict["total_modules"] = crud_module.get_total_module_by_subject(db, subject.subject_id)
+        subject_dict["total_lessons"] = crud_subject.get_total_lessons(db, subject.subject_id)
+        response_data.append(subject_dict)
+ 
+    return response_data
+ 

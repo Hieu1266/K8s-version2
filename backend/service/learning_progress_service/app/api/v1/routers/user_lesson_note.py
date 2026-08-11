@@ -17,14 +17,18 @@ def get_lesson_notes(
     current_user: dict = Depends(get_current_user_role)
 ):
     user_id = UUID(current_user["user_id"])
-    lesson = crud_lesson_progress.get_by_lesson(db, user_id, lesson_id)
-    if lesson is None:
+
+    if not crud_course_enrollment.check_enrolled_by_lesson(db, user_id, lesson_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Bạn không có quyền để lấy danh sách ghi chú"
+            detail="Bạn chưa đăng ký khóa học chứa bài học này"
         )
+
     return crud_note.get_multi_by_user_and_lesson(db, user_id, lesson_id)
-    
+
+
+
+
 @router.post(
     "/", 
     response_model=NoteResponse, 

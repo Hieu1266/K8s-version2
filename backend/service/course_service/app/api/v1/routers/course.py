@@ -198,10 +198,13 @@ def search_courses(
     )
 
 @router.post("/", response_model=CourseRead)
-def create_course(db: SessionDep, course_in: CourseCreate, current_user: dict = Depends(RoleChecker(["Admin", "Instructor", "Manager"]))):
+def create_course(
+    db: SessionDep,
+    course_in: CourseCreate,
+    current_user: dict = Depends(RoleChecker(["Admin", "Instructor", "Manager"]))
+):
     course_data = course_in.model_dump()
-    user_id = getattr(current_user, "id", None) or current_user.get("id")
-    course_data["instructor_id"] = user_id
+    course_data["instructor_id"] = current_user["user_id"]
     return crud_course.create(db, obj_in=course_data)
 
 @router.get("/{course_id}", response_model=CourseRead)
@@ -435,3 +438,32 @@ async def get_learning_course(
             await asyncio.gather(*tasks)
 
         return course_data
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+@router.get("/instructor/{instructor_id}", response_model=list[CourseRead])
+def get_courses_by_instructor(
+    db: SessionDep,
+    instructor_id: UUID,
+    current_user: dict = Depends(RoleChecker(["Admin", "Instructor"]))
+):
+
+    return crud_course.get_by_instructor_id(db, instructor_id=instructor_id)
+ 
