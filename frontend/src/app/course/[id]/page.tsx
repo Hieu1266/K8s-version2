@@ -697,7 +697,9 @@ export default function CourseLearningPage() {
               <div key="quiz" className="anim-fade-up pb-12">
                 <QuizSection
                   lessonId={currentLesson.lesson_id}
+                  courseId={id}
                   onQuizPassed={handleQuizPassed}
+                  isPeerReview={currentLesson.is_peer_review}
                 />
               </div>
             )}

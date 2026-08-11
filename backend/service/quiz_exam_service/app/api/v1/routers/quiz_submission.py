@@ -2,7 +2,7 @@ from uuid import UUID
 import httpx
 from fastapi import HTTPException, status
 from fastapi import APIRouter, Depends, Header, Request
-from app.schemas.quiz_submission import QuizSubmissionCreate, QuizSubmissionStatusResponse, QuizSubmissionSummaryResponse, QuizUserSummaryResponse, UserSubmissionItem, GradeSubmissionRequest
+from app.schemas.quiz_submission import QuizSubmissionCreate, QuizSubmissionStatusResponse, QuizSubmissionSummaryResponse, QuizUserSummaryResponse, UserSubmissionItem, GradeSubmissionRequest, QuizSubmissionStatus
 from app.schemas.quiz import QuizTakeResponse
 from app.schemas.submission_detail import SubmissionDetailCreate, QuizSubmissionDetailResponse
 from app.api.v1.deps import SessionDep
@@ -14,17 +14,18 @@ from app.crud.submission_detail import crud_submission_detail
 from app.crud.quiz import crud_quiz
 from app.core.security import get_current_user_role, oauth2_scheme, RoleChecker
 from app.core.config import settings
-from typing import List
+from typing import List, Optional
 
 router = APIRouter(prefix="/quiz-submissions", tags=["Quiz Submissions"])
 
 @router.post("/start/{lesson_id}", response_model=QuizTakeResponse)
 def start_quiz_submission(
     lesson_id: UUID,
-    db: SessionDep,
+    is_peer_review: bool = False,
+    db: SessionDep = None,
     current_user: dict = Depends(get_current_user_role)
 ):
-    quiz_id = crud_quiz.get_quiz_by_lesson(db, lesson_id)
+    quiz = crud_quiz.get_quiz_by_lesson(db, lesson_id)
     user_id_str = current_user.get("user_id")
     if not user_id_str:
         raise HTTPException(
@@ -35,7 +36,7 @@ def start_quiz_submission(
     user_id = UUID(user_id_str)
 
     # 1. Lấy thông tin bài thi và kiểm tra trạng thái
-    quiz = crud_quiz.get_by_id(db, quiz_id)
+    quiz = crud_quiz.get_by_id(db, quiz.quiz_id)
     if not quiz:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy bài thi")
     
@@ -92,7 +93,8 @@ def start_quiz_submission(
     # 4. Tạo mới QuizSubmission
     submission_in = QuizSubmissionCreate(
         quiz_id=quiz.quiz_id,
-        user_id=user_id
+        user_id=user_id,
+        is_peer_review=is_peer_review
     )
     new_submission = crud_quiz_submission.create(db=db, obj_in=submission_in)
 
@@ -302,6 +304,7 @@ def _build_status_response(submission_obj) -> dict:
         "started_at": submission_obj.started_at,
         "total_score": submission_obj.total_score if is_graded else None,
         "is_passed": submission_obj.is_passed if is_graded else None,
+        "is_peer_review": submission_obj.is_peer_review,
         "questions": questions_response
     }
 
@@ -318,8 +321,8 @@ def get_submission_status_by_lesson(
     - Nếu chưa từng đạt -> lấy lượt gần nhất bất kể trạng thái (kể cả đang làm dở / trượt).
     """
     # 1. Tìm quiz gắn với lesson
-    quiz_id = crud_quiz.get_quiz_by_lesson(db, lesson_id)
-    if not quiz_id:
+    quiz = crud_quiz.get_quiz_by_lesson(db, lesson_id)
+    if not quiz:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Không tìm thấy bài thi cho bài học này"
@@ -334,7 +337,7 @@ def get_submission_status_by_lesson(
     user_id = UUID(user_id_str)
 
     # 2. Lấy tất cả lượt làm bài của user cho quiz này
-    submissions = crud_quiz_submission.get_by_quiz_and_user(db, quiz_id=quiz_id, user_id=user_id)
+    submissions = crud_quiz_submission.get_by_quiz_and_user(db, quiz_id=quiz.quiz_id, user_id=user_id)
     if not submissions:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -351,19 +354,67 @@ def get_submission_status_by_lesson(
     # 4. Build response
     return _build_status_response(target_submission)
 
-@router.get("/get-lastest-status/{lesson_id}")
+@router.get("/get-quiz-status/{lesson_id}", response_model=QuizSubmissionStatus)
 def get_status(
     db: SessionDep,
     lesson_id: UUID,
     current_user: dict = Depends(get_current_user_role)
 ):
     user_id = UUID(current_user["user_id"])
-    quiz_id = crud_quiz.get_quiz_by_lesson(db, lesson_id)
-    submmit = crud_quiz_submission.get_last_attemp_submitted(db, quiz_id, user_id)
-    if submmit is None:
-        return None
-    else:
-        return submmit.status
+    quiz = crud_quiz.get_quiz_by_lesson(db, lesson_id)
+    if not quiz:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Không tìm thấy quiz cho bài học này"
+        )
+    submmit = crud_quiz_submission.get_last_attemp_submitted(db, quiz.quiz_id, user_id)
+    
+    return QuizSubmissionStatus(
+        submit_status=submmit.status if submmit else None,
+        is_peer_review=quiz.is_peer_review
+    )
+
+@router.get(
+    "/courses/{course_id}/in-progress-count",
+    response_model=int,
+    summary="Số lượng thành viên đang trong quá trình học khóa học (dùng để gate tham gia chấm chéo)"
+)
+async def get_course_in_progress_count(
+    course_id: UUID,
+    token: str = Depends(oauth2_scheme),  # Forward sang Learning Progress Service
+    current_user: dict = Depends(get_current_user_role)
+):
+    """Proxy sang Learning Progress Service. FE gọi API này trước khi cho phép học viên
+    chọn 'Tham gia chấm chéo' — chỉ bật lựa chọn khi kết quả trả về >= 3."""
+    url = f"{settings.BACKEND_LEARNING_PROGRESS_URL}/course_enrollment/get-users-in-progress/{course_id}"
+    headers = {"Authorization": f"Bearer {token}"}
+
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, headers=headers, timeout=5.0)
+            if response.status_code == 200:
+                return response.json()
+
+            # 🆕 Log rõ status code + body trả về từ Learning Progress Service để debug
+            # (vd: 404 = course_id không tồn tại bên đó, 401/403 = lỗi xác thực, 422 = sai kiểu tham số...)
+            print(
+                f"[peer-review] Learning Progress Service trả về lỗi khi lấy in-progress-count "
+                f"cho course_id={course_id}: status={response.status_code}, body={response.text}"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=(
+                    f"Không lấy được số lượng học viên đang học khóa học "
+                    f"(Learning Progress Service trả về {response.status_code}: {response.text})"
+                ),
+            )
+    except httpx.RequestError as exc:
+        print(f"[peer-review] Lỗi kết nối tới Learning Progress Service ({url}): {exc}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Hệ thống theo dõi tiến độ học tập đang bận, vui lòng thử lại sau.",
+        )
+
 
 @router.get(
     "/subjects/{subject_id}/quizzes",

@@ -25,6 +25,7 @@ class QuizSubmission(SQLModel, table=True):
     submitted_at: Optional[datetime] = Field(default=None)
 
     # Chấm điểm chéo
+    is_peer_review: Optional[bool] = Field(default=False)
     peer_avg_score: Optional[float] = Field(default=None) 
     is_discrepant: bool = Field(default=False, nullable=False) #Cờ đánh dấu bài này có bị lệch điểm nghiêm trọng hay không
     completed_review_count: int = Field(default=0, nullable=False) # Số lượng người đã hoàn thành chấm bài

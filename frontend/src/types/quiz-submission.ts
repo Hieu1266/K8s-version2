@@ -89,6 +89,7 @@ export interface QuizSubmissionStatusResponse {
     attempt_number: number;
     started_at: string;
     total_score?: number | null;
+    is_peer_review?: boolean | null;
     is_passed?: boolean | null;
     questions: SubmissionStatusDetail[];
 }

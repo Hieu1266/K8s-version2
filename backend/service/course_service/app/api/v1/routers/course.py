@@ -391,16 +391,21 @@ async def get_learning_course(
         async def fetch_lesson_status(lesson: LessonLearningStructure):
             try:
                 res = await client.get(
-                    f"{EXAM_QUIZ_SERVICE}/quiz-submissions/get-lastest-status/{lesson.lesson_id}",
+                    f"{EXAM_QUIZ_SERVICE}/quiz-submissions/get-quiz-status/{lesson.lesson_id}",
                     headers=headers,
                     timeout=5.0
                 )
                 if res.status_code == 200:
-                    lesson.submit_status = res.json()
+                    data = res.json()
+                    lesson.submit_status = data.get("submit_status")
+                    lesson.is_peer_review = data.get("is_peer_review")
                 else:
                     lesson.submit_status = None
+                    lesson.is_peer_review = False
             except httpx.RequestError:
                 lesson.submit_status = None
+                lesson.is_peer_review = False
+
 
         async def fetch_lesson_had_quiz(lesson: LessonLearningStructure):
             try:
@@ -410,12 +415,15 @@ async def get_learning_course(
                     timeout=5.0
                 )
                 if res.status_code == 200:
-                    lesson.had_quiz = res.json()  # Gán trực tiếp giá trị boolean (True/False)
+                    lesson.had_quiz = res.json()
+                    
+                    # Nếu bài học thường có đính kèm Quiz -> Lấy tiếp status & peer review
+                    if lesson.had_quiz:
+                        await fetch_lesson_status(lesson)
                 else:
                     lesson.had_quiz = False
             except httpx.RequestError:
                 lesson.had_quiz = False
-
         # 7. Gom tất cả request và gọi song song (Concurrent Async Calls)
         tasks = []
         if quiz_lessons:

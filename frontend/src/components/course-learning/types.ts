@@ -10,5 +10,6 @@ export type LessonWithStatus = LessonLearningStructure & {
   content_body?: string | null;
   submit_status?: string | null;
   is_optional?: boolean;
+  is_peer_review: boolean;
   had_quiz?: boolean;
 };

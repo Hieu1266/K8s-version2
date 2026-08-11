@@ -9,6 +9,7 @@ class QuizSubmissionCreate(BaseModel):
     quiz_id: UUID
     user_id: UUID
     attempt_number: Optional[int] = None
+    is_peer_review: Optional[bool] = False
 
 class QuizSubmissionUpdate(BaseModel):
     status: SubmissionStatus | None = None
@@ -54,6 +55,7 @@ class QuizSubmissionStatusResponse(BaseModel):
     started_at: datetime
     total_score: Optional[float] = None
     is_passed: Optional[bool] = None
+    is_peer_review: Optional[bool] = None
     questions: List[SubmissionStatusDetail]
 
 
@@ -127,3 +129,7 @@ class QuestionGradingInput(BaseModel):
 
 class GradeSubmissionRequest(BaseModel):
     gradings: List[QuestionGradingInput]
+
+class QuizSubmissionStatus(BaseModel):
+    submit_status: Optional[str] = None
+    is_peer_review: bool | None = None

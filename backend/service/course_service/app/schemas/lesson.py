@@ -35,6 +35,7 @@ class LessonLearningStructure(BaseModel):
     is_optional: bool
     had_quiz: bool = False
     is_quiz: bool = False
+    is_peer_review: Optional[bool] = False
     submit_status: Optional[SubmissionStatus] = None
 
 # 🆕 Schema trả về cho trang Quản lý bài học (Instructor) - kèm danh sách tài nguyên đính kèm

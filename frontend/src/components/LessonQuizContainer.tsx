@@ -6,6 +6,7 @@ import {
     updateSubmissionDetailAction,
     submitQuizAction,
     getQuizStatusByLessonAction,
+    getCourseInProgressCountAction,
 } from '@/actions/getQuizSubmission';
 import {
     QuizTakeResponse,
@@ -17,7 +18,94 @@ import { SubmissionStatus } from '@/types/statuses';
 
 type AnswersMap = Record<string, { optionId?: string; essayText?: string }>;
 
-export function QuizSection({ lessonId, onQuizPassed }: { lessonId: string; onQuizPassed?: (status?: string) => void }) {
+// `is_peer_review` chưa có trong type QuizSubmissionStatusResponse gốc (backend mới bổ sung) —
+// mở rộng cục bộ để không phải sửa file type dùng chung.
+type StatusWithPeerReview = QuizSubmissionStatusResponse & { is_peer_review?: boolean | null };
+
+const MIN_MEMBERS_FOR_PEER_REVIEW = 3;
+
+/** Khối nút bắt đầu/làm lại bài thi — hiển thị 2 lựa chọn khi đề thi hỗ trợ chấm chéo. */
+function StartQuizActions({
+    isPeerReview,
+    loading,
+    canJoinPeerReview,
+    inProgressCountLoading,
+    inProgressCount,
+    onStart,
+    idleLabel,
+}: {
+    isPeerReview: boolean;
+    loading: boolean;
+    canJoinPeerReview: boolean;
+    inProgressCountLoading: boolean;
+    inProgressCount: number | null;
+    onStart: (choosePeerReview: boolean) => void;
+    idleLabel: string;
+}) {
+    if (!isPeerReview) {
+        return (
+            <button
+                onClick={() => onStart(false)}
+                disabled={loading}
+                className="w-full bg-[#5B5FEF] hover:bg-[#4B4FEF] text-white text-sm font-bold py-3.5 rounded-full transition-transform hover:scale-[1.01] disabled:opacity-50"
+            >
+                {loading ? 'Đang chuẩn bị đề thi...' : idleLabel}
+            </button>
+        );
+    }
+
+    return (
+        <div className="space-y-3 text-left">
+            <p className="text-sm text-[#565A70] text-center">
+                Đề thi này hỗ trợ chấm chéo. Chọn hình thức nộp bài phù hợp với bạn:
+            </p>
+
+            <button
+                onClick={() => onStart(false)}
+                disabled={loading}
+                className="w-full bg-[#5B5FEF] hover:bg-[#4B4FEF] text-white text-sm font-bold py-3.5 rounded-full transition-transform hover:scale-[1.01] disabled:opacity-50"
+            >
+                {loading ? 'Đang chuẩn bị đề thi...' : 'Nộp bài cho giảng viên chấm'}
+            </button>
+
+            <button
+                onClick={() => onStart(true)}
+                disabled={loading || inProgressCountLoading || !canJoinPeerReview}
+                title={
+                    !inProgressCountLoading && !canJoinPeerReview
+                        ? 'Cần tối thiểu 3 học viên đang học khóa này để mở chấm chéo'
+                        : undefined
+                }
+                className="w-full bg-white hover:bg-[#F7F8FB] text-[#5B5FEF] border-2 border-[#5B5FEF] text-sm font-bold py-3.5 rounded-full transition-transform hover:scale-[1.01] disabled:opacity-50 disabled:cursor-not-allowed disabled:border-[#D9DBE6] disabled:text-[#8A8FA3] disabled:hover:scale-100"
+            >
+                {inProgressCountLoading
+                    ? 'Đang kiểm tra điều kiện chấm chéo...'
+                    : loading
+                        ? 'Đang chuẩn bị đề thi...'
+                        : 'Tham gia chấm chéo'}
+            </button>
+
+            {!inProgressCountLoading && !canJoinPeerReview && (
+                <p className="text-xs text-[#8A8FA3] text-center">
+                    Khóa học cần có từ {MIN_MEMBERS_FOR_PEER_REVIEW} học viên đang học trở lên mới có thể tham gia chấm chéo
+                    {inProgressCount !== null ? ` (hiện tại: ${inProgressCount})` : ''}.
+                </p>
+            )}
+        </div>
+    );
+}
+
+export function QuizSection({
+    lessonId,
+    courseId,
+    isPeerReview,
+    onQuizPassed,
+}: {
+    lessonId: string;
+    courseId: string;
+    isPeerReview: boolean;
+    onQuizPassed?: (status?: string) => void;
+}) {
     // Trạng thái đã lưu (fetch từ server khi vào bài học)
     const [initialStatus, setInitialStatus] = useState<QuizSubmissionStatusResponse | null>(null);
     const [statusLoading, setStatusLoading] = useState(true);
@@ -31,6 +119,39 @@ export function QuizSection({ lessonId, onQuizPassed }: { lessonId: string; onQu
     const [savingDetailId, setSavingDetailId] = useState<string | null>(null);
     const [result, setResult] = useState<QuizSubmitResponse | null>(null);
     const [error, setError] = useState<string | null>(null);
+
+    // Ghi nhớ chế độ được chọn khi bắt đầu (chấm chéo hay giảng viên chấm) để hiển thị đúng thông báo sau khi nộp
+    const [startedAsPeerReview, setStartedAsPeerReview] = useState(false);
+
+    // Số học viên đang học khóa (chỉ cần khi đề thi hỗ trợ chấm chéo)
+    const [inProgressCount, setInProgressCount] = useState<number | null>(null);
+    const [inProgressCountLoading, setInProgressCountLoading] = useState(false);
+
+    const canJoinPeerReview =
+        isPeerReview && inProgressCount !== null && inProgressCount >= MIN_MEMBERS_FOR_PEER_REVIEW;
+
+    // ---- -1. Kiểm tra điều kiện tham gia chấm chéo (số học viên đang học khóa) ----
+    useEffect(() => {
+        let cancelled = false;
+
+        if (!isPeerReview || !courseId) {
+            setInProgressCount(null);
+            return;
+        }
+
+        (async () => {
+            setInProgressCountLoading(true);
+            const res = await getCourseInProgressCountAction(courseId);
+            if (!cancelled) {
+                setInProgressCount(res.success ? res.data ?? 0 : 0);
+            }
+            setInProgressCountLoading(false);
+        })();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [isPeerReview, courseId]);
 
     // ---- 0. Fetch trạng thái bài thi đã lưu khi vào bài học ----
     useEffect(() => {
@@ -94,17 +215,18 @@ export function QuizSection({ lessonId, onQuizPassed }: { lessonId: string; onQu
     }, [lessonId]);
 
     // 1. Bắt đầu làm bài thi (dùng cho lần đầu hoặc "Làm lại")
-    const handleStartQuiz = async () => {
+    const handleStartQuiz = async (choosePeerReview: boolean = false) => {
         setLoading(true);
         setError(null);
         setResult(null);
-        const res = await startQuizSubmissionAction(lessonId);
+        const res = await startQuizSubmissionAction(lessonId, choosePeerReview);
         setLoading(false);
 
         if (res.success && res.data) {
             setQuizData(res.data);
             setAnswers({});
             setInitialStatus(null); // Chuyển hẳn sang chế độ đang làm bài mới
+            setStartedAsPeerReview(choosePeerReview);
         } else {
             setError(res.error || 'Không thể tải đề thi.');
         }
@@ -164,11 +286,13 @@ export function QuizSection({ lessonId, onQuizPassed }: { lessonId: string; onQu
                     <div className="w-20 h-20 rounded-full bg-[#FEF3C7] text-[#D97706] flex items-center justify-center mx-auto text-3xl font-bold">⏳</div>
                     <h3 className="font-display text-2xl font-bold text-[#161826]">Đã nộp bài thành công!</h3>
                     <p className="text-sm text-[#565A70] max-w-lg mx-auto leading-relaxed">
-                        Bài làm của bạn chứa câu hỏi tự luận và đang chờ giảng viên chấm điểm. Kết quả sẽ được cập nhật sau khi hoàn tất.
+                        {startedAsPeerReview
+                            ? 'Bài làm của bạn chứa câu hỏi tự luận và sẽ được các bạn học viên khác trong khóa học chấm chéo. Kết quả sẽ được cập nhật sau khi hoàn tất.'
+                            : 'Bài làm của bạn chứa câu hỏi tự luận và đang chờ giảng viên chấm điểm. Kết quả sẽ được cập nhật sau khi hoàn tất.'}
                     </p>
                     <div className="pt-2">
                         <span className="inline-block text-xs font-semibold text-[#D97706] bg-[#FFFBEB] border border-[#FDE68A] px-4 py-2 rounded-full">
-                            Trạng thái: Đang chờ chấm điểm
+                            {startedAsPeerReview ? 'Trạng thái: Đang chờ chấm chéo' : 'Trạng thái: Đang chờ chấm điểm'}
                         </span>
                     </div>
                 </div>
@@ -192,15 +316,17 @@ export function QuizSection({ lessonId, onQuizPassed }: { lessonId: string; onQu
 
                 {/* NÚT LÀM LẠI BÀI THI KHI CHƯA ĐẠT (VỪA NỘP XONG) */}
                 {!result.is_passed && (
-                    <div className="pt-2 max-w-xs mx-auto">
+                    <div className="pt-2 max-w-sm mx-auto">
                         {error && <p className="text-sm text-[#E5484D] font-medium mb-2">{error}</p>}
-                        <button
-                            onClick={handleStartQuiz}
-                            disabled={loading}
-                            className="w-full bg-[#5B5FEF] hover:bg-[#4B4FEF] text-white text-sm font-bold py-3.5 rounded-full transition-transform hover:scale-[1.01] disabled:opacity-50"
-                        >
-                            {loading ? 'Đang chuẩn bị đề thi...' : 'Làm lại bài thi'}
-                        </button>
+                        <StartQuizActions
+                            isPeerReview={isPeerReview}
+                            loading={loading}
+                            canJoinPeerReview={canJoinPeerReview}
+                            inProgressCountLoading={inProgressCountLoading}
+                            inProgressCount={inProgressCount}
+                            onStart={handleStartQuiz}
+                            idleLabel="Làm lại bài thi"
+                        />
                     </div>
                 )}
             </div>
@@ -210,6 +336,8 @@ export function QuizSection({ lessonId, onQuizPassed }: { lessonId: string; onQu
     // ---------------- CHẾ ĐỘ CHỈ XEM: đã SUBMITTED hoặc GRADED ----------------
     if (initialStatus && (initialStatus.status === SubmissionStatus.SUBMITTED || initialStatus.status === SubmissionStatus.GRADED)) {
         const isGraded = initialStatus.status === SubmissionStatus.GRADED;
+        const statusWithPeerReview = initialStatus as StatusWithPeerReview;
+        const isSubmissionPeerReview = Boolean(statusWithPeerReview.is_peer_review);
 
         return (
             <div className="bg-white border border-[#ECEAF0] rounded-2xl p-8 space-y-7">
@@ -226,7 +354,11 @@ export function QuizSection({ lessonId, onQuizPassed }: { lessonId: string; onQu
                             : 'text-[#D97706] bg-[#FFFBEB] border border-[#FDE68A]'
                             }`}
                     >
-                        {isGraded ? (initialStatus.is_passed ? 'Đã đạt' : 'Chưa đạt') : 'Đang chờ chấm điểm'}
+                        {isGraded
+                            ? (initialStatus.is_passed ? 'Đã đạt' : 'Chưa đạt')
+                            : isSubmissionPeerReview
+                                ? 'Đang chờ chấm chéo'
+                                : 'Đang chờ chấm điểm'}
                     </span>
                 </div>
 
@@ -306,15 +438,17 @@ export function QuizSection({ lessonId, onQuizPassed }: { lessonId: string; onQu
 
                 {/* NÚT LÀM LẠI BÀI THI KHI XEM TRẠNG THÁI CŨ LÀ CHƯA ĐẠT */}
                 {isGraded && !initialStatus.is_passed && (
-                    <div className="pt-5 border-t border-[#ECEAF0] max-w-xs mx-auto">
+                    <div className="pt-5 border-t border-[#ECEAF0] max-w-sm mx-auto">
                         {error && <p className="text-sm text-[#E5484D] font-medium mb-2">{error}</p>}
-                        <button
-                            onClick={handleStartQuiz}
-                            disabled={loading}
-                            className="w-full bg-[#5B5FEF] hover:bg-[#4B4FEF] text-white text-sm font-bold py-3.5 rounded-full transition-transform hover:scale-[1.01] disabled:opacity-50"
-                        >
-                            {loading ? 'Đang chuẩn bị đề thi...' : 'Làm lại bài thi'}
-                        </button>
+                        <StartQuizActions
+                            isPeerReview={isPeerReview}
+                            loading={loading}
+                            canJoinPeerReview={canJoinPeerReview}
+                            inProgressCountLoading={inProgressCountLoading}
+                            inProgressCount={inProgressCount}
+                            onStart={handleStartQuiz}
+                            idleLabel="Làm lại bài thi"
+                        />
                     </div>
                 )}
             </div>
@@ -332,13 +466,15 @@ export function QuizSection({ lessonId, onQuizPassed }: { lessonId: string; onQu
                 {(error || statusError) && (
                     <p className="text-sm text-[#E5484D] font-medium">{error || statusError}</p>
                 )}
-                <button
-                    onClick={handleStartQuiz}
-                    disabled={loading}
-                    className="w-full bg-[#5B5FEF] hover:bg-[#4B4FEF] text-white text-sm font-bold py-3.5 rounded-full transition-transform hover:scale-[1.01] disabled:opacity-50"
-                >
-                    {loading ? 'Đang chuẩn bị đề thi...' : 'Bắt đầu làm bài'}
-                </button>
+                <StartQuizActions
+                    isPeerReview={isPeerReview}
+                    loading={loading}
+                    canJoinPeerReview={canJoinPeerReview}
+                    inProgressCountLoading={inProgressCountLoading}
+                    inProgressCount={inProgressCount}
+                    onStart={handleStartQuiz}
+                    idleLabel="Bắt đầu làm bài"
+                />
             </div>
         );
     }
