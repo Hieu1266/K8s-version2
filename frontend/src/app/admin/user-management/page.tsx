@@ -14,8 +14,8 @@ import {
 import {
   getCoursesByInstructor,       // Manager (5) — khóa học đã tạo
   getSubjectsByInstructorAdmin, // Giảng viên (4) — môn học được phân công
-  getStudentCoursesByStatus,    // Học viên (2) — đang học / đã hoàn thành
-  getStudentStatistics,         // Học viên (2) — thống kê tổng quan
+  getStudentCoursesByStatus,    // Học viên (2) & Kiểm thử (3) — đang học / đã hoàn thành
+  getStudentStatistics,         // Học viên (2) & Kiểm thử (3) — thống kê tổng quan
 } from "@/actions/getUserRole";
 import Link from "next/link";
 
@@ -58,11 +58,11 @@ export default function UserManagementPage() {
   const [isOpenEditModal, setIsOpenEditModal] = useState(false);
 
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  // Lưu dữ liệu chi tiết trả về từ API đơn lẻ (dùng cho Admin, Kiểm thử, Giảng viên & Manager)
+  // Lưu dữ liệu chi tiết trả về từ API đơn lẻ (dùng cho Admin, Giảng viên & Manager)
   const [userDetail, setUserDetail] = useState<any | null>(null);
   const [loadingDetail, setLoadingDetail] = useState<boolean>(false);
 
-  // 🆕 Lưu dữ liệu chi tiết theo vai trò (Giảng viên/Manager/Học viên)
+  // 🆕 Lưu dữ liệu chi tiết theo vai trò (Giảng viên/Manager/Học viên/Kiểm thử)
   const [roleDetailData, setRoleDetailData] = useState<RoleDetailData>(null);
   // 🆕 Lưu lỗi khi tải dữ liệu chi tiết (mọi nhánh role)
   const [detailError, setDetailError] = useState<string | null>(null);
@@ -185,10 +185,10 @@ export default function UserManagementPage() {
   };
 
   // 🆕 Hàm gọi API lấy chi tiết theo TỪNG VAI TRÒ khác nhau
-  // - Admin (1) & Kiểm thử (3, tạm thời): thông tin cá nhân như cũ
+  // - Admin (1): thông tin cá nhân như cũ
   // - Giảng viên (4): thông tin cá nhân + danh sách MÔN HỌC được phân công (qua Syllabus)
   // - Manager (5): thông tin cá nhân + danh sách KHÓA HỌC đã tạo (qua Curriculum.assigner_id)
-  // - Học viên (2): khóa học đang học + đã hoàn thành + thống kê
+  // - Học viên (2) & Kiểm thử (3): khóa học đang học + đã hoàn thành + thống kê
   const handleOpenViewModal = async (user: User) => {
     setSelectedUser(user);
     setUserDetail(null);
@@ -230,8 +230,8 @@ export default function UserManagementPage() {
         } else {
           setDetailError(coursesRes.message || "Không thể tải danh sách khóa học");
         }
-      } else if (user.role_id === 2) {
-        // Học viên -> lấy khóa học đang học + đã hoàn thành + thống kê
+      } else if (user.role_id === 2 || user.role_id === 3) {
+        // Học viên & Kiểm thử -> lấy khóa học đang học + đã hoàn thành + thống kê
         const [inProgressRes, completedRes, statsRes] = await Promise.all([
           getStudentCoursesByStatus(user.user_id, false),
           getStudentCoursesByStatus(user.user_id, true),
@@ -249,7 +249,7 @@ export default function UserManagementPage() {
           });
         }
       } else {
-        // Admin, Kiểm thử (tạm thời), hoặc vai trò khác -> thông tin cá nhân như cũ
+        // Admin, hoặc vai trò khác -> thông tin cá nhân như cũ
         const response = await getInforUser(user.user_id);
         if (response.success && response.data) {
           setUserDetail(response.data);
@@ -351,6 +351,7 @@ export default function UserManagementPage() {
       case 4: return "Thông tin Giảng viên";
       case 5: return "Thông tin Quản lý";
       case 2: return "Tình hình học tập";
+      case 3: return "Tình hình học tập (Kiểm thử)";
       default: return "Thông tin chi tiết tài khoản";
     }
   };
@@ -791,8 +792,8 @@ export default function UserManagementPage() {
                   )}
                 </div>
               </div>
-            ) : selectedUser.role_id === 2 ? (
-              /* ===== NHÁNH: HỌC VIÊN (2) — Đang học + Đã hoàn thành ===== */
+            ) : selectedUser.role_id === 2 || selectedUser.role_id === 3 ? (
+              /* ===== NHÁNH: HỌC VIÊN (2) & KIỂM THỬ (3) — Đang học + Đã hoàn thành ===== */
               <div className="space-y-7">
                 {roleDetailData?.type === "student" && roleDetailData.stats && (
                   <div className="grid grid-cols-3 gap-3 bg-slate-50 p-5 rounded-xl">
@@ -844,7 +845,7 @@ export default function UserManagementPage() {
                 </div>
               </div>
             ) : (
-              /* ===== NHÁNH: ADMIN (1) & KIỂM THỬ (3, tạm thời) — Thông tin cá nhân như cũ ===== */
+              /* ===== NHÁNH: ADMIN (1) — Thông tin cá nhân như cũ ===== */
               <div className="space-y-5 text-base">
                 <div className="grid grid-cols-2 gap-5 bg-slate-50 p-5 rounded-xl mb-2">
                   <div>
@@ -901,12 +902,6 @@ export default function UserManagementPage() {
                     </p>
                   </div>
                 </div>
-
-                {selectedUser.role_id === 3 && (
-                  <p className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
-                    ℹ️ Xem khóa học được giao cho Kiểm thử sẽ được bổ sung sau.
-                  </p>
-                )}
               </div>
             )}
 
