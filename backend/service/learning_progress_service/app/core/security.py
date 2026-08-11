@@ -4,6 +4,8 @@ import jwt
 import bcrypt
 from datetime import datetime, timedelta, timezone
 from app.core.config import settings
+import httpx
+from uuid import UUID
 
 authServer = settings.BACKEND_USER_URL + "/login"
 # Khai báo đường dẫn lấy token, FastAPI sẽ tự động hiển thị nút Authorize trên giao diện Swagger UI Docs
@@ -43,7 +45,29 @@ def get_current_user_role(
             status_code=status.HTTP_401_UNAUTHORIZED, 
             detail="Token không hợp lệ"
         )
-    
+
+
+
+def call_get_usernames_service(tester_ids: list[UUID]) -> dict[str, str]:
+    USER_SERVICE_URL = settings.BACKEND_USER_URL
+    result: dict[str, str] = {}
+
+    timeout = httpx.Timeout(connect=3.0, read=3.0, write=3.0, pool=3.0)
+
+    with httpx.Client(timeout=timeout) as client:
+        for tester_id in tester_ids:
+            try:
+                response = client.get(f"{USER_SERVICE_URL}/get-name/{tester_id}")
+                if response.status_code == 200:
+                    result[str(tester_id)] = response.json() or "Không rõ"
+                else:
+                    result[str(tester_id)] = "Không rõ"
+            except httpx.RequestError as exc:
+                print(f"[CẢNH BÁO] Không gọi được User Service cho tester {tester_id}: {exc}")
+                result[str(tester_id)] = "Không rõ"
+
+    return result
+
 class RoleChecker:
     def __init__(self, allowed_roles: list[str]):
         # Khởi tạo danh sách các Role được phép truy cập API này

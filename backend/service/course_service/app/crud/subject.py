@@ -83,4 +83,11 @@ class CRUDSubject(CRUDBase[Subject, SubjectCreate, SubjectUpdate, UUID]):
         )
         return db.exec(statement).first()
 
+    def get_ids_by_instructor(self, db: Session, instructor_id: UUID) -> list[UUID]:
+        statement = (
+            select(Subject.subject_id)
+            .join(Syllabus, Syllabus.subject_id == Subject.subject_id)
+            .where(Syllabus.instructor_id == instructor_id)
+        )
+        return db.exec(statement).all()
 crud_subject = CRUDSubject(Subject)

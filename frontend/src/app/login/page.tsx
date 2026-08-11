@@ -71,10 +71,13 @@ function LoginContent() {
         } else if (userRole === "Manager") {
           localStorage.setItem("role", "manager");
           window.location.href = "/training-management";
+        } else if (userRole === "Tester") {
+          localStorage.setItem("role", "tester");
+          window.location.href = "/tester-dashboard";
         } else {
           localStorage.setItem("role", "student");
           window.location.href = "/dashboard-student";
-        }
+        } 
       } else {
         alert(`Đăng nhập thất bại: ${result.message}`);
       }
@@ -113,6 +116,9 @@ function LoginContent() {
           } else if (userRole === "Instructor" || userRole === "Faculty") {
             localStorage.setItem("role", "faculty");
             window.location.href = "/training-management";
+          } else if (userRole === "Tester") {
+            localStorage.setItem("role", "tester");
+            window.location.href = "/tester-dashboard";
           } else {
             localStorage.setItem("role", "student");
             window.location.href = "/dashboard-student";

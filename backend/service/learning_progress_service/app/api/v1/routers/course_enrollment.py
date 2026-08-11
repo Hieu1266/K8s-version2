@@ -18,6 +18,13 @@ from app.schemas.course_enrollment import (
     GeneralUserEnrollmentInfo
 )
 
+from app.models.enum import TestingEnrollment, StructurePart
+from app.schemas.comment import CommentCreate
+from app.crud.comment import crud_comment
+from pydantic import BaseModel
+from typing import Optional
+
+
 router = APIRouter(prefix="/course_enrollment", tags=["course_enrollment"])
 
 # 1. ĐĂNG KÝ KHÓA HỌC (Tạo Enrollment + Khởi tạo Tiến độ bài học & Video)
@@ -137,17 +144,15 @@ async def get_progress_list(
     current_user: dict = Depends(get_current_user_role)
 ):
     user_id = UUID(current_user["user_id"])
-    
-    # Lấy toàn bộ danh sách bản ghi enrollment thay vì chỉ lấy list ID (Tránh lặp truy vấn DB)
+
     enrollments = crud_course_enrollment.get_history_by_user(db, user_id=user_id, is_completed=is_completed)
-    
+
     if not enrollments:
         return []
 
     token = request.headers.get("Authorization")
     headers = {"Authorization": token} if token else {}
 
-    # Hàm bổ trợ call API lấy Title dạng không đồng bộ (Async)
     async def fetch_course_title(client: httpx.AsyncClient, course_id: UUID) -> str:
         url = f"{settings.BACKEND_COURSE_URL}/courses/title/{course_id}"
         try:
@@ -156,12 +161,10 @@ async def get_progress_list(
         except httpx.RequestError:
             return "Lỗi kết nối hệ thống"
 
-    # Sử dụng asyncio.gather để gọi đồng loạt các HTTP request (Tăng tốc độ đáng kể so với vòng lặp `for` tuần tự)
     async with httpx.AsyncClient() as client:
         tasks = [fetch_course_title(client, enroll.course_id) for enroll in enrollments]
         titles = await asyncio.gather(*tasks)
 
-    # Đóng gói dữ liệu đầu ra
     result = []
     for enroll, title in zip(enrollments, titles):
         result.append(
@@ -169,10 +172,12 @@ async def get_progress_list(
                 course_id=enroll.course_id,
                 course_title=title,
                 current_overall_progress=enroll.current_overall_progress,
-                is_completed=enroll.is_completed
+                is_completed=enroll.is_completed,
+                is_tested=enroll.is_tested,
+                testing_course_status=enroll.testing_course_status,
             )
         )
-            
+
     return result
 
 
@@ -293,3 +298,158 @@ def get_users_inprogress(
     current_user: dict = Depends(get_current_user_role)
 ):
     return crud_course_enrollment.get_users_in_progress(db, course_id)
+
+
+
+
+
+
+
+
+
+
+
+@router.get("/admin/history/{user_id}/{is_completed}", response_model=List[CourseInProgress])
+async def get_progress_list_admin(
+    request: Request,
+    db: SessionDep,
+    user_id: UUID,
+    is_completed: bool,
+    current_user: dict = Depends(RoleChecker(["Admin", "Manager"]))
+):
+
+    enrollments = crud_course_enrollment.get_history_by_user(
+        db, user_id=user_id, is_completed=is_completed
+    )
+ 
+    if not enrollments:
+        return []
+ 
+    token = request.headers.get("Authorization")
+    headers = {"Authorization": token} if token else {}
+ 
+    async def fetch_course_title(client: httpx.AsyncClient, course_id: UUID) -> str:
+        url = f"{settings.BACKEND_COURSE_URL}/courses/title/{course_id}"
+        try:
+            res = await client.get(url, headers=headers, timeout=5.0)
+            return res.json() if res.status_code == 200 else "Khóa học không xác định"
+        except httpx.RequestError:
+            return "Lỗi kết nối hệ thống"
+ 
+    async with httpx.AsyncClient() as client:
+        tasks = [fetch_course_title(client, enroll.course_id) for enroll in enrollments]
+        titles = await asyncio.gather(*tasks)
+ 
+    result = []
+    for enroll, title in zip(enrollments, titles):
+        result.append(
+            CourseInProgress(
+                course_id=enroll.course_id,
+                course_title=title,
+                current_overall_progress=enroll.current_overall_progress,
+                is_completed=enroll.is_completed,
+                is_tested=enroll.is_tested,                             # 🌟 THÊM
+                testing_course_status=enroll.testing_course_status,     # 🌟 THÊM
+            )
+        )
+
+    return result
+ 
+
+
+
+@router.get("/admin/statistics/{user_id}", response_model=GeneralUserEnrollmentInfo)
+def get_user_statistics_admin(
+    db: SessionDep,
+    user_id: UUID,
+    current_user: dict = Depends(RoleChecker(["Admin", "Manager"]))
+):
+    """
+    API dành cho ADMIN: lấy thông số thống kê (đang học/hoàn thành/chứng chỉ)
+    của một user bất kỳ.
+    """
+    stats = crud_course_enrollment.get_general_statistics(db, user_id=user_id)
+    return stats
+
+
+@router.put("/admin/testing-status/{tester_id}/{course_id}", response_model=CourseEnrollmentResponse)
+def update_testing_status_admin(
+    db: SessionDep,
+    tester_id: UUID,
+    course_id: UUID,
+    payload: CourseEnrollmentUpdate,
+    current_user: dict = Depends(RoleChecker(["Admin", "Manager"]))
+):
+    """
+    API dành cho Manager/Admin: cập nhật trạng thái duyệt kiểm thử
+    (testing_course_status) cho enrollment của một tester cụ thể.
+    """
+    enroll = crud_course_enrollment.get_by_user_and_course(
+        db, user_id=tester_id, course_id=course_id
+    )
+    if not enroll:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tester chưa đăng ký khóa học này."
+        )
+
+    if payload.testing_course_status is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Thiếu trạng thái testing_course_status."
+        )
+
+    updated_enroll = crud_course_enrollment.update_testing_status(
+        db, db_obj=enroll, status=payload.testing_course_status
+    )
+    return updated_enroll 
+
+
+
+class TesterReviewPayload(BaseModel):
+    testing_course_status: TestingEnrollment
+    reason: Optional[str] = None
+
+
+@router.put("/testing-status/{course_id}", response_model=CourseEnrollmentResponse)
+def submit_testing_status(
+    db: SessionDep,
+    course_id: UUID,
+    payload: TesterReviewPayload,
+    current_user: dict = Depends(RoleChecker(["Tester"])),   # ⚠️ xác nhận đúng chuỗi role_name
+):
+    user_id = UUID(current_user["user_id"])
+    enroll = crud_course_enrollment.get_by_user_and_course(db, user_id=user_id, course_id=course_id)
+    if not enroll:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bản ghi đăng ký khóa học không tồn tại.")
+
+    if not enroll.is_tested:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Đây không phải khóa học kiểm thử được giao cho bạn.")
+
+    if not enroll.is_completed:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cần hoàn thành khóa học trước khi chấm kết quả.")
+
+    if payload.testing_course_status not in (TestingEnrollment.APPROVED, TestingEnrollment.REJECTED):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Trạng thái phải là APPROVED hoặc REJECTED.")
+
+    if payload.testing_course_status == TestingEnrollment.REJECTED and not (payload.reason and payload.reason.strip()):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Vui lòng nhập lý do khi chọn Không đạt.")
+
+    updated_enroll = crud_course_enrollment.update_testing_status(
+        db, db_obj=enroll, status=payload.testing_course_status
+    )
+
+    if payload.testing_course_status == TestingEnrollment.REJECTED:
+        crud_comment.create(
+            db,
+            obj_in=CommentCreate(
+                enrollment_id=enroll.enrollment_id,
+                tester_id=user_id,
+                structure_part=StructurePart.COURSE,
+                part_id=course_id,
+                title="Lý do không đạt",
+                comment=payload.reason.strip(),
+            ),
+        )
+
+    return updated_enroll

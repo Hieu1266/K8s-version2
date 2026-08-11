@@ -153,3 +153,4 @@ export async function deleteCurriculum(curriculumId: string) {
     throw new Error(error.message);
   }
 }
+

@@ -250,4 +250,9 @@ class CRUDLesson(CRUDBase[Lesson, LessonCreate, LessonUpdate, UUID]):
 
         statement = statement.order_by(Module.order_index, Lesson.order_index)
         return db.exec(statement).all()
+    def get_ids_by_module_ids(self, db: Session, module_ids: list[UUID]) -> list[UUID]:
+        if not module_ids:
+            return []
+        statement = select(Lesson.lesson_id).where(Lesson.module_id.in_(module_ids))
+        return db.exec(statement).all()
 crud_lesson = CRUDLesson(Lesson)

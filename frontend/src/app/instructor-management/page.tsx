@@ -39,6 +39,14 @@ export default function TeacherDashboard() {
       icon: "📊",
       tag: "Chấm điểm",
       badgeColor: "bg-blue-50 text-blue-600 border-blue-100",
+    },
+    {
+      title: "Nhận xét khóa học",
+      desc: "Nhận xét từ kiểm thử cho khóa học của bạn",
+      route: "/instructor-management/tester-comment",
+      icon: "📊",
+      tag: "Nhận xét",
+      badgeColor: "bg-blue-50 text-blue-600 border-blue-100",
     }
   ];
 

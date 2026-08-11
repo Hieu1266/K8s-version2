@@ -179,5 +179,12 @@ class CRUDModule(CRUDBase[Module, ModuleCreate, ModuleUpdate, UUID]):
         
         count = db.exec(statement).first()
         return count or 0
+
+    def get_ids_by_subject_ids(self, db: Session, subject_ids: list[UUID]) -> list[UUID]:
+            if not subject_ids:
+                return []
+            statement = select(Module.module_id).where(Module.subject_id.in_(subject_ids))
+            return db.exec(statement).all()
+
     
 crud_module = CRUDModule(Module)

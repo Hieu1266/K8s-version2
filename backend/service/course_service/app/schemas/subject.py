@@ -37,6 +37,7 @@ class InstructorStatictisSubject(BaseModel):
 
 class GeneralInfoInstructorSubject(BaseModel):
     subject_id: UUID
+    course_id: UUID
     title: str
     description: str
     status_id: str
