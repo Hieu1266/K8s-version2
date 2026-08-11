@@ -43,21 +43,17 @@ export default function CourseLearningPage() {
   const router = useRouter();
   const id = params?.id as string;
 
-  // State quản lý dữ liệu lấy từ Backend API
   const [course, setCourse] = useState<CourseLearningStructure | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // State điều hướng cây thư mục bài học
   const [currentLesson, setCurrentLesson] = useState<LessonWithStatus | undefined>(undefined);
   const [currentSubject, setCurrentSubject] = useState<SubjectLearningStructure | undefined>(undefined);
 
-  // State quản lý thu gọn / mở rộng
   const [expandedSubjects, setExpandedSubjects] = useState<Record<string, boolean>>({});
   const [expandedModules, setExpandedModules] = useState<Record<string, boolean>>({});
   const [activeTab, setActiveTab] = useState<TabKey>('lecture');
 
-  // State thu gọn thanh sidebar bên trái (ghi nhớ lựa chọn của người dùng ở trình duyệt)
   const [sidebarCollapsed, setSidebarCollapsedState] = useState(false);
 
   useEffect(() => {
@@ -72,37 +68,28 @@ export default function CourseLearningPage() {
     });
   };
 
-  // State Ghi chú + Video
   const [notes, setNotes] = useState<UserLessonNote[]>([]);
   const [notesLoading, setNotesLoading] = useState(false);
   const [videoCurrentTime, setVideoCurrentTime] = useState(0);
   const [seekTarget, setSeekTarget] = useState<number | null>(null);
 
-  // Tiến độ video THẬT
   const [videoProgress, setVideoProgress] = useState<VideoProgress | null>(null);
   const [videoProgressLoading, setVideoProgressLoading] = useState(false);
 
-  // STATE TÀI LIỆU ĐÍNH KÈM (RESOURCES)
   const [resources, setResources] = useState<LessonResourceItem[]>([]);
   const [resourcesLoading, setResourcesLoading] = useState(false);
 
-  // Ô tạo ghi chú nhanh
   const [quickNoteOpen, setQuickNoteOpen] = useState(false);
   const [quickNoteContent, setQuickNoteContent] = useState('');
   const [quickNoteSaving, setQuickNoteSaving] = useState(false);
 
-  // State xử lý quá trình gửi API hoàn thành bài đọc
   const [completing, setCompleting] = useState(false);
 
-  // quiz_id + trạng thái bài nộp hiện tại (do QuizSection resolve ra), dùng để hiển thị
-  // PeerReviewSection — CHỈ hiện khi học viên đã thực sự nộp bài (SUBMITTED/GRADED)
   const [activeQuizId, setActiveQuizId] = useState<string | null>(null);
   const [activeQuizStatus, setActiveQuizStatus] = useState<string | null>(null);
 
-  // Ref tới khung nội dung bài học bên phải, dùng để cuộn lên đầu mỗi khi đổi bài học
   const lessonContentScrollRef = useRef<HTMLDivElement>(null);
 
-  // Call Server Action để lấy dữ liệu khóa học và status
   useEffect(() => {
     if (!id) return;
 
@@ -142,7 +129,6 @@ export default function CourseLearningPage() {
         const firstModule = firstSubject?.modules[0];
         const firstLesson = firstModule?.lessons[0] as LessonWithStatus | undefined;
 
-        // Nếu người dùng đã từng mở một bài học trong khóa này, ưu tiên mở lại đúng bài đó
         let targetSubject = firstSubject;
         let targetModule = firstModule;
         let targetLesson = firstLesson;
@@ -182,7 +168,6 @@ export default function CourseLearningPage() {
     fetchLearningData();
   }, [id]);
 
-  // Lấy danh sách ghi chú
   useEffect(() => {
     if (!currentLesson?.lesson_id) {
       setNotes([]);
@@ -210,7 +195,6 @@ export default function CourseLearningPage() {
     };
   }, [currentLesson?.lesson_id]);
 
-  // EFFECT TẢI DANH SÁCH TÀI LIỆU KHI CHỌN BÀI HỌC
   useEffect(() => {
     if (!currentLesson?.lesson_id) {
       setResources([]);
@@ -249,6 +233,52 @@ export default function CourseLearningPage() {
   const progressPercent = flatLessons.length
     ? Math.round((completedCount / flatLessons.length) * 100)
     : 0;
+
+  // Hàm reload trạng thái tất cả các bài học từ Backend/Progress Service
+  const refreshCourseProgress = async () => {
+    if (!course) return;
+
+    try {
+      const updatedSubjects = await Promise.all(
+        course.subjects.map(async (subject) => {
+          const updatedModules = await Promise.all(
+            subject.modules.map(async (mod) => {
+              const lessonsWithStatus = await attachStatusToLessons(mod.lessons);
+              return {
+                ...mod,
+                lessons: lessonsWithStatus,
+              };
+            })
+          );
+          return {
+            ...subject,
+            modules: updatedModules,
+          };
+        })
+      );
+
+      setCourse((prevCourse) => {
+        if (!prevCourse) return prevCourse;
+        return {
+          ...prevCourse,
+          subjects: updatedSubjects,
+        };
+      });
+
+      if (currentLesson) {
+        for (const sub of updatedSubjects) {
+          for (const mod of sub.modules) {
+            const found = mod.lessons.find((les) => les.lesson_id === currentLesson.lesson_id);
+            if (found) {
+              setCurrentLesson(found as LessonWithStatus);
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Lỗi khi làm mới tiến độ khóa học:', err);
+    }
+  };
 
   const findNextLockedLesson = (startIndex: number) => {
     for (let i = startIndex; i < flatLessons.length; i++) {
@@ -305,8 +335,6 @@ export default function CourseLearningPage() {
         ? flatLessons[currentIndex + 1]
         : null;
 
-    // Nếu bài kế tiếp đã mở sẵn (không LOCKED) và không phải bài tùy chọn
-    // -> không cần tìm/mở thêm gì (tránh mở nhầm bài xa hơn, sai thứ tự)
     const nextAlreadyAccessible =
       !!nextItem && nextItem.lesson.status !== LessonStatus.LOCKED && !nextItem.lesson.is_optional;
 
@@ -536,7 +564,6 @@ export default function CourseLearningPage() {
 
   const hasVideo = Boolean(currentLesson?.video_url && currentLesson.video_url.trim() !== '');
 
-  // Danh sách Tab Động (Chỉ thêm tab 'Bài thi' khi had_quiz == true VÀ KHÔNG CÓ video)
   const lessonTabs = useMemo(() => {
     const tabs: [TabKey, string][] = [
       ['lecture', 'Bài giảng'],
@@ -573,7 +600,6 @@ export default function CourseLearningPage() {
     };
   }, [currentLesson?.lesson_id, hasVideo]);
 
-  // Cuộn khung nội dung bài học về đầu mỗi khi người dùng chuyển sang bài học khác
   useEffect(() => {
     lessonContentScrollRef.current?.scrollTo({ top: 0, behavior: 'auto' });
   }, [currentLesson?.lesson_id]);
@@ -635,7 +661,6 @@ export default function CourseLearningPage() {
           onToggleCollapse={toggleSidebarCollapsed}
         />
 
-        {/* Khung Hiển Thị Nội Dung Bài Học */}
         <div ref={lessonContentScrollRef} className="flex-1 min-h-0 overflow-y-auto bg-[#F7F8FB] flex flex-col">
           <div className="px-10 pt-8 space-y-6 flex-1 max-w-7xl">
             <LessonTitleHeader
@@ -649,7 +674,6 @@ export default function CourseLearningPage() {
               <LessonTabsNav tabs={lessonTabs} activeTab={activeTab} onChange={setActiveTab} />
             )}
 
-            {/* TAB BÀI GIẢNG / BÀI ĐỌC */}
             {activeTab === 'lecture' && !currentLesson?.is_quiz && (
               <div key="lecture" className="anim-fade-up space-y-6 pb-12">
                 <LectureTabContent
@@ -674,14 +698,12 @@ export default function CourseLearningPage() {
               </div>
             )}
 
-            {/* TAB TÀI LIỆU */}
             {activeTab === 'resources' && !currentLesson?.is_quiz && (
               <div key="resources" className="anim-fade-up space-y-3 pb-12">
                 <ResourcesTabContent loading={resourcesLoading} resources={resources} courseBackendUrl={COURSE_URL} />
               </div>
             )}
 
-            {/* TAB GHI CHÚ */}
             {activeTab === 'notes' && !currentLesson?.is_quiz && currentLesson && (
               <div key="notes" className="anim-fade-up pb-12">
                 <LessonNotesPanel
@@ -700,7 +722,6 @@ export default function CourseLearningPage() {
               </div>
             )}
 
-            {/* TAB BÀI THI / QUIZ SECTION */}
             {(activeTab === 'quiz' || currentLesson?.is_quiz) && currentLesson && (
               <div key="quiz" className="anim-fade-up space-y-6 pb-12">
                 <QuizSection
@@ -714,13 +735,14 @@ export default function CourseLearningPage() {
                   }}
                 />
 
-                {/* Các bài của học viên khác được giao cho mình chấm chéo —
-                    chỉ hiện sau khi học viên đã thực sự NỘP bài của chính mình */}
                 {currentLesson.is_peer_review &&
                   activeQuizId &&
                   (activeQuizStatus === SubmissionStatus.SUBMITTED ||
                     activeQuizStatus === SubmissionStatus.GRADED) && (
-                    <PeerReviewSection quizId={activeQuizId} />
+                    <PeerReviewSection
+                      quizId={activeQuizId}
+                      onReviewSubmitted={refreshCourseProgress}
+                    />
                   )}
               </div>
             )}

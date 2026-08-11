@@ -15,16 +15,17 @@ import {
 
 type ScoreDraft = { score: string; feedback: string };
 
-/** Làm tròn 2 chữ số thập phân, tránh lỗi hiển thị số thực kiểu 0.1 + 0.2 */
 function round2(value: number): number {
     return Math.round(value * 100) / 100;
 }
 
-/**
- * Hiển thị danh sách các bài được giao cho học viên hiện tại chấm chéo (theo quiz_id)
- * và cho phép chấm điểm theo rubric của từng câu tự luận.
- */
-export default function PeerReviewSection({ quizId }: { quizId: string }) {
+export default function PeerReviewSection({
+    quizId,
+    onReviewSubmitted,
+}: {
+    quizId: string;
+    onReviewSubmitted?: () => void;
+}) {
     const [assignments, setAssignments] = useState<MyAssignment[] | null>(null);
     const [listLoading, setListLoading] = useState(true);
     const [listError, setListError] = useState<string | null>(null);
@@ -56,6 +57,9 @@ export default function PeerReviewSection({ quizId }: { quizId: string }) {
                 onCompleted={() => {
                     setActiveAssignmentId(null);
                     loadAssignments();
+                    if (onReviewSubmitted) {
+                        onReviewSubmitted();
+                    }
                 }}
             />
         );
