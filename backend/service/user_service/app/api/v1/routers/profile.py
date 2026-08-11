@@ -55,14 +55,22 @@ def get_profile(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Hồ sơ không tồn tại"
         )
-
+    db_user = crud_user.get_by_id(session, user)
     # Kiểm tra quyền: chính chủ hoặc Admin mới được phép xem
     is_owner = str(current_user["user_id"]) == str(db_profile.user_id)
     is_admin = str(current_user["role_name"]) == "Admin"
+    print(db_user.birthdate)
+    result = ProfileInfo(
+        birthdate=db_user.birthdate,
+        avatar_url=db_profile.avatar_url,
+        bio=db_profile.bio,
+        firstname=db_profile.firstname,
+        lastname=db_profile.lastname
+    )
     if not is_owner and not is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Không có quyền xem hồ sơ"
         )
 
-    return db_profile
+    return result

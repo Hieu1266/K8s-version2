@@ -21,18 +21,10 @@ export default function SubjectHeader({ subject }: Props) {
         </button>
 
         <span className="text-xs font-semibold bg-white/20 px-3 py-1 rounded-full uppercase tracking-wider">
-          Question Bank
+          Ngân hàng câu hỏi
         </span>
 
         <h1 className="text-4xl font-extrabold mt-3">{subject.title}</h1>
-
-        <p className="mt-2 text-blue-100 text-sm">
-          {subject.code}
-          <span className="mx-2">•</span>
-          {subject.totalQuestions} câu hỏi
-          <span className="mx-2">•</span>
-          {subject.totalModules} Module
-        </p>
       </div>
     </section>
   );

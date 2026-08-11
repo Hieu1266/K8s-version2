@@ -17,7 +17,6 @@ export default function CreateQuizDrawer({
     subjectPools?: any[];
     onSuccess: (data: any) => void;
 }) {
-    // 🟢 Chuyển các trường số sang dạng chuỗi (String) để quản lý an toàn
     const [formData, setFormData] = useState({
         title: "",
         description: "",
@@ -47,7 +46,6 @@ export default function CreateQuizDrawer({
         }
     }, [subjectId]);
 
-    // Reset Form về trạng thái ban đầu khi mở Drawer
     useEffect(() => {
         if (isOpen) {
             setFormData({
@@ -87,7 +85,6 @@ export default function CreateQuizDrawer({
             return;
         }
 
-        // 🟢 Ép kiểu an toàn sang Number trước khi đẩy dữ liệu
         const payload = {
             ...formData,
             duration_minutes: formData.duration_minutes === "" ? 0 : Number(formData.duration_minutes),
@@ -95,10 +92,6 @@ export default function CreateQuizDrawer({
             max_attempts: formData.max_attempts === "" ? 0 : Number(formData.max_attempts),
             target_lesson_id: formData.target_lesson_id.trim() || null,
         };
-
-        // 🐞 DEBUG TẠI ĐÂY: Mở F12 -> Console để xem dữ liệu
-        console.log("=== DEBUG CREATE QUIZ PAYLOAD ===", payload);
-        console.log("Kiểu dữ liệu của passing_percentage:", typeof payload.passing_percentage);
 
         onSuccess(payload);
     };
@@ -226,17 +219,26 @@ export default function CreateQuizDrawer({
                                     </option>
                                 ))}
                             </select>
-                            <p className="text-xs text-slate-400 mt-1">
-                                {isLoadingLessons
-                                    ? "Đang tải danh sách bài học..."
-                                    : formData.placement_type === "IN_VIDEO"
-                                        ? "Danh sách hiển thị các bài học video."
-                                        : formData.placement_type === "INSIDE_LESSON"
-                                            ? "Danh sách hiển thị các bài đọc."
-                                            : "Danh sách tất cả bài học trong môn học."}
-                            </p>
                         </div>
                     )}
+
+                    {/* 🟢 TÙY CHỌN CHẤM ĐIỂM CHÉO (PEER REVIEW) */}
+                    <div className="pt-2 border-t border-slate-100">
+                        <label className="flex items-center gap-2 cursor-pointer select-none">
+                            <input
+                                type="checkbox"
+                                checked={formData.is_peer_review}
+                                onChange={(e) => setFormData({ ...formData, is_peer_review: e.target.checked })}
+                                className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                            />
+                            <span className="text-sm font-medium text-slate-700">
+                                Cho phép chấm điểm chéo (Peer Review)
+                            </span>
+                        </label>
+                        <p className="text-xs text-slate-400 mt-1 pl-6">
+                            Khi bật, học viên sẽ chấm điểm bài làm của nhau dựa trên tiêu chí quy định.
+                        </p>
+                    </div>
                 </div>
 
                 <div className="px-6 py-4 border-t border-slate-200 bg-gray-50 flex justify-end gap-3">

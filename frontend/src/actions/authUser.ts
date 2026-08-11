@@ -35,11 +35,11 @@ interface GoogleAuthResponse {
 // Hàm helper để phân loại URL theo Role
 function getRedirectUrlByRole(role: string): string {
   const roleClean = role?.trim().toLowerCase();
-  
+
   if (roleClean === "admin") return "/admin";
   if (roleClean === "faculty" || roleClean === "instructor") return "/training-management";
-  if (roleClean === "manager") return "/instructor-management"; 
-  return "/dashboard-student"; 
+  if (roleClean === "manager") return "/instructor-management";
+  return "/dashboard-student";
 }
 
 async function setAuthCookies(data: any) {
@@ -47,17 +47,17 @@ async function setAuthCookies(data: any) {
   const cookieConfig = {
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax' as const,
-    maxAge: 60 * 60 * 24, 
+    maxAge: 60 * 60 * 24,
     path: '/',
   };
 
   if (data.access_token) {
     cookieStore.set('token', data.access_token, { ...cookieConfig, httpOnly: true })
   }
-  
+
   if (data.user) {
     cookieStore.set('user_info', JSON.stringify(data.user), { ...cookieConfig, httpOnly: false })
-    
+
     const roleToStore = data.user.role ? data.user.role.toLowerCase().trim() : '';
     cookieStore.set('user_role', roleToStore, { ...cookieConfig, httpOnly: false })
   }
@@ -100,7 +100,7 @@ export async function registerAccount(name: string, email: string, password: str
 //   if (data.access_token) {
 //     cookieStore.set('token', data.access_token, { ...cookieConfig, httpOnly: true })
 //   }
-  
+
 //   if (data.user) {
 //     cookieStore.set('user_info', JSON.stringify(data.user), { ...cookieConfig, httpOnly: false })
 //     cookieStore.set('user_role', data.role.toLowerCase(), { expires: 7 })
@@ -153,9 +153,9 @@ export async function loginGoogleUserAction(googleAccessToken: string): Promise<
       return { success: false, message: data.detail || 'Đăng nhập Google thất bại' }
     }
     await setAuthCookies(data);
-    return { 
-      success: true, 
-      message: data.message, 
+    return {
+      success: true,
+      message: data.message,
       user: data.user,
       redirectTo: getRedirectUrlByRole(data.user?.role) // Trả URL về cho Client
     }
@@ -180,4 +180,15 @@ export async function registerGoogleUserAction(googleAccessToken: string): Promi
   } catch (error) {
     return { success: false, message: 'Không thể kết nối đến hệ thống!' }
   }
+}
+
+export async function logoutUserAction() {
+  const cookieStore = await cookies();
+
+  // Xóa các Cookie do Next.js quản lý
+  cookieStore.delete('token');
+  cookieStore.delete('user_info');
+  cookieStore.delete('user_role');
+
+  return { success: true };
 }

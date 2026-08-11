@@ -36,6 +36,7 @@ class UserGeneralInfo(BaseModel):
     role_name: str
     username: str
     email: EmailStr
+    birthdate: datetime | None = None
     created_at: datetime 
     status_id: str
     display_status: str

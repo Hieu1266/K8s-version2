@@ -126,7 +126,7 @@ export default function DashboardPage() {
     try {
       const userPayload = {
         username: formData.username,
-        birthdate: formData.birthdate || undefined,
+        birthdate: formData.birthdate,
       };
 
       const profilePayload = {

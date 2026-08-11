@@ -285,3 +285,11 @@ def is_enrolled_course(
     user_id = current_user["user_id"]
     return crud_course_enrollment.check_already_enrolled(db, user_id, course_id)
 
+
+@router.get("/get-users-in-progress/{course_id}", response_model=int)
+def get_users_inprogress(
+    db: SessionDep,
+    course_id: UUID,
+    current_user: dict = Depends(get_current_user_role)
+):
+    return crud_course_enrollment.get_users_in_progress(db, course_id)

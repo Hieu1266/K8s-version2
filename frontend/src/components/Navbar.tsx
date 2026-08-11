@@ -2,6 +2,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { env } from "process";
+import { logoutUserAction } from "@/actions/authUser";
 
 export default function Navbar() {
   const router = useRouter();
@@ -41,12 +43,24 @@ export default function Navbar() {
     }
   };
 
-  const handleLogout = () => {
-    localStorage.clear();
-    alert("Đã đăng xuất tài khoản!");
-    setIsLoggedIn(false);
-    setShowUserMenu(false);
-    router.push("/");
+  const handleLogout = async () => {
+    try {
+      // 1. Gọi Next.js Server Action để xóa Cookie HttpOnly
+      await logoutUserAction();
+
+      // 2. Xóa dữ liệu trong localStorage
+      localStorage.clear();
+
+      // 3. Cập nhật state
+      setIsLoggedIn(false);
+      setShowUserMenu(false);
+      alert("Đã đăng xuất tài khoản!");
+
+      // 4. Chuyển hướng và làm sạch cache trình duyệt
+      window.location.href = "/";
+    } catch (error) {
+      console.error("Lỗi đăng xuất:", error);
+    }
   };
 
   const menuConfig = getUserMenuConfig();

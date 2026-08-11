@@ -3,28 +3,30 @@
 import { useMemo, useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Navbar from "@/components/Navbar";
-import SubjectHeader from "@/components/SubjectHeader";
+import SubjectHeader from "@/components/question-bank/SubjectHeader";
 import SubjectInfoComponent from "@/components/SubjectInfo";
-import QuestionFilter from "@/components/QuestionFilter";
-import QuestionCard from "@/components/QuestionCard";
-import Pagination from "@/components/Pagination";
-import AddQuestionModal from "@/components/AddQuestionModal";
+import QuestionFilter from "@/components/question-bank/QuestionFilter";
+import QuestionCard from "@/components/question-bank//QuestionCard";
+import Pagination from "@/components/question-bank/Pagination";
+import AddQuestionModal from "@/components/question-bank/AddQuestionModal";
 import { Question, SubjectInfo } from "@/types/questions-bank";
+import Link from "next/link";
 import {
-  Layers,
-  HelpCircle,
   Plus,
   SearchX,
-  Sparkles,
   Loader2,
-  BookOpenCheck
+  BookOpenCheck,
+  HelpCircle,
+  FileText
 } from "lucide-react";
 
 import {
   getQuestionsBySubjectAction,
   getSubjectDetailAction,
+  getQuestionDetailAction, // 🎯 Gọi API chi tiết khi mở modal Sửa
   saveQuestionAction,
   deleteQuestionAction, // 🎯 1. Đã import thêm hàm Delete Action
+
 } from "@/actions/getQuestionBank";
 
 export default function QuestionBankDetailPage() {
@@ -46,6 +48,7 @@ export default function QuestionBankDetailPage() {
   const [loading, setLoading] = useState<boolean>(true);
   const [openModal, setOpenModal] = useState<boolean>(false);
   const [editingQuestion, setEditingQuestion] = useState<Question | undefined>();
+  const [editLoadingId, setEditLoadingId] = useState<string | null>(null); // 🎯 Câu hỏi đang được tải chi tiết để sửa
 
   // State bộ lọc
   const [keyword, setKeyword] = useState<string>("");
@@ -54,6 +57,32 @@ export default function QuestionBankDetailPage() {
   // State phân trang
   const [currentPage, setCurrentPage] = useState<number>(1);
   const pageSize = 5;
+
+  // 🎯 Danh sách câu hỏi (get-list) có thể không kèm đủ dữ liệu "rubrics" của câu tự luận.
+  // Nên với các câu ESSAY, gọi thêm API chi tiết từng câu để lấy đủ tiêu chí đánh giá,
+  // giúp hiển thị ngay ở danh sách ngoài mà không cần bấm Sửa.
+  const enrichEssayRubrics = useCallback(async (list: Question[]): Promise<Question[]> => {
+    const essayQuestions = list.filter(
+      (q) => String(q.question_type).toUpperCase() === "ESSAY" && (!q.rubrics || q.rubrics.length === 0)
+    );
+
+    if (essayQuestions.length === 0) return list;
+
+    const details = await Promise.all(
+      essayQuestions.map((q) => getQuestionDetailAction(q.question_id))
+    );
+
+    const detailMap = new Map<string, Question>();
+    essayQuestions.forEach((q, i) => {
+      const detail = details[i];
+      if (detail) detailMap.set(q.question_id, detail);
+    });
+
+    return list.map((q) => {
+      const detail = detailMap.get(q.question_id);
+      return detail ? { ...q, rubrics: detail.rubrics, options: detail.options } : q;
+    });
+  }, []);
 
   // Fetch dữ liệu môn học & câu hỏi
   const fetchData = useCallback(async () => {
@@ -78,13 +107,19 @@ export default function QuestionBankDetailPage() {
         });
       }
 
-      setQuestions(questionsRes || []);
+      const baseQuestions = questionsRes || [];
+      setQuestions(baseQuestions);
+
+      // Bổ sung rubrics cho câu tự luận sau khi đã hiển thị danh sách cơ bản,
+      // tránh chặn màn hình chờ nếu có nhiều câu tự luận.
+      const enriched = await enrichEssayRubrics(baseQuestions);
+      setQuestions(enriched);
     } catch (error) {
       console.error("Lỗi tải dữ liệu:", error);
     } finally {
       setLoading(false);
     }
-  }, [subjectId]);
+  }, [subjectId, enrichEssayRubrics]);
 
   useEffect(() => {
     fetchData();
@@ -185,9 +220,18 @@ export default function QuestionBankDetailPage() {
     currentPage * pageSize
   );
 
-  const handleEdit = (question: Question) => {
-    setEditingQuestion(question);
-    setOpenModal(true);
+  // 🎯 Gọi GET /questions/{question_id} để lấy đầy đủ options (trắc nghiệm)
+  // và rubrics (tự luận) mới nhất trước khi mở modal Sửa, tránh trường hợp
+  // dữ liệu từ danh sách câu hỏi (get-list) chưa kèm đủ 2 quan hệ này.
+  const handleEdit = async (question: Question) => {
+    setEditLoadingId(question.question_id);
+    try {
+      const detail = await getQuestionDetailAction(question.question_id);
+      setEditingQuestion(detail || question); // fallback về dữ liệu cũ nếu API lỗi
+      setOpenModal(true);
+    } finally {
+      setEditLoadingId(null);
+    }
   };
 
   const currentSubject: SubjectInfo = subjectData || {
@@ -207,48 +251,30 @@ export default function QuestionBankDetailPage() {
       <Navbar />
       <SubjectHeader subject={currentSubject} />
 
+      {/* 🎯 TAB CHUYỂN ĐỔI NGÂN HÀNG CÂU HỎI <-> NGÂN HÀNG ĐỀ THI */}
+      <div className="bg-white border-b border-slate-200 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex gap-8">
+          <button className="py-3 px-1 border-b-2 border-emerald-600 font-bold text-emerald-600 text-sm flex items-center gap-2">
+            <HelpCircle size={18} />
+            Ngân hàng câu hỏi
+          </button>
+
+          <Link
+            href={`/instructor-management/exam-manage/${subjectId}`}
+            className="py-3 px-1 border-b-2 border-transparent text-slate-500 hover:text-slate-900 font-medium text-sm flex items-center gap-2 transition duration-200"
+          >
+            <FileText size={18} />
+            Ngân hàng đề thi
+          </Link>
+        </div>
+      </div>
+
       <main className="mx-auto max-w-7xl px-4 sm:px-6 py-8 space-y-8">
 
         {/* 1. THÔNG TIN MÔN HỌC & THỐNG KÊ */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
-          <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm hover:shadow-md transition-all duration-300">
+        <div className="grid grid-cols-1 gap-6 items-stretch">
+          <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm hover:shadow-md transition-all duration-300">
             <SubjectInfoComponent subject={currentSubject} />
-          </div>
-
-          <div className="bg-gradient-to-br from-emerald-950 via-slate-900 to-emerald-900 text-white rounded-2xl p-6 shadow-md flex flex-col justify-between relative overflow-hidden border border-emerald-800/40">
-            <div className="absolute top-0 right-0 w-36 h-36 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
-
-            <div className="space-y-3 relative z-10">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold uppercase tracking-wider">
-                <Sparkles size={14} /> Bảng Tổng Quan
-              </div>
-              <h3 className="text-xl font-extrabold text-white tracking-tight">
-                Ngân Hàng Đề {currentSubject.code}
-              </h3>
-              <p className="text-xs text-emerald-100/70 leading-relaxed">
-                Hệ thống lưu trữ và quản lý câu hỏi tiêu chuẩn, phục vụ tạo đề thi tự động.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 pt-6 border-t border-emerald-800/50 relative z-10">
-              <div className="bg-emerald-900/30 backdrop-blur-md rounded-xl p-3.5 border border-emerald-500/20">
-                <div className="flex items-center gap-2 text-emerald-300 text-xs font-semibold">
-                  <HelpCircle size={15} /> Tổng câu hỏi
-                </div>
-                <div className="text-2xl font-black text-white mt-1">
-                  {questions.length}
-                </div>
-              </div>
-
-              <div className="bg-emerald-900/30 backdrop-blur-md rounded-xl p-3.5 border border-emerald-500/20">
-                <div className="flex items-center gap-2 text-teal-300 text-xs font-semibold">
-                  <Layers size={15} /> Tổng Module
-                </div>
-                <div className="text-2xl font-black text-white mt-1">
-                  {currentSubject.totalModules || 0}
-                </div>
-              </div>
-            </div>
           </div>
         </div>
 
@@ -323,6 +349,7 @@ export default function QuestionBankDetailPage() {
                       index={(currentPage - 1) * pageSize + index}
                       onEdit={() => handleEdit(question)}
                       onDelete={() => handleDelete(question.question_id)}
+                      isEditLoading={editLoadingId === question.question_id}
                     />
                   </div>
                 ))}

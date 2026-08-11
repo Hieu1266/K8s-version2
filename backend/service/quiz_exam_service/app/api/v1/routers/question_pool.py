@@ -36,7 +36,7 @@ def create_question_pool(
     current_user: dict = Depends(RoleChecker(["Instructor"]))
 ):
     user_id = UUID(current_user["user_id"])
-    if crud_question_pool.is_title_existed(db, obj_in.title):
+    if crud_question_pool.is_title_existed(db, obj_in.title, obj_in.subject_id):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail = "Tên pool đã được sử dụng"

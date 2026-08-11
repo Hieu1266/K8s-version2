@@ -4,11 +4,13 @@ import React, { useState, useEffect, useCallback } from 'react';
 import LessonVideoPlayer from './LessonVideoPlayer';
 import { QuizQuestion } from '@/types/quiz-submission';
 import { VideoProgress } from '@/types/video';
+import { SubmissionStatus } from '@/types/statuses';
 import {
     startQuizSubmissionAction,
     updateSubmissionDetailAction,
     submitQuestionAction,
-    submitQuizAction
+    submitQuizAction,
+    getQuizStatusByLessonAction,
 } from '@/actions/getQuizSubmission';
 
 export interface InVideoQuizWrapperProps {
@@ -48,9 +50,38 @@ export const InVideoQuizWrapper: React.FC<InVideoQuizWrapperProps> = ({
     const [isVideoEnded, setIsVideoEnded] = useState<boolean>(false);
 
     useEffect(() => {
+        let cancelled = false;
+
         const initializeQuiz = async () => {
             try {
+                // ---- Bước 1: Kiểm tra trạng thái đã lưu trước, KHÔNG tạo lượt làm bài mới ngay ----
+                // getQuizStatusByLessonAction chỉ đọc trạng thái, không tạo submission mới.
+                const statusRes = await getQuizStatusByLessonAction(lessonId);
+                if (cancelled) return;
+
+                const savedStatus = statusRes.success ? statusRes.data : undefined;
+
+                // Nếu bài thi trong video này đã NỘP (SUBMITTED) hoặc đã CHẤM (GRADED) từ trước,
+                // nghĩa là người dùng đã hoàn tất toàn bộ câu hỏi ở lượt xem trước đó.
+                // Không được gọi startQuizSubmissionAction ở đây, vì action đó dùng để bắt đầu
+                // lượt làm bài MỚI (giống nút "Làm lại bài thi"), sẽ khiến câu hỏi bị hỏi lại
+                // từ đầu mỗi khi xem lại video. Ta chỉ cần để video phát tự do, không bẫy câu hỏi nữa.
+                if (
+                    savedStatus &&
+                    (savedStatus.status === SubmissionStatus.SUBMITTED || savedStatus.status === SubmissionStatus.GRADED)
+                ) {
+                    setSubmissionId(null);
+                    setInVideoQuestions([]);
+                    setAnsweredQuestionIds([]);
+                    return;
+                }
+
+                // ---- Bước 2: Chưa từng làm bài (data null), hoặc đang làm dở (IN_PROGRESS) ----
+                // startQuizSubmissionAction trong 2 trường hợp này sẽ tạo lượt đầu tiên hoặc khôi phục
+                // đúng lượt IN_PROGRESS đang dang dở (kèm is_answered_correct từng câu để không hỏi lại
+                // những câu đã trả lời đúng trong cùng lượt đó).
                 const res = await startQuizSubmissionAction(lessonId);
+                if (cancelled) return;
 
                 if (res.success && res.data) {
                     setSubmissionId(res.data.submission_id);
@@ -74,6 +105,10 @@ export const InVideoQuizWrapper: React.FC<InVideoQuizWrapperProps> = ({
         if (lessonId) {
             initializeQuiz();
         }
+
+        return () => {
+            cancelled = true;
+        };
     }, [lessonId]);
 
     // --- Logic bẫy thời gian & kiểm soát Tua/Phát Video ---
@@ -83,6 +118,7 @@ export const InVideoQuizWrapper: React.FC<InVideoQuizWrapperProps> = ({
         }
 
         // 🆕 2. Nếu video đã kết thúc hoặc không có câu hỏi -> Dừng kiểm tra bẫy thời gian
+        // (inVideoQuestions rỗng bao gồm cả trường hợp bài thi đã SUBMITTED/GRADED từ trước)
         if (isVideoEnded || !inVideoQuestions || inVideoQuestions.length === 0) return;
 
         const currentSecond = Math.floor(seconds);
@@ -128,6 +164,9 @@ export const InVideoQuizWrapper: React.FC<InVideoQuizWrapperProps> = ({
         setIsModalVisible(false);
         setActiveQuestion(null);
 
+        // submissionId chỉ khác null khi lượt làm bài hiện tại thực sự đang mở (mới tạo hoặc
+        // IN_PROGRESS được khôi phục ở trên). Nếu bài đã SUBMITTED/GRADED từ trước, submissionId
+        // đã được set về null nên khối này sẽ tự động được bỏ qua, tránh nộp lại một bài đã xong.
         if (submissionId) {
             try {
                 const res = await submitQuizAction(submissionId);

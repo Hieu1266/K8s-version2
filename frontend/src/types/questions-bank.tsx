@@ -27,6 +27,16 @@ export interface QuestionOption {
   is_correct: boolean;
 }
 
+// 💥 Khớp với RubricCriteriaResponse trong backend (question_bank.py)
+export interface RubricCriteria {
+  criteria_id?: string;
+  question_id?: string;
+  title: string;
+  description?: string;
+  percentage?: number; // Tính lại ở client nếu backend không trả về
+  max_score?: number;
+}
+
 export interface Question {
   question_id: string;
   subject_id: string;
@@ -35,4 +45,5 @@ export interface Question {
   content: string;
   max_points: number;
   options?: QuestionOption[];
+  rubrics?: RubricCriteria[]; // Chỉ áp dụng cho câu hỏi ESSAY
 }

@@ -9,6 +9,7 @@ import CreateQuizDrawer from "@/components/exam-management/CreateQuizDrawer";
 import EditQuizModal from "@/components/exam-management/EditQuizModal";
 import { Quiz, QuizCreatePayload, QuizUpdatePayload } from "@/types/exam-management";
 import { getQuizzesAction, createQuizAction, deleteQuizAction, updateQuizAction } from "@/actions/getQuizzes";
+import { HelpCircle, FileText, Users, Link2 } from "lucide-react";
 
 export default function SubjectDetailPage({
   params,
@@ -28,7 +29,6 @@ export default function SubjectDetailPage({
   const [isLoadingQuizzes, setIsLoadingQuizzes] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
 
-  // 🟢 HÀM FETCH API
   const fetchQuizzes = useCallback(async (searchQuery: string = "") => {
     setIsLoadingQuizzes(true);
     try {
@@ -80,7 +80,6 @@ export default function SubjectDetailPage({
     }
   };
 
-  // 🟢 ĐÃ BỔ SUNG: Bổ sung target_lesson_id vào payload cập nhật
   const handleEditQuizSuccess = async (updatedData: Partial<Quiz>) => {
     if (!editingQuiz) return;
 
@@ -148,24 +147,36 @@ export default function SubjectDetailPage({
             </button>
           </div>
 
-          <div className="flex gap-6 mt-8 border-b border-slate-200 pb-px">
+          <div className="flex items-center gap-6 mt-8 border-b border-slate-200 pb-px overflow-x-auto">
+            <Link
+              href={`/instructor-management/questions-bank/${subjectId}`}
+              className="pb-3 text-sm font-medium transition border-b-2 border-transparent text-slate-500 hover:text-slate-900 flex items-center gap-2 whitespace-nowrap"
+            >
+              <HelpCircle size={18} />
+              Ngân hàng câu hỏi
+            </Link>
+
+            <span className="h-4 w-px bg-slate-200 -mt-3 hidden sm:inline-block" />
+
             <button
               onClick={() => setActiveTab("QUIZZES")}
-              className={`pb-3 text-sm font-medium transition border-b-2 ${activeTab === "QUIZZES"
-                ? "border-blue-600 text-blue-600"
-                : "border-transparent text-slate-500 hover:text-slate-800"
+              className={`pb-3 text-sm font-medium transition border-b-2 flex items-center gap-2 whitespace-nowrap ${activeTab === "QUIZZES"
+                  ? "border-blue-600 text-blue-600 font-semibold"
+                  : "border-transparent text-slate-500 hover:text-slate-800"
                 }`}
             >
+              <FileText size={18} />
               Danh sách Bài thi ({quizzes.length})
             </button>
+
             <button
               onClick={() => setActiveTab("POOLS")}
-              className={`pb-3 text-sm font-medium transition border-b-2 ${activeTab === "POOLS"
-                ? "border-blue-600 text-blue-600"
-                : "border-transparent text-slate-500 hover:text-slate-800"
+              className={`pb-3 text-sm font-medium transition border-b-2 whitespace-nowrap ${activeTab === "POOLS"
+                  ? "border-blue-600 text-blue-600 font-semibold"
+                  : "border-transparent text-slate-500 hover:text-slate-800"
                 }`}
             >
-              Kho câu hỏi
+              Kho câu hỏi (Pools)
             </button>
           </div>
         </div>
@@ -210,7 +221,25 @@ export default function SubjectDetailPage({
                         <tr key={qz.quiz_id} className="hover:bg-slate-50/50 transition">
                           <td className="p-4">
                             <p className="font-medium text-slate-900">{qz.title}</p>
-                            <span className="text-[11px] text-slate-500">Mã: {qz.quiz_id}</span>
+
+                            {/* 🟢 HIỂN THỊ CÁC BADGE ĐÁNH DẤU */}
+                            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                              <span className="text-[11px] text-slate-500 font-mono">Mã: {qz.quiz_id}</span>
+
+                              {qz.is_peer_review && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-purple-50 text-purple-700 border border-purple-200">
+                                  <Users size={12} />
+                                  Chấm chéo
+                                </span>
+                              )}
+
+                              {qz.target_lesson_id && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200" title={`Mã bài học: ${qz.target_lesson_id}`}>
+                                  <Link2 size={12} />
+                                  Đã gắn bài học
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className="p-4">
                             <span className="text-slate-600">
@@ -269,7 +298,6 @@ export default function SubjectDetailPage({
         onSuccess={handleCreateQuizSuccess}
       />
 
-      {/* 🟢 ĐÃ SỬA: Đã truyền thêm subjectId={subjectId} */}
       <EditQuizModal
         quiz={editingQuiz}
         subjectId={subjectId}

@@ -11,6 +11,7 @@ export interface UserDataInfo {
 export interface ProfileInfo {
     firstname: string;
     lastname: string;
+    birthdate: string;
     bio: string;
     avatar_url: string
 }

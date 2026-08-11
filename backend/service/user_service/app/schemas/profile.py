@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from uuid import UUID
+from datetime import date
 
 class ProfileUpdate(BaseModel):
     firstname: str | None = None
@@ -17,6 +18,7 @@ class ProfileCreate(BaseModel):
 class ProfileInfo(BaseModel):
     firstname: str | None = None
     lastname: str | None = None
+    birthdate: date | None = None
     bio: str | None = None
     avatar_url: str | None = None
 

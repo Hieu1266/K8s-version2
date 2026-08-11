@@ -42,9 +42,13 @@ export default function QuestionCard({
   };
 
   const typeInfo = getTypeBadge();
-  
+
   // Hiển thị phương án cho cả Trắc nghiệm & Đúng/Sai nếu có
   const showOptions = (isMultipleChoice || isTrueFalse) && question.options && question.options.length > 0;
+
+  // Hiển thị rubric cho câu hỏi Tự luận (ESSAY) - dữ liệu trả về từ QuestionResponse.rubrics
+  const isEssay = !isMultipleChoice && !isTrueFalse;
+  const showRubrics = isEssay && question.rubrics && question.rubrics.length > 0;
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm hover:shadow-md transition-shadow">
@@ -79,18 +83,16 @@ export default function QuestionCard({
               {question.options!.map((opt, optIdx) => (
                 <div
                   key={opt.option_id || optIdx}
-                  className={`flex items-center gap-2 p-2.5 rounded-lg border text-sm ${
-                    opt.is_correct
-                      ? "border-emerald-300 bg-emerald-50/50 text-emerald-900 font-medium"
-                      : "border-slate-200 bg-slate-50 text-slate-700"
-                  }`}
+                  className={`flex items-center gap-2 p-2.5 rounded-lg border text-sm ${opt.is_correct
+                    ? "border-emerald-300 bg-emerald-50/50 text-emerald-900 font-medium"
+                    : "border-slate-200 bg-slate-50 text-slate-700"
+                    }`}
                 >
                   <span
-                    className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${
-                      opt.is_correct
-                        ? "bg-emerald-600 text-white"
-                        : "bg-slate-200 text-slate-600"
-                    }`}
+                    className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${opt.is_correct
+                      ? "bg-emerald-600 text-white"
+                      : "bg-slate-200 text-slate-600"
+                      }`}
                   >
                     {String.fromCharCode(65 + optIdx)} {/* A, B, C, D */}
                   </span>
@@ -100,6 +102,42 @@ export default function QuestionCard({
                       (Đúng)
                     </span>
                   )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Hiển thị Rubric cho câu hỏi Tự luận */}
+          {showRubrics && (
+            <div className="mt-4 space-y-2 pt-3 border-t border-slate-100">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                Thang đánh giá
+              </span>
+              {question.rubrics!.map((criterion, cIdx) => (
+                <div
+                  key={criterion.criteria_id || cIdx}
+                  className="flex items-start gap-2.5 p-2.5 rounded-lg border border-purple-100 bg-purple-50/40"
+                >
+                  <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-purple-600 text-white text-xs font-bold shrink-0">
+                    {cIdx + 1}
+                  </span>
+                  <div className="flex-1 space-y-0.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-semibold text-slate-800">
+                        {criterion.title}
+                      </span>
+                      <span className="text-xs font-bold text-purple-700 whitespace-nowrap">
+                        {criterion.max_score != null
+                          ? `${criterion.max_score} điểm`
+                          : criterion.percentage != null
+                            ? `${criterion.percentage}%`
+                            : ""}
+                      </span>
+                    </div>
+                    {criterion.description && (
+                      <p className="text-xs text-slate-600">{criterion.description}</p>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

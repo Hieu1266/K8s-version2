@@ -6,9 +6,10 @@ from app.models.question_pool_link import QuestionPoolLink
 from app.schemas.question_pool import QuestionPoolCreate, QuestionPoolUpdate
 
 class CRUDQuestionPool(CRUDBase[QuestionPool, QuestionPoolCreate, QuestionPoolUpdate, UUID]):
-    def is_title_existed(self, db: Session, title: str):
+    def is_title_existed(self, db: Session, title: str, subject_id: UUID):
         statement = select(QuestionPool).where(
-            QuestionPool.title == title
+            QuestionPool.title == title,
+            QuestionPool.subject_id == subject_id
         )
         return db.exec(statement).first() is not None
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import { getFeaturedCourses } from '@/actions/getCourse';
 import { GeneralCourseInfo } from '@/types/course';
@@ -9,6 +10,7 @@ import { GeneralCourseInfo } from '@/types/course';
 export default function LandingPage() {
   const [topCourses, setTopCourses] = useState<GeneralCourseInfo[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const router = useRouter();
 
   // Gọi API lấy Top 5 khóa học nổi bật
   useEffect(() => {
@@ -27,6 +29,25 @@ export default function LandingPage() {
 
     fetchCourses();
   }, []);
+
+  // Xử lý khi click vào nút "Bắt đầu ngay"
+  const handleGetStarted = (e: React.MouseEvent) => {
+    e.preventDefault();
+
+    // 1. Kiểm tra sự tồn tại của Cookie 'token'
+    const hasTokenCookie = document.cookie
+      .split('; ')
+      .some((item) => item.trim().startsWith('token='));
+
+    // 2. Kiểm tra thêm localStorage (Dự phòng trường hợp token là HttpOnly cookie nên JS không đọc được)
+    const isLoggedInStorage = localStorage.getItem('isLoggedIn') === 'true';
+
+    if (hasTokenCookie || isLoggedInStorage) {
+      router.push('/dashboard-student');
+    } else {
+      router.push('/login?mode=register');
+    }
+  };
 
   const featuredCourse = topCourses[0];
   const remainingCourses = topCourses.slice(1, 5);
@@ -51,12 +72,13 @@ export default function LandingPage() {
           </p>
 
           <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-3">
-            <Link
-              href="/login?mode=register"
-              className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm px-7 py-3.5 rounded-lg shadow-sm transition"
+            {/* ĐÃ SỬA: Thay Link thành button kèm sự kiện handleGetStarted */}
+            <button
+              onClick={handleGetStarted}
+              className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm px-7 py-3.5 rounded-lg shadow-sm transition cursor-pointer"
             >
               Bắt đầu ngay
-            </Link>
+            </button>
             <Link
               href="/home"
               className="w-full sm:w-auto bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-sm px-6 py-3.5 rounded-lg transition"

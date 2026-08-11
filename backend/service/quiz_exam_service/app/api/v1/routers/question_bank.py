@@ -14,7 +14,7 @@ from app.schemas.question_bank import (
     QuestionUpdateWrapper,
 )
 
-router = APIRouter(prefix="/questions", tags=["Question Bank"])
+router = APIRouter(prefix="/questions-bank", tags=["Question Bank"])
 
 
 @router.post("/", response_model=QuestionResponse, status_code=status.HTTP_201_CREATED)

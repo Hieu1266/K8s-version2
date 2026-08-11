@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, HTTPException, status, Depends, Response
 from sqlmodel import select
 from typing import List
 from app.api.v1.deps import SessionDep
@@ -249,3 +249,20 @@ def get_name_by_id(
     user_id: UUID
 ):
     return crud_user.get_name_by_id(db, user_id)
+
+@router.post("/logout")
+def logout(response: Response):
+    # 1. Xóa cookie token (HttpOnly)
+    response.delete_cookie(
+        key="token",
+        path="/",
+        httponly=True,
+        samesite="lax",  # Hoặc "none" nếu Frontend & Backend khác Domain/HTTPS
+        secure=False     # Đổi thành True nếu hệ thống chạy trên HTTPS
+    )
+    
+    # 2. Xóa các cookie phụ khác (nếu có set từ backend)
+    response.delete_cookie(key="user_info", path="/")
+    response.delete_cookie(key="user_role", path="/")
+
+    return {"message": "Đăng xuất thành công!"}

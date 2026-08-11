@@ -1,6 +1,6 @@
 import React from "react";
 import { SubjectInfo } from "@/types/questions-bank";
-import { BookOpen, User, Layers, CheckCircle2, FileText } from "lucide-react";
+import { BookOpen, Layers, CheckCircle2, HelpCircle } from "lucide-react";
 
 interface SubjectInfoProps {
   subject: SubjectInfo;
@@ -26,23 +26,14 @@ export default function SubjectInfoComponent({ subject }: SubjectInfoProps) {
         </div>
       </div>
 
-      {/* Thông tin chi tiết dạng Grid 2x2 cân đối */}
-      <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-100 text-xs">
+      {/* Thông tin chi tiết */}
+      <div className="grid grid-cols-3 gap-4 pt-4 border-t border-slate-100 text-xs">
         <div className="space-y-1">
           <span className="text-slate-400 font-bold uppercase tracking-wider text-[10px] flex items-center gap-1.5">
-            <FileText size={12} className="text-slate-400" /> Mã môn học
+            <HelpCircle size={12} className="text-slate-400" /> Tổng câu hỏi
           </span>
           <p className="font-bold text-slate-800 text-sm">
-            {subject.code || subject.subject_id?.substring(0, 8).toUpperCase()}
-          </p>
-        </div>
-
-        <div className="space-y-1">
-          <span className="text-slate-400 font-bold uppercase tracking-wider text-[10px] flex items-center gap-1.5">
-            <User size={12} className="text-slate-400" /> Giảng viên
-          </span>
-          <p className="font-bold text-slate-800 text-sm">
-            {subject.instructor || "Chưa phân công"}
+            {subject.totalQuestions || 0} câu hỏi
           </p>
         </div>
 

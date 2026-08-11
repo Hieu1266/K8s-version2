@@ -219,4 +219,11 @@ class CRUDCourseEnrollment(CRUDBase[CourseEnrollment, CourseEnrollmentCreate, Co
             for row in results
         ]
 
+    def get_users_in_progress(self, db: Session, course_id: UUID) -> int:
+        statement = select(func.count(CourseEnrollment.enrollment_id)).where(
+            CourseEnrollment.course_id == course_id,
+            CourseEnrollment.is_completed == False
+        )
+        return db.exec(statement).first() or 0
+
 crud_course_enrollment = CRUDCourseEnrollment(CourseEnrollment)

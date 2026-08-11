@@ -1,4 +1,3 @@
-
 from pydantic import BaseModel, Field
 from typing import List, Optional
 from uuid import UUID
@@ -13,13 +12,15 @@ class RubricCriteriaCreate(RubricCriteriaBase):
 
 class RubricCriteriaResponse(BaseModel):
     criteria_id: UUID
-    question_id: UUID
+    question_id: Optional[UUID] = None
     title: str
     description: Optional[str] = ""
-    max_score: float
+    percentage: float = 0.0
+    max_score: Optional[float] = None
 
     class Config:
         from_attributes = True
+        populate_by_name = True
 
 # --- OPTION SCHEMAS ---
 class OptionBase(BaseModel):
@@ -44,8 +45,14 @@ class QuestionCreate(BaseModel):
     question_type: str
     max_points: float = 10.0
     rubrics: Optional[List[RubricCriteriaCreate]] = []
-    options: Optional[List[dict]] = []  
-    
+    options: Optional[List[dict]] = []
+
+    class Config:
+        # Phòng ngừa lỗi tương tự update: nếu sau này thêm field optional mới
+        # khiến model không còn field bắt buộc nào, việc cấm field lạ vẫn giữ
+        # cho Union luôn chọn đúng QuestionCreateWrapper.
+        extra = "forbid"
+
 class QuestionCreateWrapper(BaseModel):
     question: QuestionCreate
 
@@ -56,6 +63,9 @@ class QuestionUpdate(BaseModel):
     max_points: Optional[float] = None
     options: Optional[List[OptionCreate]] = None
     rubrics: Optional[List[RubricCriteriaCreate]] = None
+
+    class Config:
+        extra = "forbid"
 
 class QuestionUpdateWrapper(BaseModel):
     question: QuestionUpdate
@@ -68,7 +78,9 @@ class QuestionResponse(BaseModel):
     question_type: str
     max_points: float
     options: List[OptionResponse] = []
-    rubrics: List[RubricCriteriaResponse] = []
+    rubrics: List[RubricCriteriaResponse] = Field(
+        default_factory=list, alias="rubric_criterias"
+    )
 
     class Config:
         from_attributes = True

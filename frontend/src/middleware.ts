@@ -22,7 +22,7 @@ export function middleware(request: NextRequest) {
     '/training-management',
     '/dashboard-student',
     '/instructor-management',
-    '/home' 
+    '/home'
   ].some(p => path.startsWith(p))
 
   if (isProtectedPath && !token) {
@@ -37,7 +37,7 @@ export function middleware(request: NextRequest) {
       console.log(`❌ Bị chặn vì: Có Token nhưng không tìm thấy Cookie "user_role"`);
       return NextResponse.redirect(new URL('/unauthorized', request.url))
     }
-    
+
     if (path.startsWith('/admin') && roleClean !== 'admin') {
       console.log(`❌ Bị chặn vì: Vào khu vực Admin nhưng Role là "${roleClean}"`);
       return NextResponse.redirect(new URL('/unauthorized', request.url))
@@ -88,6 +88,5 @@ export const config = {
     '/dashboard-student/:path*',
     '/instructor-management',
     '/instructor-management/:path*',
-
   ],
 }

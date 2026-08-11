@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  devIndicators: false,
   output: "standalone",
   // Bỏ qua lỗi TypeScript khi build Docker
   typescript: {

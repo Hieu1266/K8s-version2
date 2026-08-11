@@ -107,13 +107,35 @@ export async function getSubjectDetailAction(
 }
 
 
+export async function getQuestionDetailAction(
+  questionId: string,
+  token?: string
+): Promise<Question | null> {
+  try {
+    const headers = await getAuthHeaders(token);
+    const res = await fetch(`${EXAM_QUIZ_URL}/questions-bank/${questionId}`, {
+      method: "GET",
+      headers,
+      cache: "no-store",
+    });
+
+    if (!res.ok) return null;
+
+    const data = await res.json();
+    return mapQuestion(data);
+  } catch (error) {
+    return null;
+  }
+}
+
+
 export async function getQuestionsBySubjectAction(
   subjectId: string,
   token?: string
 ): Promise<Question[] | null> {
   try {
     const headers = await getAuthHeaders(token);
-    const res = await fetch(`${EXAM_QUIZ_URL}/questions/get-list/${subjectId}`, {
+    const res = await fetch(`${EXAM_QUIZ_URL}/questions-bank/get-list/${subjectId}`, {
       method: "GET",
       headers,
       cache: "no-store",
@@ -138,10 +160,11 @@ export async function saveQuestionAction(
   try {
     const isUpdate = Boolean(question.question_id && question.question_id !== "");
     const url = isUpdate
-      ? `${EXAM_QUIZ_URL}/questions/${question.question_id}`
-      : `${EXAM_QUIZ_URL}/questions/`;
+      ? `${EXAM_QUIZ_URL}/questions-bank/${question.question_id}`
+      : `${EXAM_QUIZ_URL}/questions-bank/`;
 
-    const method = isUpdate ? "PATCH" : "POST";
+    // 🎯 Backend router (question_bank.py) expose PUT cho update, không phải PATCH
+    const method = isUpdate ? "PUT" : "POST";
 
     const body: Record<string, any> = {
       question_title: question.question_title ?? "",
@@ -185,10 +208,6 @@ export async function saveQuestionAction(
       question: body,
     };
 
-    if (!isUpdate && body.options && body.options.length > 0) {
-      fullPayload.question_opts = body.options;
-    }
-
     console.log("==========================================");
     console.log(`🚀 [NEXT.JS SERVER] GỬI REQUEST: ${method} -> ${url}`);
     console.log("📦 [NEXT.JS SERVER] PAYLOAD:", JSON.stringify(fullPayload, null, 2));
@@ -231,7 +250,7 @@ export async function deleteQuestionAction(
   token?: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const url = `${EXAM_QUIZ_URL}/questions/${questionId}`;
+    const url = `${EXAM_QUIZ_URL}/questions-bank/${questionId}`;
     const headers = await getAuthHeaders(token);
 
     console.log("==========================================");

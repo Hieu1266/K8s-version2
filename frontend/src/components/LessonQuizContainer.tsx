@@ -147,9 +147,9 @@ export function QuizSection({ lessonId, onQuizPassed }: { lessonId: string; onQu
     // ---------------- LOADING TRẠNG THÁI BAN ĐẦU ----------------
     if (statusLoading) {
         return (
-            <div className="bg-white border border-[#ECEAF0] rounded-2xl p-6 text-center">
-                <div className="w-5 h-5 mx-auto rounded-full border-2 border-[#E7E9F0] border-t-[#5B5FEF] animate-spin" />
-                <p className="text-xs text-[#8A8FA3] mt-3">Đang kiểm tra trạng thái bài thi...</p>
+            <div className="bg-white border border-[#ECEAF0] rounded-2xl p-8 text-center">
+                <div className="w-6 h-6 mx-auto rounded-full border-2 border-[#E7E9F0] border-t-[#5B5FEF] animate-spin" />
+                <p className="text-sm text-[#8A8FA3] mt-3">Đang kiểm tra trạng thái bài thi...</p>
             </div>
         );
     }
@@ -160,14 +160,14 @@ export function QuizSection({ lessonId, onQuizPassed }: { lessonId: string; onQu
 
         if (isPendingGrading) {
             return (
-                <div className="bg-white border border-[#ECEAF0] rounded-2xl p-6 text-center space-y-4">
-                    <div className="w-16 h-16 rounded-full bg-[#FEF3C7] text-[#D97706] flex items-center justify-center mx-auto text-2xl font-bold">⏳</div>
-                    <h3 className="font-display text-xl font-bold text-[#161826]">Đã nộp bài thành công!</h3>
-                    <p className="text-xs text-[#565A70] max-w-md mx-auto leading-relaxed">
+                <div className="bg-white border border-[#ECEAF0] rounded-2xl p-10 text-center space-y-5">
+                    <div className="w-20 h-20 rounded-full bg-[#FEF3C7] text-[#D97706] flex items-center justify-center mx-auto text-3xl font-bold">⏳</div>
+                    <h3 className="font-display text-2xl font-bold text-[#161826]">Đã nộp bài thành công!</h3>
+                    <p className="text-sm text-[#565A70] max-w-lg mx-auto leading-relaxed">
                         Bài làm của bạn chứa câu hỏi tự luận và đang chờ giảng viên chấm điểm. Kết quả sẽ được cập nhật sau khi hoàn tất.
                     </p>
                     <div className="pt-2">
-                        <span className="inline-block text-[11px] font-semibold text-[#D97706] bg-[#FFFBEB] border border-[#FDE68A] px-3 py-1.5 rounded-full">
+                        <span className="inline-block text-xs font-semibold text-[#D97706] bg-[#FFFBEB] border border-[#FDE68A] px-4 py-2 rounded-full">
                             Trạng thái: Đang chờ chấm điểm
                         </span>
                     </div>
@@ -176,28 +176,28 @@ export function QuizSection({ lessonId, onQuizPassed }: { lessonId: string; onQu
         }
 
         return (
-            <div className="bg-white border border-[#ECEAF0] rounded-2xl p-6 text-center space-y-4">
-                <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto text-2xl font-bold ${result.is_passed ? 'bg-[#E6F8F3] text-[#12B886]' : 'bg-[#FDE8E8] text-[#E5484D]'}`}>
+            <div className="bg-white border border-[#ECEAF0] rounded-2xl p-10 text-center space-y-5">
+                <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto text-3xl font-bold ${result.is_passed ? 'bg-[#E6F8F3] text-[#12B886]' : 'bg-[#FDE8E8] text-[#E5484D]'}`}>
                     {result.is_passed ? '✓' : '✕'}
                 </div>
-                <h3 className="font-display text-xl font-bold text-[#161826]">
+                <h3 className="font-display text-2xl font-bold text-[#161826]">
                     {result.is_passed ? 'Chúc mừng! Bạn đã đạt bài kiểm tra' : 'Chưa đạt yêu cầu'}
                 </h3>
-                <p className="text-sm text-[#565A70]">
+                <p className="text-base text-[#565A70]">
                     Điểm số của bạn: <strong className="text-[#161826]">{result.total_score}</strong>
                 </p>
                 {result.next_lesson_unlocked && (
-                    <p className="text-xs text-[#12B886] font-bold">🎉 Bài học tiếp theo đã được mở khóa!</p>
+                    <p className="text-sm text-[#12B886] font-bold">🎉 Bài học tiếp theo đã được mở khóa!</p>
                 )}
 
                 {/* NÚT LÀM LẠI BÀI THI KHI CHƯA ĐẠT (VỪA NỘP XONG) */}
                 {!result.is_passed && (
-                    <div className="pt-2">
-                        {error && <p className="text-xs text-[#E5484D] font-medium mb-2">{error}</p>}
+                    <div className="pt-2 max-w-xs mx-auto">
+                        {error && <p className="text-sm text-[#E5484D] font-medium mb-2">{error}</p>}
                         <button
                             onClick={handleStartQuiz}
                             disabled={loading}
-                            className="w-full bg-[#5B5FEF] hover:bg-[#4B4FEF] text-white text-xs font-bold py-3 rounded-full transition-transform hover:scale-[1.01] disabled:opacity-50"
+                            className="w-full bg-[#5B5FEF] hover:bg-[#4B4FEF] text-white text-sm font-bold py-3.5 rounded-full transition-transform hover:scale-[1.01] disabled:opacity-50"
                         >
                             {loading ? 'Đang chuẩn bị đề thi...' : 'Làm lại bài thi'}
                         </button>
@@ -212,14 +212,14 @@ export function QuizSection({ lessonId, onQuizPassed }: { lessonId: string; onQu
         const isGraded = initialStatus.status === SubmissionStatus.GRADED;
 
         return (
-            <div className="bg-white border border-[#ECEAF0] rounded-2xl p-6 space-y-6">
-                <div className="border-b border-[#ECEAF0] pb-4 flex justify-between items-center">
+            <div className="bg-white border border-[#ECEAF0] rounded-2xl p-8 space-y-7">
+                <div className="border-b border-[#ECEAF0] pb-5 flex justify-between items-center">
                     <div>
-                        <h3 className="font-display text-lg font-bold text-[#161826]">{initialStatus.title}</h3>
-                        <span className="text-[11px] text-[#8A8FA3]">Lần thử: #{initialStatus.attempt_number}</span>
+                        <h3 className="font-display text-xl font-bold text-[#161826]">{initialStatus.title}</h3>
+                        <span className="text-xs text-[#8A8FA3]">Lần thử: #{initialStatus.attempt_number}</span>
                     </div>
                     <span
-                        className={`text-[11px] font-semibold px-3 py-1.5 rounded-full ${isGraded
+                        className={`text-xs font-semibold px-4 py-2 rounded-full ${isGraded
                             ? initialStatus.is_passed
                                 ? 'text-[#12B886] bg-[#E6F8F3] border border-[#B7EBDD]'
                                 : 'text-[#E5484D] bg-[#FDE8E8] border border-[#F6C1C3]'
@@ -231,34 +231,35 @@ export function QuizSection({ lessonId, onQuizPassed }: { lessonId: string; onQu
                 </div>
 
                 {isGraded && (
-                    <p className="text-sm text-[#565A70]">
+                    <p className="text-base text-[#565A70]">
                         Điểm tổng: <strong className="text-[#161826]">{initialStatus.total_score}</strong>
                     </p>
                 )}
 
-                <div className="space-y-6">
+                <div className="space-y-7">
                     {initialStatus.questions.map((q, idx) => (
-                        <div key={q.detail_id} className="p-4 rounded-xl border border-[#F0F0F5] bg-[#FBFBFD] space-y-3">
+                        <div key={q.detail_id} className="p-5 rounded-xl border border-[#F0F0F5] bg-[#FBFBFD] space-y-4">
                             <div className="flex justify-between items-center">
-                                <span className="text-xs font-bold text-[#161826]">
+                                <span className="text-sm font-bold text-[#161826]">
                                     Câu {idx + 1}: {q.question_title}
                                 </span>
                                 {isGraded && q.score_earned !== null && q.score_earned !== undefined && (
-                                    <span className="text-[11px] font-bold text-[#5B5FEF]">
+                                    <span className="text-sm font-bold text-[#5B5FEF]">
                                         {q.score_earned}/{q.max_points} điểm
                                     </span>
                                 )}
                             </div>
 
                             {q.body_content && (
-                                <div className="text-xs text-[#565A70]" dangerouslySetInnerHTML={{ __html: q.body_content }} />
+                                <div className="text-sm text-[#565A70]" dangerouslySetInnerHTML={{ __html: q.body_content }} />
                             )}
 
                             {(q.question_type === QuestionType.MULTIPLE_CHOICE || q.question_type === QuestionType.TRUE_FALSE) && (
-                                <div className="space-y-2 pt-1">
+                                <div className="space-y-2.5 pt-1">
                                     {q.options.map((opt) => {
                                         const isSelected = q.selected_option_id === opt.option_id;
                                         let styleClass = 'border-[#ECEAF0] bg-white text-[#2B2D3D]';
+
                                         if (isGraded && opt.is_correct) {
                                             styleClass = 'border-[#12B886] bg-[#E6F8F3] text-[#0B8F63]';
                                         } else if (isGraded && isSelected && !opt.is_correct) {
@@ -270,12 +271,12 @@ export function QuizSection({ lessonId, onQuizPassed }: { lessonId: string; onQu
                                         return (
                                             <label
                                                 key={opt.option_id}
-                                                className={`flex items-center gap-3 p-3 rounded-lg border text-xs font-medium ${styleClass}`}
+                                                className={`flex items-center gap-3 p-3.5 rounded-lg border text-sm font-medium ${styleClass}`}
                                             >
-                                                <input type="radio" checked={isSelected} disabled readOnly className="accent-[#5B5FEF]" />
+                                                <input type="radio" checked={isSelected} disabled readOnly className="accent-[#5B5FEF] w-4 h-4" />
                                                 <span>{opt.option_text}</span>
                                                 {isGraded && opt.is_correct && (
-                                                    <span className="ml-auto text-[10px] font-bold text-[#12B886]">Đáp án đúng</span>
+                                                    <span className="ml-auto text-xs font-bold text-[#12B886]">Đáp án đúng</span>
                                                 )}
                                             </label>
                                         );
@@ -289,12 +290,12 @@ export function QuizSection({ lessonId, onQuizPassed }: { lessonId: string; onQu
                                     readOnly
                                     disabled
                                     value={q.essay_answer_text || 'Bạn chưa trả lời câu này.'}
-                                    className="w-full text-xs p-3 bg-[#F7F8FB] border border-[#ECEAF0] rounded-xl text-[#565A70]"
+                                    className="w-full text-sm p-3.5 bg-[#F7F8FB] border border-[#ECEAF0] rounded-xl text-[#565A70]"
                                 />
                             )}
 
                             {isGraded && q.teacher_feedback && (
-                                <div className="text-[11px] text-[#565A70] bg-[#F7F8FB] border border-[#ECEAF0] rounded-lg p-2.5">
+                                <div className="text-sm text-[#565A70] bg-[#F7F8FB] border border-[#ECEAF0] rounded-lg p-3.5">
                                     <span className="font-bold text-[#161826]">Nhận xét của giảng viên: </span>
                                     {q.teacher_feedback}
                                 </div>
@@ -305,12 +306,12 @@ export function QuizSection({ lessonId, onQuizPassed }: { lessonId: string; onQu
 
                 {/* NÚT LÀM LẠI BÀI THI KHI XEM TRẠNG THÁI CŨ LÀ CHƯA ĐẠT */}
                 {isGraded && !initialStatus.is_passed && (
-                    <div className="pt-4 border-t border-[#ECEAF0]">
-                        {error && <p className="text-xs text-[#E5484D] font-medium mb-2">{error}</p>}
+                    <div className="pt-5 border-t border-[#ECEAF0] max-w-xs mx-auto">
+                        {error && <p className="text-sm text-[#E5484D] font-medium mb-2">{error}</p>}
                         <button
                             onClick={handleStartQuiz}
                             disabled={loading}
-                            className="w-full bg-[#5B5FEF] hover:bg-[#4B4FEF] text-white text-xs font-bold py-3 rounded-full transition-transform hover:scale-[1.01] disabled:opacity-50"
+                            className="w-full bg-[#5B5FEF] hover:bg-[#4B4FEF] text-white text-sm font-bold py-3.5 rounded-full transition-transform hover:scale-[1.01] disabled:opacity-50"
                         >
                             {loading ? 'Đang chuẩn bị đề thi...' : 'Làm lại bài thi'}
                         </button>
@@ -323,18 +324,18 @@ export function QuizSection({ lessonId, onQuizPassed }: { lessonId: string; onQu
     // ---------------- MÀN HÌNH CHƯA LÀM BÀI (status = null) ----------------
     if (!quizData) {
         return (
-            <div className="bg-white border border-[#ECEAF0] rounded-2xl p-6 space-y-4">
-                <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-[#FDF3DA] text-[#9A6B00] inline-block">
+            <div className="bg-white border border-[#ECEAF0] rounded-2xl p-10 space-y-5 max-w-xl mx-auto text-center">
+                <span className="text-xs font-bold px-3 py-1.5 rounded-full bg-[#FDF3DA] text-[#9A6B00] inline-block">
                     Bài kiểm tra đánh giá
                 </span>
-                <h3 className="font-display text-lg font-bold text-[#161826]">Sẵn sàng làm bài kiểm tra</h3>
+                <h3 className="font-display text-2xl font-bold text-[#161826]">Sẵn sàng làm bài kiểm tra</h3>
                 {(error || statusError) && (
-                    <p className="text-xs text-[#E5484D] font-medium">{error || statusError}</p>
+                    <p className="text-sm text-[#E5484D] font-medium">{error || statusError}</p>
                 )}
                 <button
                     onClick={handleStartQuiz}
                     disabled={loading}
-                    className="w-full bg-[#5B5FEF] hover:bg-[#4B4FEF] text-white text-xs font-bold py-3 rounded-full transition-transform hover:scale-[1.01] disabled:opacity-50"
+                    className="w-full bg-[#5B5FEF] hover:bg-[#4B4FEF] text-white text-sm font-bold py-3.5 rounded-full transition-transform hover:scale-[1.01] disabled:opacity-50"
                 >
                     {loading ? 'Đang chuẩn bị đề thi...' : 'Bắt đầu làm bài'}
                 </button>
@@ -344,39 +345,39 @@ export function QuizSection({ lessonId, onQuizPassed }: { lessonId: string; onQu
 
     // ---------------- MÀN HÌNH ĐANG LÀM BÀI (mới bắt đầu hoặc IN_PROGRESS được khôi phục) ----------------
     return (
-        <div className="bg-white border border-[#ECEAF0] rounded-2xl p-6 space-y-6">
-            <div className="border-b border-[#ECEAF0] pb-4 flex justify-between items-center">
+        <div className="bg-white border border-[#ECEAF0] rounded-2xl p-8 space-y-7">
+            <div className="border-b border-[#ECEAF0] pb-5 flex justify-between items-center">
                 <div>
-                    <h3 className="font-display text-lg font-bold text-[#161826]">{quizData.title}</h3>
-                    <span className="text-[11px] text-[#8A8FA3]">Lần thử: #{quizData.attempt_number}</span>
+                    <h3 className="font-display text-xl font-bold text-[#161826]">{quizData.title}</h3>
+                    <span className="text-xs text-[#8A8FA3]">Lần thử: #{quizData.attempt_number}</span>
                 </div>
-                {submitting && <span className="text-xs text-[#5B5FEF] font-bold animate-pulse">Đang nộp bài...</span>}
+                {submitting && <span className="text-sm text-[#5B5FEF] font-bold animate-pulse">Đang nộp bài...</span>}
             </div>
 
-            <div className="space-y-6">
+            <div className="space-y-7">
                 {quizData.questions.map((q, idx) => (
-                    <div key={q.detail_id} className="p-4 rounded-xl border border-[#F0F0F5] bg-[#FBFBFD] space-y-3">
+                    <div key={q.detail_id} className="p-5 rounded-xl border border-[#F0F0F5] bg-[#FBFBFD] space-y-4">
                         <div className="flex justify-between items-center">
-                            <span className="text-xs font-bold text-[#161826]">
+                            <span className="text-sm font-bold text-[#161826]">
                                 Câu {idx + 1}: {q.question_title}
                             </span>
                             {savingDetailId === q.detail_id && (
-                                <span className="text-[10px] text-[#5B5FEF] font-semibold animate-pulse">Đang lưu...</span>
+                                <span className="text-xs text-[#5B5FEF] font-semibold animate-pulse">Đang lưu...</span>
                             )}
                         </div>
 
                         {q.body_content && (
-                            <div className="text-xs text-[#565A70]" dangerouslySetInnerHTML={{ __html: q.body_content }} />
+                            <div className="text-sm text-[#565A70]" dangerouslySetInnerHTML={{ __html: q.body_content }} />
                         )}
 
                         {(q.question_type === QuestionType.MULTIPLE_CHOICE || q.question_type === QuestionType.TRUE_FALSE) && (
-                            <div className="space-y-2 pt-1">
+                            <div className="space-y-2.5 pt-1">
                                 {q.options.map((opt) => {
                                     const isChecked = answers[q.detail_id]?.optionId === opt.option_id;
                                     return (
                                         <label
                                             key={opt.option_id}
-                                            className={`flex items-center gap-3 p-3 rounded-lg border text-xs font-medium cursor-pointer transition-all ${isChecked
+                                            className={`flex items-center gap-3 p-3.5 rounded-lg border text-sm font-medium cursor-pointer transition-all ${isChecked
                                                 ? 'border-[#5B5FEF] bg-[#EEF0FE] text-[#3F3FC9]'
                                                 : 'border-[#ECEAF0] bg-white text-[#2B2D3D] hover:bg-[#FAFAFD]'
                                                 }`}
@@ -387,7 +388,7 @@ export function QuizSection({ lessonId, onQuizPassed }: { lessonId: string; onQu
                                                 value={opt.option_id}
                                                 checked={isChecked}
                                                 onChange={() => handleSelectOption(q.detail_id, opt.option_id)}
-                                                className="accent-[#5B5FEF]"
+                                                className="accent-[#5B5FEF] w-4 h-4"
                                             />
                                             <span>{opt.option_text}</span>
                                         </label>
@@ -400,7 +401,7 @@ export function QuizSection({ lessonId, onQuizPassed }: { lessonId: string; onQu
                             <textarea
                                 rows={4}
                                 placeholder="Nhập câu trả lời của bạn vào đây..."
-                                className="w-full text-xs p-3 bg-white border border-[#ECEAF0] rounded-xl focus:outline-none focus:border-[#5B5FEF]"
+                                className="w-full text-sm p-3.5 bg-white border border-[#ECEAF0] rounded-xl focus:outline-none focus:border-[#5B5FEF]"
                                 defaultValue={answers[q.detail_id]?.essayText || ''}
                                 onBlur={(e) => handleEssayBlur(q.detail_id, e.target.value)}
                             />
@@ -409,12 +410,12 @@ export function QuizSection({ lessonId, onQuizPassed }: { lessonId: string; onQu
                 ))}
             </div>
 
-            {error && <p className="text-xs text-[#E5484D] font-medium text-center">{error}</p>}
+            {error && <p className="text-sm text-[#E5484D] font-medium text-center">{error}</p>}
 
             <button
                 onClick={handleSubmit}
                 disabled={submitting}
-                className="w-full bg-[#12B886] hover:bg-[#0EA275] text-white text-xs font-bold py-3 rounded-full transition-all disabled:opacity-50"
+                className="w-full bg-[#12B886] hover:bg-[#0EA275] text-white text-sm font-bold py-3.5 rounded-full transition-all disabled:opacity-50"
             >
                 {submitting ? 'Đang gửi bài làm...' : 'Nộp bài thi'}
             </button>

@@ -52,14 +52,25 @@ class CRUDQuestionBank:
                     if hasattr(opt, "model_dump")
                     else (opt if isinstance(opt, dict) else opt.__dict__)
                 )
-                opt_id_str = str(opt_dict.get("option_id") or chr(65 + idx))
-                
-                db_option = QuestionOption(
+
+                option_kwargs = dict(
                     question_id=db_question.question_id,
-                    option_id=opt_id_str,
                     option_text=opt_dict.get("option_text", ""),
                     is_correct=bool(opt_dict.get("is_correct", False)),
                 )
+                # 🎯 option_id trong DB là UUID (primary key). Client chỉ nên gửi
+                # option_id khi đó là UUID thật của option đã tồn tại. Với option
+                # mới, client thường gửi nhãn hiển thị ("A","B"...) hoặc không gửi
+                # gì -> bỏ qua, để default_factory=uuid.uuid4 của model tự sinh ID,
+                # tránh lỗi UUID parsing / lỗi insert vào cột UUID.
+                raw_option_id = opt_dict.get("option_id")
+                if raw_option_id:
+                    try:
+                        option_kwargs["option_id"] = UUID(str(raw_option_id))
+                    except (ValueError, AttributeError):
+                        pass  # nhãn hiển thị dạng chữ cái -> bỏ qua
+
+                db_option = QuestionOption(**option_kwargs)
                 db.add(db_option)
 
         db.commit()
@@ -117,17 +128,27 @@ class CRUDQuestionBank:
         # 3. Cập nhật Options nếu client truyền danh sách mới
         if "options" in update_data and update_data["options"] is not None:
             db.query(QuestionOption).filter(QuestionOption.question_id == db_obj.question_id).delete()
-            
+            db.flush()
+
             for idx, opt in enumerate(update_data["options"]):
                 opt_dict = opt if isinstance(opt, dict) else opt.model_dump()
-                opt_id_str = str(opt_dict.get("option_id") or chr(65 + idx))
 
-                db_option = QuestionOption(
+                option_kwargs = dict(
                     question_id=db_obj.question_id,
-                    option_id=opt_id_str,
                     option_text=opt_dict.get("option_text", ""),
                     is_correct=bool(opt_dict.get("is_correct", False)),
                 )
+                # 🎯 Giống create(): chỉ dùng option_id của client nếu là UUID thật
+                # (option cũ đang sửa lại). Option mới / nhãn chữ cái -> để model
+                # tự sinh UUID mới, tránh lỗi UUID parsing hoặc lỗi insert.
+                raw_option_id = opt_dict.get("option_id")
+                if raw_option_id:
+                    try:
+                        option_kwargs["option_id"] = UUID(str(raw_option_id))
+                    except (ValueError, AttributeError):
+                        pass
+
+                db_option = QuestionOption(**option_kwargs)
                 db.add(db_option)
 
         db.commit()

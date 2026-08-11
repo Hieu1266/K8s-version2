@@ -56,16 +56,16 @@ const roundToFixed = (num: number, decimals: number = 2): number => {
   return Math.round((num + Number.EPSILON) * factor) / factor;
 };
 
-const reindexOptions = (opts: OptionItem[]): OptionItem[] => {
-  return opts.map((opt, idx) => ({
-    ...opt,
-    option_id: String.fromCharCode(65 + idx),
-  }));
-};
+// 🎯 FIX: KHÔNG ghi đè option_id (UUID thật từ backend) bằng nhãn chữ cái nữa.
+// Nhãn A/B/C/D chỉ dùng để HIỂN THỊ theo vị trí (xem JSX bên dưới), option_id
+// giữ nguyên giá trị backend trả về (hoặc rỗng nếu là option mới chưa lưu).
+// Trước đây hàm này gán option_id = "A"/"B"... đè lên UUID thật -> khi submit
+// backend nhận "A" cho field UUID -> lỗi 422 "invalid UUID".
+const reindexOptions = (opts: OptionItem[]): OptionItem[] => opts;
 
 const DEFAULT_INITIAL_OPTIONS: OptionItem[] = [
-  { option_id: "A", option_text: "", is_correct: true },
-  { option_id: "B", option_text: "", is_correct: false },
+  { option_id: "", option_text: "", is_correct: true },
+  { option_id: "", option_text: "", is_correct: false },
 ];
 
 const DEFAULT_RUBRICS: RubricCriterionItem[] = [
@@ -89,7 +89,7 @@ export default function AddQuestionModal({
   useEffect(() => {
     if (editQuestion) {
       setContent(editQuestion.content || "");
-      
+
       // 🎯 1. CHUẨN HÓA CẢ CHỮ HOA VÀ CHỮ THƯỜNG CỦA QUESTION TYPE
       const rawType = editQuestion.question_type || "MULTIPLE_CHOICE";
       const normalizedType = String(rawType).toUpperCase();
@@ -107,9 +107,9 @@ export default function AddQuestionModal({
       }
 
       // 🎯 2. ĐỌC RUBRIC & TÍNH FALLBACK NẾU % HOẶC DIỂM BỊ BẰNG 0
-      const qRubrics = (editQuestion as unknown as { rubrics?: any[]; rubric_criteria?: any[] }).rubrics 
-                    || (editQuestion as unknown as { rubrics?: any[]; rubric_criteria?: any[] }).rubric_criteria;
-      
+      const qRubrics = (editQuestion as unknown as { rubrics?: any[]; rubric_criteria?: any[] }).rubrics
+        || (editQuestion as unknown as { rubrics?: any[]; rubric_criteria?: any[] }).rubric_criteria;
+
       if (qRubrics && Array.isArray(qRubrics) && qRubrics.length > 0) {
         setRubrics(
           qRubrics.map((r) => {
@@ -159,8 +159,8 @@ export default function AddQuestionModal({
     setQuestionType(upperType);
     if (upperType === "TRUE_FALSE") {
       setOptions([
-        { option_id: "A", option_text: "Đúng", is_correct: true },
-        { option_id: "B", option_text: "Sai", is_correct: false },
+        { option_id: "", option_text: "Đúng", is_correct: true },
+        { option_id: "", option_text: "Sai", is_correct: false },
       ]);
     } else if (upperType === "MULTIPLE_CHOICE" && options.length < 2) {
       setOptions(DEFAULT_INITIAL_OPTIONS);
@@ -177,7 +177,7 @@ export default function AddQuestionModal({
   };
 
   const handleAddOption = () => {
-    setOptions((prev) => reindexOptions([...prev, { option_id: "", option_text: "", is_correct: false }]));
+    setOptions((prev) => [...prev, { option_id: "", option_text: "", is_correct: false }]);
   };
 
   const handleRemoveOption = (index: number) => {
@@ -229,15 +229,15 @@ export default function AddQuestionModal({
   const handleScoreDirectChange = (index: number, inputScore: number) => {
     if (maxPoints <= 0) return;
     const calculatedPct = roundToFixed((inputScore / maxPoints) * 100, 1);
-    
+
     setRubrics(
       rubrics.map((item, i) =>
         i === index
           ? {
-              ...item,
-              percentage: Math.min(100, Math.max(0, calculatedPct)),
-              max_score: inputScore,
-            }
+            ...item,
+            percentage: Math.min(100, Math.max(0, calculatedPct)),
+            max_score: inputScore,
+          }
           : item
       )
     );
@@ -289,19 +289,19 @@ export default function AddQuestionModal({
       ...(normalizedType === "MULTIPLE_CHOICE" || normalizedType === "TRUE_FALSE"
         ? { options }
         : {
-            rubrics: rubrics.map((r) => {
-              const pct = Number(r.percentage) || 0;
-              const maxScore = roundToFixed((pct * maxPoints) / 100, 2);
-              return {
-                ...(r.criteria_id ? { criteria_id: r.criteria_id } : {}),
-                title: r.title,
-                description: r.description || "",
-                percentage: pct,
-                percent: pct,
-                max_score: maxScore,
-              };
-            }),
+          rubrics: rubrics.map((r) => {
+            const pct = Number(r.percentage) || 0;
+            const maxScore = roundToFixed((pct * maxPoints) / 100, 2);
+            return {
+              ...(r.criteria_id ? { criteria_id: r.criteria_id } : {}),
+              title: r.title,
+              description: r.description || "",
+              percentage: pct,
+              percent: pct,
+              max_score: maxScore,
+            };
           }),
+        }),
     };
 
     console.log("🚀 [FRONTEND PAYLOAD SENT]:", payload);
@@ -312,7 +312,7 @@ export default function AddQuestionModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
       <div className="w-full max-w-3xl rounded-2xl bg-white shadow-2xl max-h-[92vh] flex flex-col border border-slate-100">
-        
+
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-3.5 bg-slate-50/60 shrink-0 rounded-t-2xl">
           <div className="flex items-center gap-2 text-slate-800">
@@ -386,13 +386,13 @@ export default function AddQuestionModal({
                       onClick={() => handleSelectCorrect(index)}
                       className={`w-7 h-7 rounded-lg text-xs font-bold ${opt.is_correct ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-600"}`}
                     >
-                      {opt.option_id || String.fromCharCode(65 + index)}
+                      {String.fromCharCode(65 + index)}
                     </button>
                     <input
                       type="text"
                       value={opt.option_text}
                       onChange={(e) => handleOptionChange(index, e.target.value)}
-                      placeholder={`Phương án ${opt.option_id}...`}
+                      placeholder={`Phương án ${String.fromCharCode(65 + index)}...`}
                       className="flex-1 bg-transparent text-xs font-medium focus:outline-none px-1"
                     />
                     {options.length > 2 && questionType !== "TRUE_FALSE" && (
