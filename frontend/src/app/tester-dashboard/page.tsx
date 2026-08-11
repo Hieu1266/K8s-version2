@@ -228,14 +228,14 @@ function CourseCard({
         </div>
       )}
 
-      <div className="relative z-10 mt-6 flex items-center gap-3 pointer-events-none">
+      {/* <div className="relative z-10 mt-6 flex items-center gap-3 pointer-events-none">
         <span className="inline-flex items-center px-3 py-1.5 rounded-lg bg-blue-50/80 backdrop-blur-sm text-[#0066FF] text-xs font-bold border border-blue-100/50">
           Học như học viên
         </span>
         <span className="text-xs text-slate-400 font-semibold group-hover:text-slate-600 transition-colors">
           Double click để mở
         </span>
-      </div>
+      </div> */}
     </div>
   );
 }

@@ -1,11 +1,11 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import LessonNotesPanel from '@/components/LessonNotesPanel';
 import { QuizSection } from '@/components/LessonQuizContainer';
-import PeerReviewSection from '@/components/course-learning/PeerReviewSection';
+import TesterFeedbackPanel from '@/components/course-learning/TesterFeedbackPanel';
 import { getLearningCourse } from '@/actions/getCourse';
 import { attachStatusToLessons, completeLessonAction } from '@/actions/getLesson';
 import { getLessonNotesAction, createNoteAction } from '@/actions/getNotes';
@@ -39,14 +39,14 @@ import TestModeNextButton from '@/components/course-learning/TestModeNextButton'
 
 const COURSE_URL = process.env.NEXT_PUBLIC_COURSE_BACKEND_URL;
 
-// Đặt true qua .env (NEXT_PUBLIC_TEST_MODE=true) chỉ ở môi trường dev/staging.
-// KHÔNG bật ở production.
-const IS_TEST_MODE = process.env.NEXT_PUBLIC_TEST_MODE === 'true';
-
 export default function CourseLearningPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const id = params?.id as string;
+
+  // Kiểm tra chính xác trên URL có tham số tester=1 hay không
+  const isTester = searchParams.get('tester') === '1';
 
   const [course, setCourse] = useState<CourseLearningStructure | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -239,51 +239,11 @@ export default function CourseLearningPage() {
     ? Math.round((completedCount / flatLessons.length) * 100)
     : 0;
 
-  // Hàm reload trạng thái tất cả các bài học từ Backend/Progress Service
-  const refreshCourseProgress = async () => {
-    if (!course) return;
-
-    try {
-      const updatedSubjects = await Promise.all(
-        course.subjects.map(async (subject) => {
-          const updatedModules = await Promise.all(
-            subject.modules.map(async (mod) => {
-              const lessonsWithStatus = await attachStatusToLessons(mod.lessons);
-              return {
-                ...mod,
-                lessons: lessonsWithStatus,
-              };
-            })
-          );
-          return {
-            ...subject,
-            modules: updatedModules,
-          };
-        })
-      );
-
-      setCourse((prevCourse) => {
-        if (!prevCourse) return prevCourse;
-        return {
-          ...prevCourse,
-          subjects: updatedSubjects,
-        };
-      });
-
-      if (currentLesson) {
-        for (const sub of updatedSubjects) {
-          for (const mod of sub.modules) {
-            const found = mod.lessons.find((les) => les.lesson_id === currentLesson.lesson_id);
-            if (found) {
-              setCurrentLesson(found as LessonWithStatus);
-            }
-          }
-        }
-      }
-    } catch (err) {
-      console.error('Lỗi khi làm mới tiến độ khóa học:', err);
-    }
-  };
+  const isLastLesson = useMemo(() => {
+    if (!currentLesson || flatLessons.length === 0) return false;
+    const idx = flatLessons.findIndex((f) => f.lesson.lesson_id === currentLesson.lesson_id);
+    return idx === flatLessons.length - 1;
+  }, [currentLesson, flatLessons]);
 
   const findNextLockedLesson = (startIndex: number) => {
     for (let i = startIndex; i < flatLessons.length; i++) {
@@ -322,14 +282,27 @@ export default function CourseLearningPage() {
     }
   };
 
+  const handleGoToNextLesson = () => {
+    if (!currentLesson) return;
+    const currentIndex = flatLessons.findIndex(
+      (f) => f.lesson.lesson_id === currentLesson.lesson_id
+    );
+    if (currentIndex !== -1 && currentIndex + 1 < flatLessons.length) {
+      const nextItem = flatLessons[currentIndex + 1];
+      if (nextItem.lesson.status !== LessonStatus.LOCKED) {
+        selectLesson(nextItem.subject, nextItem.lesson);
+        setExpandedSubjects((prev) => ({ ...prev, [nextItem.subject.subject_id]: true }));
+        setExpandedModules((prev) => ({ ...prev, [nextItem.module.module_id]: true }));
+      }
+    }
+  };
+
   const handleQuizPassed = (submissionStatus?: string, isPass?: boolean) => {
     if (!currentLesson || !course) return;
 
-    const isPendingGrading = submissionStatus === 'SUBMITTED';
     const isFailed = isPass === false;
-
-    const shouldMarkCompleted = !isPendingGrading && !isFailed;
-    const shouldUnlockNext = shouldMarkCompleted || isPendingGrading;
+    const shouldMarkCompleted = !isFailed;
+    const shouldUnlockNext = !isFailed;
 
     const currentIndex = flatLessons.findIndex(
       (f) => f.lesson.lesson_id === currentLesson.lesson_id
@@ -377,10 +350,10 @@ export default function CourseLearningPage() {
     setCurrentLesson((prev: LessonWithStatus | undefined): LessonWithStatus | undefined =>
       prev
         ? {
-          ...prev,
-          submit_status: (submissionStatus ?? prev.submit_status) as LessonWithStatus['submit_status'],
-          ...(shouldMarkCompleted ? { status: LessonStatus.COMPLETED } : {}),
-        }
+            ...prev,
+            submit_status: (submissionStatus ?? prev.submit_status) as LessonWithStatus['submit_status'],
+            ...(shouldMarkCompleted ? { status: LessonStatus.COMPLETED } : {}),
+          }
         : prev
     );
   };
@@ -457,6 +430,8 @@ export default function CourseLearningPage() {
               [nextItem.module.module_id]: true,
             }));
           }
+        } else if (isLastLesson) {
+          alert('Chúc mừng! Bạn đã hoàn thành bài học cuối cùng của khóa học.');
         }
       } else {
         alert(result.error || 'Có lỗi xảy ra khi xác nhận hoàn thành bài học.');
@@ -538,16 +513,15 @@ export default function CourseLearningPage() {
     }
   };
 
-  // === TEST MODE ===
-  // Next = coi như hoàn thành bài hiện tại thật sự (gọi đúng luồng completeLessonAction,
-  // đánh dấu COMPLETED, mở khóa bài kế tiếp) — không phải chỉ xem trước rồi quay lại.
-  // Đây chính là handleCompleteAndNext, chỉ khác là được kích hoạt từ nút test cho nhanh.
+  // === TESTER FUNCTIONS ===
   const handleTestNext = () => {
     handleCompleteAndNext();
   };
 
-  // Prev = quay lại xem bài trước đó. Bài trước luôn đã UNLOCKED/COMPLETED nên
-  // dùng thẳng selectLesson, không cần ép trạng thái.
+  const hideNextButton = useMemo(() => {
+    return isLastLesson && currentLesson?.status === LessonStatus.COMPLETED;
+  }, [isLastLesson, currentLesson?.status]);
+
   const handleTestPrev = () => {
     if (!currentLesson) return;
     const currentIndex = flatLessons.findIndex(
@@ -564,7 +538,7 @@ export default function CourseLearningPage() {
   const testNextDisabled = useMemo(() => {
     if (!currentLesson || completing) return true;
     const idx = flatLessons.findIndex((f) => f.lesson.lesson_id === currentLesson.lesson_id);
-    return idx === -1 || idx + 1 >= flatLessons.length;
+    return idx === -1;
   }, [currentLesson, flatLessons, completing]);
 
   const testPrevDisabled = useMemo(() => {
@@ -573,9 +547,8 @@ export default function CourseLearningPage() {
     return idx <= 0;
   }, [currentLesson, flatLessons]);
 
-  // Phím tắt: Ctrl+Shift+N (next), Ctrl+Shift+P (prev) — chỉ hoạt động khi TEST MODE bật.
   useEffect(() => {
-    if (!IS_TEST_MODE) return;
+    if (!isTester) return;
 
     const handler = (e: KeyboardEvent) => {
       if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'n') {
@@ -590,9 +563,7 @@ export default function CourseLearningPage() {
 
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentLesson, flatLessons]);
-  // === END TEST MODE ===
+  }, [currentLesson, flatLessons, isTester]);
 
   const toggleSubject = (subjectId: string) =>
     setExpandedSubjects((prev) => ({ ...prev, [subjectId]: !prev[subjectId] }));
@@ -702,7 +673,7 @@ export default function CourseLearningPage() {
       <CourseHeaderBar
         courseTitle={course.title}
         progressPercent={progressPercent}
-        onLeaveCourse={() => router.push('/dashboard-student')}
+        onLeaveCourse={() => router.back()}
       />
 
       <div className="flex flex-1 min-h-0 overflow-hidden">
@@ -735,7 +706,7 @@ export default function CourseLearningPage() {
               <LessonTabsNav tabs={lessonTabs} activeTab={activeTab} onChange={setActiveTab} />
             )}
 
-            {activeTab === 'lecture' && !currentLesson?.is_quiz && (
+            {activeTab === 'lecture' && !currentLesson?.is_quiz && currentLesson && (
               <div key="lecture" className="anim-fade-up space-y-6 pb-12">
                 <LectureTabContent
                   currentLesson={currentLesson}
@@ -756,6 +727,15 @@ export default function CourseLearningPage() {
                   completing={completing}
                   onCompleteAndNext={handleCompleteAndNext}
                 />
+
+                {/* CHỈ HIỂN THỊ KHUNG NHẬN XÉT KHI URL CÓ ?tester=1 */}
+                {isTester && (
+                  <TesterFeedbackPanel
+                    courseId={id}
+                    lessonId={currentLesson.lesson_id}
+                    lessonTitle={currentLesson.title}
+                  />
+                )}
               </div>
             )}
 
@@ -796,27 +776,37 @@ export default function CourseLearningPage() {
                   }}
                 />
 
-                {currentLesson.is_peer_review &&
-                  activeQuizId &&
-                  (activeQuizStatus === SubmissionStatus.SUBMITTED ||
-                    activeQuizStatus === SubmissionStatus.GRADED) && (
-                    <PeerReviewSection
-                      quizId={activeQuizId}
-                      onReviewSubmitted={refreshCourseProgress}
-                    />
-                  )}
+                {(activeQuizStatus === SubmissionStatus.SUBMITTED ||
+                  activeQuizStatus === SubmissionStatus.GRADED ||
+                  currentLesson.status === LessonStatus.COMPLETED) && (
+                  <div className="flex justify-end pt-4">
+                    <button
+                      onClick={handleGoToNextLesson}
+                      disabled={isLastLesson}
+                      className="px-6 py-2.5 bg-[#5B5FEF] text-white font-medium rounded-lg hover:bg-[#4B4FEF] transition-colors disabled:opacity-50 flex items-center gap-2 shadow-sm"
+                    >
+                      <span>Bài tiếp theo</span>
+                      <span>→</span>
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
         </div>
       </div>
 
-      <TestModeNextButton
-        onNext={handleTestNext}
-        onPrev={handleTestPrev}
-        disabled={testNextDisabled}
-        disabledPrev={testPrevDisabled}
-      />
+      {/* CHỈ HIỂN THỊ NÚT CHUYỂN BÀI MÀU VÀNG KHI URL CÓ ?tester=1 */}
+      {isTester && (
+        <TestModeNextButton
+          onNext={handleTestNext}
+          onPrev={handleTestPrev}
+          disabled={testNextDisabled}
+          disabledPrev={testPrevDisabled}
+          isLast={isLastLesson}
+          hideNext={hideNextButton}
+        />
+      )}
     </div>
   );
 }

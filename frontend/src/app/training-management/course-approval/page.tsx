@@ -7,7 +7,6 @@ import React, {
 } from "react";
 
 import Link from "next/link";
-
 import Navbar from "@/components/Navbar";
 
 import {
@@ -60,7 +59,6 @@ type Course = {
   course_id: string;
   title: string;
   description?: string | null;
-
   subjects: Subject[];
 };
 
@@ -86,11 +84,9 @@ export default function CourseApprovalPage() {
      STATE
      ============================================================ */
 
-  const [courses, setCourses] =
-    useState<Course[]>([]);
+  const [courses, setCourses] = useState<Course[]>([]);
 
-  const [testers, setTesters] =
-    useState<TesterUser[]>([]);
+  const [testers, setTesters] = useState<TesterUser[]>([]);
 
   const [
     selectedCourseId,
@@ -141,7 +137,7 @@ export default function CourseApprovalPage() {
     setProgressLoading,
   ] = useState(false);
 
-  /* ---------------- DUYỆT (MANAGER XÁC NHẬN ĐÃ XEM) ---------------- */
+  /* ---------------- DUYỆT ---------------- */
 
   const [
     acknowledgingId,
@@ -149,7 +145,7 @@ export default function CourseApprovalPage() {
   ] = useState<string | null>(null);
 
   /* ============================================================
-     LOAD DATA (COURSE + SUBJECT + TESTER)
+     LOAD DATA
      ============================================================ */
 
   useEffect(() => {
@@ -225,61 +221,59 @@ export default function CourseApprovalPage() {
      SELECTED COURSE
      ============================================================ */
 
-  const selectedCourse =
-    useMemo(() => {
-      return (
-        courses.find(
-          (course) =>
-            course.course_id ===
-            selectedCourseId
-        ) || null
-      );
-    }, [
-      courses,
-      selectedCourseId,
-    ]);
+  const selectedCourse = useMemo(() => {
+    return (
+      courses.find(
+        (course) =>
+          course.course_id ===
+          selectedCourseId
+      ) || null
+    );
+  }, [
+    courses,
+    selectedCourseId,
+  ]);
 
   /* ============================================================
      SEARCH COURSE
      ============================================================ */
 
-  const filteredCourses =
-    useMemo(() => {
-      const keyword =
-        searchKeyword
-          .trim()
-          .toLowerCase();
+  const filteredCourses = useMemo(() => {
+    const keyword =
+      searchKeyword
+        .trim()
+        .toLowerCase();
 
-      if (!keyword) {
-        return courses;
+    if (!keyword) {
+      return courses;
+    }
+
+    return courses.filter(
+      (course) => {
+        return (
+          course.title
+            ?.toLowerCase()
+            .includes(keyword) ||
+          course.course_id
+            ?.toLowerCase()
+            .includes(keyword)
+        );
       }
-
-      return courses.filter(
-        (course) => {
-          return (
-            course.title
-              ?.toLowerCase()
-              .includes(keyword) ||
-            course.course_id
-              ?.toLowerCase()
-              .includes(keyword)
-          );
-        }
-      );
-    }, [
-      courses,
-      searchKeyword,
-    ]);
+    );
+  }, [
+    courses,
+    searchKeyword,
+  ]);
 
   /* ============================================================
-     SUBJECTS OF SELECTED COURSE
+     SUBJECTS
      ============================================================ */
 
   const selectedSubjects =
     selectedCourse?.subjects || [];
 
   /* ============================================================
-     KHI ĐỔI KHÓA HỌC -> XÓA THÔNG BÁO GÁN CŨ
+     KHI ĐỔI KHÓA HỌC
      ============================================================ */
 
   useEffect(() => {
@@ -287,11 +281,14 @@ export default function CourseApprovalPage() {
   }, [selectedCourseId]);
 
   /* ============================================================
-     LOAD TIẾN ĐỘ TESTER MỖI KHI ĐỔI KHÓA HỌC / DANH SÁCH TESTER
+     LOAD TIẾN ĐỘ TESTER
      ============================================================ */
 
   useEffect(() => {
-    if (!selectedCourseId || testers.length === 0) {
+    if (
+      !selectedCourseId ||
+      testers.length === 0
+    ) {
       setProgressMap({});
       return;
     }
@@ -301,12 +298,15 @@ export default function CourseApprovalPage() {
     async function loadProgress() {
       setProgressLoading(true);
 
-      const ids = testers.map((t) => t.user_id);
-
-      const result = await getTestersCourseStatusBulk(
-        ids,
-        selectedCourseId as string
+      const ids = testers.map(
+        (t) => t.user_id
       );
+
+      const result =
+        await getTestersCourseStatusBulk(
+          ids,
+          selectedCourseId as string
+        );
 
       if (mounted) {
         setProgressMap(result);
@@ -319,29 +319,34 @@ export default function CourseApprovalPage() {
     return () => {
       mounted = false;
     };
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCourseId, testers]);
 
   /* ============================================================
-     GÁN TESTER VÀO KHÓA HỌC ĐANG CHỌN
+     GÁN TESTER
      ============================================================ */
 
-  async function handleAssignTester(testerId: string) {
+  async function handleAssignTester(
+    testerId: string
+  ) {
     if (!selectedCourseId) return;
 
     setAssigningId(testerId);
     setAssignMessage(null);
 
     try {
-      const result = await enrollTesterToCourse(
-        testerId,
-        selectedCourseId
-      );
+      const result =
+        await enrollTesterToCourse(
+          testerId,
+          selectedCourseId
+        );
 
       if (result.success) {
         setAssignedMap((prev) => ({
           ...prev,
-          [`${testerId}_${selectedCourseId}`]: true,
+          [`${testerId}_${selectedCourseId}`]:
+            true,
         }));
 
         setAssignMessage({
@@ -374,18 +379,19 @@ export default function CourseApprovalPage() {
   }
 
   /* ============================================================
-     MANAGER BẤM "DUYỆT" — XÁC NHẬN ĐÃ XEM KẾT QUẢ TESTER CHẤM
-     ⚠️ Placeholder: DB hiện chưa có cột lưu trạng thái Manager đã
-     duyệt, nên hàm này CHƯA gọi API thật. Khi chốt xong schema,
-     thay đoạn setTimeout bằng lời gọi action thật (ví dụ
-     acknowledgeTesterReview(testerId, selectedCourseId)).
+     MANAGER DUYỆT
      ============================================================ */
 
-  async function handleManagerAcknowledge(testerId: string) {
+  async function handleManagerAcknowledge(
+    testerId: string
+  ) {
     setAcknowledgingId(testerId);
 
-    // TODO: thay bằng gọi API thật khi có cột lưu trạng thái duyệt
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    // Placeholder
+    await new Promise(
+      (resolve) =>
+        setTimeout(resolve, 300)
+    );
 
     setAcknowledgingId(null);
   }
@@ -452,9 +458,7 @@ export default function CourseApprovalPage() {
     <div className="min-h-screen bg-slate-50">
       <Navbar />
 
-      {/* ========================================================
-          HEADER
-          ======================================================== */}
+      {/* HEADER */}
 
       <section className="relative overflow-hidden bg-gradient-to-r from-[#0066FF] to-[#0052cc] px-6 pb-24 pt-10 text-white">
         <div className="pointer-events-none absolute inset-0 overflow-hidden opacity-20">
@@ -470,7 +474,6 @@ export default function CourseApprovalPage() {
               className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/10 px-3 py-1.5 transition hover:bg-white/20"
             >
               <ArrowLeft size={14} />
-
               Quản lý đào tạo
             </Link>
 
@@ -481,7 +484,6 @@ export default function CourseApprovalPage() {
 
             <span className="flex items-center gap-1.5 font-semibold text-white">
               <ShieldCheck size={14} />
-
               Duyệt khóa học
             </span>
           </div>
@@ -492,25 +494,23 @@ export default function CourseApprovalPage() {
             </h1>
 
             <p className="mt-3 text-sm font-medium leading-relaxed text-blue-100">
-              Xem thông tin khóa học, gán tester, theo dõi
-              tiến độ và xem kết quả kiểm thử do tester
-              chấm.
+              Xem thông tin khóa học, gán tester,
+              theo dõi tiến độ và xem kết quả
+              kiểm thử do tester chấm.
             </p>
           </div>
         </div>
       </section>
 
-      {/* ========================================================
-          CONTENT
-          ======================================================== */}
+      {/* CONTENT */}
 
       <main className="relative z-20 mx-auto -mt-14 w-full max-w-7xl px-6 pb-20">
         <div className="rounded-[2rem] border border-white bg-white/90 p-6 shadow-xl backdrop-blur-xl md:p-8">
-          {/* ====================================================
-              STATISTICS
-              ==================================================== */}
+
+          {/* STATISTICS */}
 
           <section className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-3">
+
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex items-center justify-between">
                 <div>
@@ -569,18 +569,17 @@ export default function CourseApprovalPage() {
                 </div>
               </div>
             </div>
+
           </section>
 
-          {/* ====================================================
-              TWO COLUMNS
-              ==================================================== */}
+          {/* TWO COLUMNS */}
 
           <section className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
-            {/* ==================================================
-                LEFT: COURSE
-                ================================================== */}
+
+            {/* LEFT */}
 
             <aside className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm lg:sticky lg:top-6">
+
               <div className="border-b border-slate-100 p-5">
                 <div className="flex items-center justify-between">
                   <div>
@@ -653,6 +652,7 @@ export default function CourseApprovalPage() {
                           }`}
                         >
                           <div className="flex items-start justify-between gap-3">
+
                             <div className="min-w-0">
                               <p
                                 className={`line-clamp-2 text-sm font-bold leading-5 ${
@@ -677,14 +677,14 @@ export default function CourseApprovalPage() {
                                   : "text-slate-300"
                               }`}
                             />
+
                           </div>
 
                           <div className="mt-4 flex flex-wrap gap-2">
                             <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-600">
                               <BookOpen size={12} />
 
-                              {course.subjects.length}{" "}
-                              môn học
+                              {course.subjects.length} môn học
                             </span>
                           </div>
                         </button>
@@ -695,11 +695,10 @@ export default function CourseApprovalPage() {
               </div>
             </aside>
 
-            {/* ==================================================
-                RIGHT
-                ================================================== */}
+            {/* RIGHT */}
 
             <div className="space-y-6">
+
               {!selectedCourse ? (
                 <section className="rounded-2xl border border-dashed border-slate-200 bg-white p-12 text-center">
                   <GraduationCap
@@ -713,15 +712,18 @@ export default function CourseApprovalPage() {
                 </section>
               ) : (
                 <>
-                  {/* ==========================================
-                      COURSE INFORMATION
-                      ========================================== */}
+
+                  {/* COURSE INFORMATION */}
 
                   <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+
                     <div className="border-b border-slate-100 p-6 sm:p-7">
                       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+
                         <div className="min-w-0">
+
                           <div className="flex flex-wrap items-center gap-2">
+
                             <span className="rounded-lg bg-blue-50 px-2.5 py-1 font-mono text-[11px] font-bold text-blue-600">
                               {selectedCourse.course_id.slice(
                                 0,
@@ -731,9 +733,9 @@ export default function CourseApprovalPage() {
 
                             <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
                               <CheckCircle2 size={12} />
-
                               Khóa học
                             </span>
+
                           </div>
 
                           <h2 className="mt-3 text-xl font-bold leading-snug text-slate-900 sm:text-2xl">
@@ -741,18 +743,17 @@ export default function CourseApprovalPage() {
                           </h2>
 
                           <div className="mt-3 flex flex-wrap gap-4 text-sm text-slate-500">
+
                             <span className="inline-flex items-center gap-1.5">
                               <BookOpen size={15} />
-
-                              {selectedSubjects.length}{" "}
-                              môn học
+                              {selectedSubjects.length} môn học
                             </span>
 
                             <span className="inline-flex items-center gap-1.5">
                               <UsersRound size={15} />
-
                               {testers.length} tester
                             </span>
+
                           </div>
                         </div>
                       </div>
@@ -760,7 +761,9 @@ export default function CourseApprovalPage() {
 
                     <div className="p-6 sm:p-7">
                       <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-4">
+
                         <div className="flex items-start gap-3">
+
                           <CircleUserRound
                             size={20}
                             className="mt-0.5 shrink-0 text-blue-600"
@@ -776,19 +779,23 @@ export default function CourseApprovalPage() {
                                 "Không có mô tả khóa học."}
                             </p>
                           </div>
+
                         </div>
+
                       </div>
                     </div>
+
                   </section>
 
-                  {/* ==========================================
-                      SUBJECT LIST
-                      ========================================== */}
+                  {/* SUBJECT LIST */}
 
                   <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-7">
+
                     <div className="mb-5 flex items-center justify-between">
+
                       <div>
                         <div className="flex items-center gap-2">
+
                           <BookOpen
                             size={20}
                             className="text-blue-600"
@@ -797,21 +804,24 @@ export default function CourseApprovalPage() {
                           <h3 className="font-bold text-slate-900">
                             Danh sách môn học
                           </h3>
+
                         </div>
 
                         <p className="mt-1 text-xs text-slate-500">
-                          Các môn học thuộc khóa học đang
-                          được chọn
+                          Các môn học thuộc khóa học đang được chọn
                         </p>
                       </div>
 
                       <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
                         {selectedSubjects.length} môn
                       </span>
+
                     </div>
 
                     {selectedSubjects.length === 0 ? (
+
                       <div className="rounded-xl border border-dashed border-slate-200 py-10 text-center">
+
                         <BookOpen
                           size={30}
                           className="mx-auto text-slate-300"
@@ -820,21 +830,29 @@ export default function CourseApprovalPage() {
                         <p className="mt-3 text-sm font-medium text-slate-600">
                           Khóa học chưa có môn học
                         </p>
+
                       </div>
+
                     ) : (
+
                       <div className="space-y-3">
+
                         {selectedSubjects.map(
                           (subject, index) => (
+
                             <div
                               key={subject.subject_id}
                               className="flex items-start gap-4 rounded-xl border border-slate-200 bg-slate-50/60 p-4 transition hover:border-blue-200 hover:bg-blue-50/30"
                             >
+
                               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-sm font-bold text-blue-600 shadow-sm">
                                 {index + 1}
                               </div>
 
                               <div className="min-w-0 flex-1">
+
                                 <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+
                                   <h4 className="text-sm font-bold text-slate-900">
                                     {subject.title}
                                   </h4>
@@ -845,6 +863,7 @@ export default function CourseApprovalPage() {
                                       8
                                     )}
                                   </span>
+
                                 </div>
 
                                 {subject.description && (
@@ -852,22 +871,30 @@ export default function CourseApprovalPage() {
                                     {subject.description}
                                   </p>
                                 )}
+
                               </div>
+
                             </div>
+
                           )
                         )}
+
                       </div>
+
                     )}
+
                   </section>
 
-                  {/* ==========================================
-                      TESTER — GÁN + TIẾN ĐỘ + KẾT QUẢ KIỂM THỬ (READ-ONLY)
-                      ========================================== */}
+                  {/* TESTER */}
 
                   <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-7">
+
                     <div className="mb-5 flex items-center justify-between">
+
                       <div>
+
                         <div className="flex items-center gap-2">
+
                           <TestTube2
                             size={20}
                             className="text-blue-600"
@@ -876,21 +903,25 @@ export default function CourseApprovalPage() {
                           <h3 className="font-bold text-slate-900">
                             Người học thử
                           </h3>
+
                         </div>
 
                         <p className="mt-1 text-xs text-slate-500">
-                          Gán tester và theo dõi kết quả
-                          kiểm thử do tester tự chấm
+                          Gán tester và theo dõi kết quả kiểm thử do tester tự chấm
                         </p>
+
                       </div>
 
                       <span className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600">
                         {testers.length} tester
                       </span>
+
                     </div>
 
                     {testers.length === 0 ? (
+
                       <div className="rounded-xl border border-dashed border-slate-200 py-10 text-center">
+
                         <UsersRound
                           size={30}
                           className="mx-auto text-slate-300"
@@ -899,15 +930,24 @@ export default function CourseApprovalPage() {
                         <p className="mt-3 text-sm font-medium text-slate-600">
                           Chưa có tester
                         </p>
+
                       </div>
+
                     ) : (
+
                       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+
                         {testers.map((tester) => {
-                          const assignKey = `${tester.user_id}_${selectedCourseId}`;
+
+                          const assignKey =
+                            `${tester.user_id}_${selectedCourseId}`;
+
                           const justAssigned =
                             !!assignedMap[assignKey];
+
                           const isAssigning =
                             assigningId === tester.user_id;
+
                           const message =
                             assignMessage?.testerId ===
                             tester.user_id
@@ -917,32 +957,40 @@ export default function CourseApprovalPage() {
                           const status:
                             | TesterCourseStatus
                             | undefined =
-                            progressMap[tester.user_id];
+                            progressMap[
+                              tester.user_id
+                            ];
 
                           const isEnrolled =
                             justAssigned ||
                             !!status?.enrolled;
 
                           const isAcknowledging =
-                            acknowledgingId === tester.user_id;
+                            acknowledgingId ===
+                            tester.user_id;
 
                           return (
+
                             <div
                               key={tester.user_id}
                               className="rounded-xl border border-slate-200 bg-white p-4 transition hover:border-blue-200 hover:shadow-sm"
                             >
+
                               <div className="flex items-center gap-3">
+
                                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-50 font-bold text-blue-600">
                                   {tester.username
                                     .split(" ")
                                     .slice(-2)
-                                    .map((word: string) =>
-                                      word.charAt(0)
+                                    .map(
+                                      (word: string) =>
+                                        word.charAt(0)
                                     )
                                     .join("")}
                                 </div>
 
                                 <div className="min-w-0">
+
                                   <p className="truncate text-sm font-bold text-slate-900">
                                     {tester.username}
                                   </p>
@@ -950,20 +998,23 @@ export default function CourseApprovalPage() {
                                   <p className="mt-0.5 truncate text-xs text-slate-500">
                                     {tester.email}
                                   </p>
+
                                 </div>
+
                               </div>
 
                               <div className="mt-3 flex items-center justify-between gap-2">
+
                                 <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-600">
                                   <UsersRound size={12} />
-
                                   Người kiểm thử
                                 </span>
 
                                 <button
                                   type="button"
                                   disabled={
-                                    isAssigning || isEnrolled
+                                    isAssigning ||
+                                    isEnrolled
                                   }
                                   onClick={() =>
                                     handleAssignTester(
@@ -976,13 +1027,16 @@ export default function CourseApprovalPage() {
                                       : "bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
                                   }`}
                                 >
+
                                   {isAssigning ? (
                                     <Loader2
                                       size={13}
                                       className="animate-spin"
                                     />
                                   ) : isEnrolled ? (
-                                    <CheckCircle2 size={13} />
+                                    <CheckCircle2
+                                      size={13}
+                                    />
                                   ) : (
                                     <UserPlus size={13} />
                                   )}
@@ -992,13 +1046,16 @@ export default function CourseApprovalPage() {
                                     : isAssigning
                                     ? "Đang gán..."
                                     : "Gán"}
+
                                 </button>
+
                               </div>
 
                               {message && (
                                 <p
                                   className={`mt-2 text-[11px] font-medium ${
-                                    message.type === "success"
+                                    message.type ===
+                                    "success"
                                       ? "text-emerald-600"
                                       : "text-red-500"
                                   }`}
@@ -1007,51 +1064,77 @@ export default function CourseApprovalPage() {
                                 </p>
                               )}
 
-                              {/* ============ TRẠNG THÁI HỌC + KẾT QUẢ KIỂM THỬ (READ-ONLY) ============ */}
+                              {/* STATUS */}
 
                               <div className="mt-3 border-t border-slate-100 pt-3">
-                                {progressLoading && !status ? (
+
+                                {progressLoading &&
+                                !status ? (
+
                                   <div className="flex items-center gap-2 text-xs text-slate-400">
+
                                     <Loader2
                                       size={12}
                                       className="animate-spin"
                                     />
+
                                     Đang tải tiến độ...
+
                                   </div>
+
                                 ) : status?.message &&
                                   !status.enrolled ? (
+
                                   <span className="inline-flex items-center gap-1 rounded-lg bg-red-50 px-2 py-1 text-[11px] font-medium text-red-500">
+
                                     <AlertCircle size={12} />
+
                                     {status.message}
+
                                   </span>
+
                                 ) : !isEnrolled ? (
+
                                   <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-500">
                                     Chưa đăng ký khóa này
                                   </span>
+
                                 ) : status?.is_completed ? (
+
                                   <div className="space-y-2">
+
                                     <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700">
+
                                       <Trophy size={12} />
+
                                       Đã hoàn thành (
                                       {Math.round(
                                         status.current_overall_progress
                                       )}
                                       %)
+
                                     </span>
 
                                     {status.testing_course_status ===
                                     "APPROVED" ? (
+
                                       <div className="flex items-center justify-between gap-2">
+
                                         <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2 py-1 text-[11px] font-bold text-emerald-700">
+
                                           <CheckCircle2
                                             size={12}
                                           />
+
                                           Tester đánh giá: Đạt
+
                                         </span>
 
-                                        <button
+                                        {/* <button
                                           type="button"
-                                          disabled={isAcknowledging}
+                                          disabled={
+                                            isAcknowledging
+                                          }
                                           onClick={() =>
                                             handleManagerAcknowledge(
                                               tester.user_id
@@ -1059,30 +1142,44 @@ export default function CourseApprovalPage() {
                                           }
                                           className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1.5 text-[11px] font-bold text-white transition hover:bg-blue-700 disabled:opacity-60"
                                         >
+
                                           {isAcknowledging ? (
                                             <Loader2
                                               size={12}
                                               className="animate-spin"
                                             />
                                           ) : (
-                                            <ShieldCheck size={12} />
+                                            <ShieldCheck
+                                              size={12}
+                                            />
                                           )}
+
                                           Duyệt
-                                        </button>
+
+                                        </button> */}
+
                                       </div>
+
                                     ) : status.testing_course_status ===
                                       "REJECTED" ? (
+
                                       <div className="flex items-center justify-between gap-2">
+
                                         <span className="inline-flex items-center gap-1 rounded-lg bg-red-50 px-2 py-1 text-[11px] font-bold text-red-600">
+
                                           <AlertCircle
                                             size={12}
                                           />
+
                                           Tester đánh giá: Không đạt
+
                                         </span>
 
-                                        <button
+                                        {/* <button
                                           type="button"
-                                          disabled={isAcknowledging}
+                                          disabled={
+                                            isAcknowledging
+                                          }
                                           onClick={() =>
                                             handleManagerAcknowledge(
                                               tester.user_id
@@ -1090,42 +1187,66 @@ export default function CourseApprovalPage() {
                                           }
                                           className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1.5 text-[11px] font-bold text-white transition hover:bg-blue-700 disabled:opacity-60"
                                         >
+
                                           {isAcknowledging ? (
                                             <Loader2
                                               size={12}
                                               className="animate-spin"
                                             />
                                           ) : (
-                                            <ShieldCheck size={12} />
+                                            <ShieldCheck
+                                              size={12}
+                                            />
                                           )}
+
                                           Duyệt
-                                        </button>
+
+                                        </button> */}
+
                                       </div>
+
                                     ) : (
+
                                       <span className="inline-flex items-center gap-1 rounded-lg bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-700">
+
                                         <Clock size={12} />
+
                                         Đang chờ tester chấm
+
                                       </span>
+
                                     )}
+
                                   </div>
+
                                 ) : (
+
                                   <div>
+
                                     <div className="flex items-center justify-between text-[11px] font-medium text-slate-600">
+
                                       <span className="inline-flex items-center gap-1">
+
                                         <Clock size={12} />
+
                                         Đang học
+
                                       </span>
 
                                       <span className="font-bold text-blue-600">
+
                                         {Math.round(
                                           status?.current_overall_progress ??
                                             0
                                         )}
                                         %
+
                                       </span>
+
                                     </div>
 
                                     <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+
                                       <div
                                         className="h-full rounded-full bg-blue-500 transition-all"
                                         style={{
@@ -1139,29 +1260,39 @@ export default function CourseApprovalPage() {
                                           )}%`,
                                         }}
                                       />
+
                                     </div>
+
                                   </div>
+
                                 )}
+
                               </div>
+
                             </div>
+
                           );
                         })}
+
                       </div>
+
                     )}
+
                   </section>
 
-                  {/* ==========================================
-                      NOTE
-                      ========================================== */}
+                  {/* NOTE */}
 
                   <section className="rounded-2xl border border-blue-200 bg-blue-50/50 p-5">
+
                     <div className="flex items-start gap-3">
+
                       <AlertCircle
                         size={20}
                         className="mt-0.5 shrink-0 text-blue-600"
                       />
 
                       <div>
+
                         <p className="text-sm font-bold text-blue-800">
                           Thông tin hiển thị
                         </p>
@@ -1173,15 +1304,23 @@ export default function CourseApprovalPage() {
                           quả và bấm Duyệt để xác nhận đã
                           xem qua.
                         </p>
+
                       </div>
+
                     </div>
+
                   </section>
+
                 </>
               )}
+
             </div>
+
           </section>
+
         </div>
       </main>
+
     </div>
   );
 }

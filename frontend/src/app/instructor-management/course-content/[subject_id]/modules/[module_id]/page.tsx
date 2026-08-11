@@ -4,6 +4,8 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import RichTextEditor from "@/components/editors/RichTextEditor";
+import CourseErrorScreen from "@/components/course-learning/CourseErrorScreen";
+
 import {
   ArrowLeft,
   Plus,
@@ -20,7 +22,6 @@ import {
   Download,
   Paperclip,
   GripVertical,
-  AlertTriangle,
 } from "lucide-react";
 import {
   getLessonListAction,
@@ -359,6 +360,10 @@ export default function ModuleDetailPage() {
     );
   }
 
+  if (errorMessage) {
+    return <CourseErrorScreen errorMessage={errorMessage} onBackHome={() => router.back()} />;
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 pb-16">
       <Navbar />
@@ -367,14 +372,12 @@ export default function ModuleDetailPage() {
         {/* Navigation Header */}
         <div className="space-y-4">
           <button
-            onClick={() =>
-              router.push(`/instructor-management/course-content/${subjectId}`)
-            }
-            className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-blue-600 transition"
-          >
-            <ArrowLeft size={18} />
-            Quay lại danh sách Module
-          </button>
+              onClick={() => router.back()}
+              className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 px-3.5 py-1.5 rounded-lg transition cursor-pointer"
+            >
+              <ArrowLeft size={18} />
+              Quay lại trang trước
+            </button>
 
           <div className="bg-white p-6 sm:p-8 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
@@ -390,7 +393,7 @@ export default function ModuleDetailPage() {
 
             <button
               onClick={handleOpenCreateModal}
-              className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-sm font-semibold transition shadow-sm"
+              className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-sm font-semibold transition shadow-sm cursor-pointer"
             >
               <Plus size={18} />
               Tạo Lesson Mới
@@ -420,8 +423,9 @@ export default function ModuleDetailPage() {
                 onDragStart={() => handleDragStart(index)}
                 onDragOver={handleDragOver}
                 onDrop={() => handleDrop(index)}
-                className={`py-4 space-y-3 transition ${draggedIndex === index ? "opacity-30 bg-blue-50 border-2 border-dashed border-blue-400 rounded-xl" : ""
-                  }`}
+                className={`py-4 space-y-3 transition ${
+                  draggedIndex === index ? "opacity-30 bg-blue-50 border-2 border-dashed border-blue-400 rounded-xl" : ""
+                }`}
               >
                 <div className="flex items-center justify-between gap-4 hover:bg-slate-50/80 p-2 rounded-xl transition">
                   <div className="flex items-center gap-3 min-w-0">
@@ -483,10 +487,11 @@ export default function ModuleDetailPage() {
                       onClick={() => handleOpenEditModal(lesson)}
                       disabled={lesson.is_quiz}
                       title={lesson.is_quiz ? "Bài thi không thể chỉnh sửa qua giao diện này" : "Sửa bài học"}
-                      className={`p-2 rounded-lg transition ${lesson.is_quiz
+                      className={`p-2 rounded-lg transition ${
+                        lesson.is_quiz
                           ? "text-slate-300 cursor-not-allowed"
-                          : "text-slate-400 hover:text-blue-600 hover:bg-blue-50"
-                        }`}
+                          : "text-slate-400 hover:text-blue-600 hover:bg-blue-50 cursor-pointer"
+                      }`}
                     >
                       <Edit3 size={18} />
                     </button>
@@ -494,10 +499,11 @@ export default function ModuleDetailPage() {
                       onClick={() => setConfirmDeleteLesson(lesson)}
                       disabled={lesson.is_quiz}
                       title={lesson.is_quiz ? "Bài thi không thể xóa qua giao diện này" : "Xóa bài học"}
-                      className={`p-2 rounded-lg transition ${lesson.is_quiz
+                      className={`p-2 rounded-lg transition ${
+                        lesson.is_quiz
                           ? "text-slate-300 cursor-not-allowed"
-                          : "text-slate-400 hover:text-rose-600 hover:bg-rose-50"
-                        }`}
+                          : "text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer"
+                      }`}
                     >
                       <Trash2 size={18} />
                     </button>
@@ -559,7 +565,7 @@ export default function ModuleDetailPage() {
               <button
                 type="button"
                 onClick={() => setShowModal(false)}
-                className="text-slate-400 hover:text-slate-600 transition p-1 rounded-lg hover:bg-slate-100"
+                className="text-slate-400 hover:text-slate-600 transition p-1 rounded-lg hover:bg-slate-100 cursor-pointer"
               >
                 <X size={18} />
               </button>
@@ -594,8 +600,9 @@ export default function ModuleDetailPage() {
                   </label>
 
                   <label
-                    className={`flex items-center gap-2 text-xs font-semibold cursor-pointer ${editingLesson ? "text-slate-300 cursor-not-allowed" : "text-slate-700"
-                      }`}
+                    className={`flex items-center gap-2 text-xs font-semibold cursor-pointer ${
+                      editingLesson ? "text-slate-300 cursor-not-allowed" : "text-slate-700"
+                    }`}
                   >
                     <input
                       type="checkbox"
@@ -647,7 +654,7 @@ export default function ModuleDetailPage() {
                             <button
                               type="button"
                               onClick={handleVideoUrlBlur}
-                              className="underline font-semibold hover:text-amber-700 ml-1"
+                              className="underline font-semibold hover:text-amber-700 ml-1 cursor-pointer"
                             >
                               Thử lại
                             </button>
@@ -696,7 +703,7 @@ export default function ModuleDetailPage() {
                                   setConfirmDeleteResourceId(res.resource_id);
                                 }}
                                 disabled={deletingResourceId === res.resource_id}
-                                className="text-rose-500 hover:text-rose-700 disabled:opacity-40 p-0.5 rounded hover:bg-rose-50"
+                                className="text-rose-500 hover:text-rose-700 disabled:opacity-40 p-0.5 rounded hover:bg-rose-50 cursor-pointer"
                                 title="Xóa tài nguyên"
                               >
                                 {deletingResourceId === res.resource_id ? (
@@ -726,7 +733,7 @@ export default function ModuleDetailPage() {
                             type="button"
                             onClick={() => fileInputRef.current?.click()}
                             disabled={uploadingResource}
-                            className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-700 disabled:opacity-50"
+                            className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-700 disabled:opacity-50 cursor-pointer"
                           >
                             {uploadingResource ? (
                               <Loader2 size={14} className="animate-spin" />
@@ -755,91 +762,19 @@ export default function ModuleDetailPage() {
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition"
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition cursor-pointer"
                 >
                   Hủy
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-5 py-2 text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition shadow-sm disabled:opacity-50"
+                  className="px-5 py-2 text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition shadow-sm disabled:opacity-50 cursor-pointer"
                 >
-                  {submitting ? "Đang lưu..." : editingLesson ? "Lưu thay đổi" : "Tạo Lesson"}
+                  {submitting ? "Đang lưu..." : editingLesson ? "Lưu thay đổi" : "Tạo bài học"}
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* --- MODAL CUSTOM: XÁC NHẬN XÓA TÀI NGUYÊN (RESOURCE) --- */}
-      {confirmDeleteResourceId && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-[70]">
-          <div className="bg-white rounded-xl max-w-sm w-full p-5 shadow-2xl border border-slate-100 space-y-4 animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center gap-3 text-rose-600">
-              <div className="p-2 bg-rose-50 rounded-lg">
-                <AlertTriangle size={20} />
-              </div>
-              <h4 className="text-base font-bold text-slate-900">Xóa tài nguyên?</h4>
-            </div>
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Bạn có chắc chắn muốn xóa tệp tài nguyên này khỏi bài học không? Thao tác này không thể hoàn tác.
-            </p>
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setConfirmDeleteResourceId(null)}
-                disabled={deletingResourceId !== null}
-                className="px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition"
-              >
-                Hủy
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmDeleteResource}
-                disabled={deletingResourceId !== null}
-                className="px-3.5 py-1.5 text-xs font-semibold bg-rose-600 text-white hover:bg-rose-700 rounded-lg transition shadow-sm inline-flex items-center gap-1.5 disabled:opacity-50"
-              >
-                {deletingResourceId ? <Loader2 size={13} className="animate-spin" /> : null}
-                {deletingResourceId ? "Đang xóa..." : "Xóa vĩnh viễn"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* --- MODAL CUSTOM: XÁC NHẬN XÓA BÀI HỌC (LESSON) --- */}
-      {confirmDeleteLesson && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-[70]">
-          <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-4 animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center gap-3 text-rose-600">
-              <div className="p-2.5 bg-rose-50 rounded-xl">
-                <AlertTriangle size={22} />
-              </div>
-              <h4 className="text-base font-bold text-slate-900">Xác nhận xóa bài học</h4>
-            </div>
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Bạn có chắc chắn muốn xóa bài học <span className="font-bold text-slate-900">&quot;{confirmDeleteLesson.title}&quot;</span>? Toàn bộ nội dung và tài nguyên đính kèm thuộc bài học này cũng sẽ bị xóa vĩnh viễn.
-            </p>
-            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => setConfirmDeleteLesson(null)}
-                disabled={deletingLessonId !== null}
-                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition"
-              >
-                Hủy
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmDeleteLesson}
-                disabled={deletingLessonId !== null}
-                className="px-4 py-2 text-xs font-semibold bg-rose-600 text-white hover:bg-rose-700 rounded-lg transition shadow-sm inline-flex items-center gap-1.5 disabled:opacity-50"
-              >
-                {deletingLessonId ? <Loader2 size={13} className="animate-spin" /> : null}
-                {deletingLessonId ? "Đang xóa..." : "Xóa bài học"}
-              </button>
-            </div>
           </div>
         </div>
       )}
