@@ -35,8 +35,13 @@ import LessonTitleHeader from '@/components/course-learning/LessonTitleHeader';
 import LessonTabsNav from '@/components/course-learning/LessonTabsNav';
 import LectureTabContent from '@/components/course-learning/LectureTabContent';
 import ResourcesTabContent from '@/components/course-learning/ResourcesTabContent';
+import TestModeNextButton from '@/components/course-learning/TestModeNextButton';
 
 const COURSE_URL = process.env.NEXT_PUBLIC_COURSE_BACKEND_URL;
+
+// Đặt true qua .env (NEXT_PUBLIC_TEST_MODE=true) chỉ ở môi trường dev/staging.
+// KHÔNG bật ở production.
+const IS_TEST_MODE = process.env.NEXT_PUBLIC_TEST_MODE === 'true';
 
 export default function CourseLearningPage() {
   const params = useParams();
@@ -533,6 +538,62 @@ export default function CourseLearningPage() {
     }
   };
 
+  // === TEST MODE ===
+  // Next = coi như hoàn thành bài hiện tại thật sự (gọi đúng luồng completeLessonAction,
+  // đánh dấu COMPLETED, mở khóa bài kế tiếp) — không phải chỉ xem trước rồi quay lại.
+  // Đây chính là handleCompleteAndNext, chỉ khác là được kích hoạt từ nút test cho nhanh.
+  const handleTestNext = () => {
+    handleCompleteAndNext();
+  };
+
+  // Prev = quay lại xem bài trước đó. Bài trước luôn đã UNLOCKED/COMPLETED nên
+  // dùng thẳng selectLesson, không cần ép trạng thái.
+  const handleTestPrev = () => {
+    if (!currentLesson) return;
+    const currentIndex = flatLessons.findIndex(
+      (f) => f.lesson.lesson_id === currentLesson.lesson_id
+    );
+    if (currentIndex <= 0) return;
+    const prevItem = flatLessons[currentIndex - 1];
+    selectLesson(prevItem.subject, prevItem.lesson);
+
+    setExpandedSubjects((prev) => ({ ...prev, [prevItem.subject.subject_id]: true }));
+    setExpandedModules((prev) => ({ ...prev, [prevItem.module.module_id]: true }));
+  };
+
+  const testNextDisabled = useMemo(() => {
+    if (!currentLesson || completing) return true;
+    const idx = flatLessons.findIndex((f) => f.lesson.lesson_id === currentLesson.lesson_id);
+    return idx === -1 || idx + 1 >= flatLessons.length;
+  }, [currentLesson, flatLessons, completing]);
+
+  const testPrevDisabled = useMemo(() => {
+    if (!currentLesson) return true;
+    const idx = flatLessons.findIndex((f) => f.lesson.lesson_id === currentLesson.lesson_id);
+    return idx <= 0;
+  }, [currentLesson, flatLessons]);
+
+  // Phím tắt: Ctrl+Shift+N (next), Ctrl+Shift+P (prev) — chỉ hoạt động khi TEST MODE bật.
+  useEffect(() => {
+    if (!IS_TEST_MODE) return;
+
+    const handler = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'n') {
+        e.preventDefault();
+        handleTestNext();
+      }
+      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'p') {
+        e.preventDefault();
+        handleTestPrev();
+      }
+    };
+
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentLesson, flatLessons]);
+  // === END TEST MODE ===
+
   const toggleSubject = (subjectId: string) =>
     setExpandedSubjects((prev) => ({ ...prev, [subjectId]: !prev[subjectId] }));
 
@@ -749,6 +810,13 @@ export default function CourseLearningPage() {
           </div>
         </div>
       </div>
+
+      <TestModeNextButton
+        onNext={handleTestNext}
+        onPrev={handleTestPrev}
+        disabled={testNextDisabled}
+        disabledPrev={testPrevDisabled}
+      />
     </div>
   );
 }

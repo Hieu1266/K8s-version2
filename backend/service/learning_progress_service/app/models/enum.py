@@ -20,3 +20,4 @@ class TestingEnrollment(str, Enum):
 class CommentStatus(str, Enum):
     PENDING = "PENDING"     # Chưa xử lý
     RESOLVED = "RESOLVED"   # Đã xử lý
+    
