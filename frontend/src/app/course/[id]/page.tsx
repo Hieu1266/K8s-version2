@@ -350,10 +350,10 @@ export default function CourseLearningPage() {
     setCurrentLesson((prev: LessonWithStatus | undefined): LessonWithStatus | undefined =>
       prev
         ? {
-            ...prev,
-            submit_status: (submissionStatus ?? prev.submit_status) as LessonWithStatus['submit_status'],
-            ...(shouldMarkCompleted ? { status: LessonStatus.COMPLETED } : {}),
-          }
+          ...prev,
+          submit_status: (submissionStatus ?? prev.submit_status) as LessonWithStatus['submit_status'],
+          ...(shouldMarkCompleted ? { status: LessonStatus.COMPLETED } : {}),
+        }
         : prev
     );
   };
@@ -779,17 +779,17 @@ export default function CourseLearningPage() {
                 {(activeQuizStatus === SubmissionStatus.SUBMITTED ||
                   activeQuizStatus === SubmissionStatus.GRADED ||
                   currentLesson.status === LessonStatus.COMPLETED) && (
-                  <div className="flex justify-end pt-4">
-                    <button
-                      onClick={handleGoToNextLesson}
-                      disabled={isLastLesson}
-                      className="px-6 py-2.5 bg-[#5B5FEF] text-white font-medium rounded-lg hover:bg-[#4B4FEF] transition-colors disabled:opacity-50 flex items-center gap-2 shadow-sm"
-                    >
-                      <span>Bài tiếp theo</span>
-                      <span>→</span>
-                    </button>
-                  </div>
-                )}
+                    <div className="flex justify-end pt-4">
+                      <button
+                        onClick={handleGoToNextLesson}
+                        disabled={isLastLesson}
+                        className="px-6 py-2.5 bg-[#5B5FEF] text-white font-medium rounded-lg hover:bg-[#4B4FEF] transition-colors disabled:opacity-50 flex items-center gap-2 shadow-sm"
+                      >
+                        <span>Bài tiếp theo</span>
+                        <span>→</span>
+                      </button>
+                    </div>
+                  )}
               </div>
             )}
           </div>
