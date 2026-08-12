@@ -186,7 +186,7 @@ const handleSelectCourse = async (course: any) => {
   if (course?.curriculum_id) {
     try {
       const res: any = await getSubjectsByCourseAction(course.course_id);
-
+      
       const subjectList = Array.isArray(res)
         ? res
         : res?.data || [];

@@ -104,6 +104,9 @@ def create_user(
         "message": "Tạo người " + new_user.username + " thành công!"
     }
 
+
+
+
 @router.get("/get-user/{user_id}", response_model=UserDetailInfo)
 def get_user(
     session: SessionDep,
@@ -121,6 +124,8 @@ def get_user(
     user_data = user.model_dump()
     user_data["role_name"] = role_name
     return user_data
+
+
 
 @router.patch("/update-role/{user_id}", response_model=UserDetailInfo)
 def update_user_role(

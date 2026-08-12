@@ -17,6 +17,10 @@ from app.schemas.syllabus import (
     SyllabusUpdate,
 )
 
+from fastapi.responses import RedirectResponse  # 🟢 Import RedirectResponse
+
+NGINX_MEDIA_URL = os.getenv("NGINX_MEDIA_URL", "http://localhost:8081")
+
 router = APIRouter(prefix="/syllabus", tags=["syllabus"])
 
 
@@ -91,7 +95,7 @@ def is_subject_instructor(
     return crud_syllabus.is_subject_instructor(db, query)
 
 
-# 🟢 5. API Download file
+
 @router.get("/download/{syllabus_id}")
 def download_syllabus_file(
     syllabus_id: UUID,
@@ -101,15 +105,11 @@ def download_syllabus_file(
     syllabus = crud_syllabus.get_by_id(db=db, id=syllabus_id)
     if not syllabus or not syllabus.syllabus_file_path:
         raise HTTPException(status_code=404, detail="Không tìm thấy tập tin đề cương.")
-
-    full_path = crud_syllabus_media.get_full_path(syllabus.syllabus_file_path)
-    file_name = os.path.basename(full_path)
+    clean_path = syllabus.syllabus_file_path.lstrip('/')
+    file_url = f"{NGINX_MEDIA_URL}/{clean_path}"
     
-    return FileResponse(
-        path=full_path,
-        filename=file_name,
-        media_type="application/pdf"
-    )
+    return RedirectResponse(url=file_url)
+
 
 
 # 🔴 6. API: Xóa đề cương theo ID

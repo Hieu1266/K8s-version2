@@ -42,7 +42,7 @@ def create_curriculum(
 
 # 🔵 3. Lấy toàn bộ danh sách Curriculum
 @router.get("/", response_model=list[CurriculumRead])
-def get_curriculums(db: SessionDep, skip: int = 0, limit: int = 10):
+def get_curriculums(db: SessionDep):
     curriculums = crud_curriculum.get_multi(db, skip=skip, limit=limit)
     
     results = []
