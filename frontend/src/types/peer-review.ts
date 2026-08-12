@@ -84,3 +84,28 @@ export interface SubmitEvaluationResponse {
     submission_peer_avg_score: number | null;
     submission_is_discrepant: boolean | null;
 }
+
+// ---------------------------------------------------------------------------
+// [Giảng viên] Bài nộp chấm chéo bị lệch điểm, cần chấm lại
+// ---------------------------------------------------------------------------
+export interface QuizPeerReviewInfo {
+    quiz_id: string;
+    title: string;
+    is_peer_review: boolean;
+}
+
+export interface SubmissionListItem {
+    submission_id: string;
+    quiz_id: string;
+    user_id: string;
+    attempt_number: number;
+    status: 'IN_PROGRESS' | 'SUBMITTED' | 'GRADED';
+    is_peer_review: boolean;
+    is_discrepant: boolean;
+    peer_avg_score: number | null;
+    completed_review_count: number;
+    total_score: number | null;
+    is_passed: boolean | null;
+    started_at: string;
+    submitted_at: string | null;
+}

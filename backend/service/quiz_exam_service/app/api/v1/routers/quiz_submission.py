@@ -502,14 +502,14 @@ async def grade_submission(
     token: str = Depends(oauth2_scheme),               
     current_user = Depends(RoleChecker(["Instructor"])), 
 ):
-    # 1. Cập nhật điểm cho bài nộp
+    # 1. Cập nhật điểm, trạng thái, is_passed và gỡ cờ is_discrepant trực tiếp trong CRUD
     updated_submission = crud_quiz_submission.update_teacher_grading(
         db=db, submission_id=submission_id, gradings=payload.gradings
     )
 
     next_unlocked = False
 
-    # 2. Nếu bài nộp đạt (is_passed = True) và bài thi gắn liền với bài học (target_lesson_id)
+    # 2. Nếu bài nộp đạt (is_passed = True) và bài thi gắn liền với lesson (target_lesson_id)
     if (
         updated_submission.status == SubmissionStatus.GRADED
         and updated_submission.is_passed
@@ -517,18 +517,15 @@ async def grade_submission(
         and updated_submission.quiz.target_lesson_id
     ):
         lesson_id = updated_submission.quiz.target_lesson_id
-        student_user_id = updated_submission.user_id  # Lấy ID của học viên làm bài
-        print(student_user_id)
-        print(lesson_id)
+        student_user_id = updated_submission.user_id
 
-        # 🔄 CẬP NHẬT: Gọi sang API mới dành riêng cho giáo viên chấm điểm
         progress_url = f"{settings.BACKEND_LEARNING_PROGRESS_URL}/lesson_progress/teacher/lesson/{lesson_id}/grade-complete"
         headers = {
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/json"
         }
         params = {
-            "user_id": str(student_user_id)  # Truyền user_id của học viên vào Query Parameter
+            "user_id": str(student_user_id)
         }
 
         try:
@@ -546,6 +543,7 @@ async def grade_submission(
         except httpx.RequestError as exc:
             print(f"Lỗi kết nối tới Progress Service: {exc}")
 
+    # 3. Trả về kết quả phản hồi
     return {
         "message": "Cập nhật điểm thành công",
         "status": updated_submission.status,

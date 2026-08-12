@@ -24,7 +24,10 @@ export default function PeerReviewSection({
     onReviewSubmitted,
 }: {
     quizId: string;
-    onReviewSubmitted?: () => void;
+    /** Gọi sau khi nộp 1 lượt chấm chéo. `isAllAssignmentsCompleted` = true khi đây là
+     *  lượt cuối cùng còn PENDING (không còn bài nào chờ chấm) — dùng để phân biệt với
+     *  các lượt chấm giữa chừng, tránh cha component cập nhật tiến độ quá sớm. */
+    onReviewSubmitted?: (isAllAssignmentsCompleted: boolean) => void;
 }) {
     const [assignments, setAssignments] = useState<MyAssignment[] | null>(null);
     const [listLoading, setListLoading] = useState(true);
@@ -32,16 +35,21 @@ export default function PeerReviewSection({
 
     const [activeAssignmentId, setActiveAssignmentId] = useState<string | null>(null);
 
-    async function loadAssignments() {
+    // 🎯 Trả về danh sách vừa tải để nơi gọi (onCompleted) có thể kiểm tra ngay
+    // còn PENDING hay không, thay vì đọc state `assignments` có thể chưa kịp cập nhật.
+    async function loadAssignments(): Promise<MyAssignment[] | null> {
         setListLoading(true);
         setListError(null);
         const res = await getMyPeerReviewAssignmentsAction(quizId);
+        let fetched: MyAssignment[] | null = null;
         if (res.success) {
-            setAssignments(res.data ?? []);
+            fetched = res.data ?? [];
+            setAssignments(fetched);
         } else {
             setListError(res.error || 'Không thể tải danh sách bài chấm chéo.');
         }
         setListLoading(false);
+        return fetched;
     }
 
     useEffect(() => {
@@ -54,12 +62,16 @@ export default function PeerReviewSection({
             <AssignmentGrading
                 assignmentId={activeAssignmentId}
                 onBack={() => setActiveAssignmentId(null)}
-                onCompleted={() => {
+                onCompleted={async () => {
                     setActiveAssignmentId(null);
-                    loadAssignments();
-                    if (onReviewSubmitted) {
-                        onReviewSubmitted();
-                    }
+                    // Chờ tải lại xong rồi mới kiểm tra, tránh đọc state `assignments` cũ
+                    // (setState không đồng bộ) — đây là nguyên nhân khiến trước đây coi
+                    // MỌI lượt nộp là "lượt cuối".
+                    const updated = await loadAssignments();
+                    const stillHasPending = (updated ?? []).some(
+                        (a) => a.status === ReviewStatus.PENDING
+                    );
+                    onReviewSubmitted?.(!stillHasPending);
                 }}
             />
         );

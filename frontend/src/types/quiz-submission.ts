@@ -68,7 +68,7 @@ export interface SubmissionStatusDetail {
     question_id: string;
     question_title: string;
     question_type: QuestionType;
-    video_trigger_seconds?: number | null; // 🆕
+    video_trigger_seconds?: number | null;
     body_content?: string | null;
     max_points?: number | null;
     options: SubmissionStatusOption[];

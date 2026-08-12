@@ -504,72 +504,62 @@ class CRUDQuizSubmission(CRUDBase[QuizSubmission, QuizSubmissionCreate, QuizSubm
             for sub in submissions
         ]
     def update_teacher_grading(
-        self, db: Session, submission_id: UUID, gradings: List[QuestionGradingInput]
+        self,
+        db: Session,
+        submission_id: UUID,
+        gradings: List[QuestionGradingInput]
     ) -> QuizSubmission:
+        # 1. Lấy thông tin bài nộp
         submission = self.get_by_id(db, submission_id)
         if not submission:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, 
+                status_code=status.HTTP_404_NOT_FOUND,
                 detail="Không tìm thấy bài nộp"
             )
 
+        # Map danh sách chấm điểm theo detail_id để truy xuất nhanh O(1)
         grading_map = {g.detail_id: g for g in gradings}
 
         total_earned_score = 0.0
         total_quiz_max_score = 0.0
 
+        # 2. Duyệt qua từng câu hỏi để cập nhật điểm & feedback của Giảng viên
         for detail in submission.details:
-            question = detail.question
-            q_max = (
-                getattr(question, "max_points", None) or 
-                getattr(question, "score", None) or 
-                getattr(question, "points", None) or 
-                1.0
-            )
-            total_quiz_max_score += float(q_max)
+            q = detail.question
+            max_p = (q.max_points or 0.0) if q else 0.0
+            total_quiz_max_score += max_p
 
-            # Nếu câu hỏi này có trong danh sách cập nhật điểm
+            # Cập nhật nếu câu trả lời này nằm trong danh sách chấm của Giảng viên
             if detail.detail_id in grading_map:
-                g_info = grading_map[detail.detail_id]
-                
-                # Ràng buộc điểm chấm không vượt quá điểm tối đa câu hỏi
-                if g_info.score_earned > float(q_max):
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"Điểm chấm ({g_info.score_earned}) vượt quá điểm tối đa ({q_max}) của câu hỏi."
-                    )
-                if g_info.score_earned < 0:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="Điểm chấm không được nhỏ hơn 0."
-                    )
-
-                detail.score_earned = float(g_info.score_earned)
-                detail.teacher_feedback = g_info.teacher_feedback
+                item_grading = grading_map[detail.detail_id]
+                detail.score_earned = item_grading.score_earned
+                if hasattr(item_grading, "teacher_feedback") and item_grading.teacher_feedback is not None:
+                    detail.teacher_feedback = item_grading.teacher_feedback
                 db.add(detail)
 
-            # Cộng dồn điểm đã thu được
-            if detail.score_earned is not None:
-                total_earned_score += float(detail.score_earned)
+            total_earned_score += (detail.score_earned or 0.0)
 
-        # Kiểm tra xem toàn bộ các câu đã có điểm chưa
-        all_graded = all(d.score_earned is not None for d in submission.details)
+        # 3. Cập nhật kết quả tổng quan bài thi
+        submission.total_score = total_earned_score
+        submission.status = SubmissionStatus.GRADED
 
-        if all_graded:
-            submission.status = SubmissionStatus.GRADED
-            submission.total_score = total_earned_score
+        passing_percentage = (
+            submission.quiz.passing_percentage
+            if (submission.quiz and submission.quiz.passing_percentage is not None)
+            else 0.0
+        )
+        passing_score = (passing_percentage / 100.0) * total_quiz_max_score
+        submission.is_passed = total_earned_score >= passing_score
 
-            passing_percentage = (
-                submission.quiz.passing_percentage 
-                if (submission.quiz and submission.quiz.passing_percentage is not None) 
-                else 0.0
-            )
-            passing_score = (passing_percentage / 100.0) * total_quiz_max_score
-            submission.is_passed = total_earned_score >= passing_score
+        # 4. Gỡ cờ bất đồng điểm (is_discrepant) nếu đây là bài nộp chấm chéo
+        if submission.is_peer_review and submission.is_discrepant:
+            submission.is_discrepant = False
 
+        # 5. Lưu toàn bộ thay đổi vào Database
         db.add(submission)
         db.commit()
         db.refresh(submission)
+
         return submission
 
 crud_quiz_submission = CRUDQuizSubmission(QuizSubmission)

@@ -100,12 +100,17 @@ export function QuizSection({
     courseId,
     isPeerReview,
     onQuizPassed,
+    onNextLessonUnlocked,
     onQuizIdResolved,
 }: {
     lessonId: string;
     courseId: string;
     isPeerReview: boolean;
-    onQuizPassed?: (status?: string) => void;
+    onQuizPassed?: (status?: string, isPass?: boolean) => void;
+    /** 🎯 Gọi khi vừa nộp bài, backend đã mở khóa bài tiếp theo (next_lesson_unlocked = true)
+     *  nhưng bài thi CHƯA chấm xong (status = SUBMITTED, đang chờ chấm chéo/giảng viên).
+     *  Chỉ nên cập nhật UI mở khóa bài sau — KHÔNG đánh dấu bài hiện tại hoàn thành. */
+    onNextLessonUnlocked?: (status?: string) => void;
     /** Báo cho component cha biết quiz_id của đề thi hiện tại (dùng để hiển thị PeerReviewSection ở ngoài). */
     /** Báo cho component cha biết quiz_id + trạng thái bài nộp hiện tại (dùng để hiển thị PeerReviewSection ở ngoài — chỉ hiện khi đã nộp bài). */
     onQuizIdResolved?: (quizId: string | null, status?: string | null) => void;
@@ -266,8 +271,20 @@ export function QuizSection({
         if (res.success && res.data) {
             setResult(res.data);
             onQuizIdResolved?.(quizData.quiz_id, res.data.status);
-            if (res.data.next_lesson_unlocked && onQuizPassed) {
-                onQuizPassed(res.data.status);
+            // 🎯 Backend chỉ set next_lesson_unlocked = true cho 2 trường hợp:
+            //  (1) status = GRADED và is_passed = true -> đã thực sự hoàn thành bài học
+            //      -> gọi onQuizPassed để vừa đánh dấu bài hiện tại COMPLETED vừa mở khóa bài sau.
+            //  (2) status = SUBMITTED (đang chờ chấm chéo/giảng viên) -> chỉ mở khóa bài sau để
+            //      học viên có thể học tiếp trong lúc chờ, bài hiện tại CHƯA hoàn thành
+            //      -> chỉ gọi onNextLessonUnlocked, không được gọi onQuizPassed.
+            if (
+                res.data.status === SubmissionStatus.GRADED &&
+                res.data.is_passed === true &&
+                onQuizPassed
+            ) {
+                onQuizPassed(res.data.status, res.data.is_passed);
+            } else if (res.data.next_lesson_unlocked && onNextLessonUnlocked) {
+                onNextLessonUnlocked(res.data.status);
             }
         } else {
             setError(res.error || 'Nộp bài thất bại.');

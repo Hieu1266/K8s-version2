@@ -366,6 +366,22 @@ async def submit_evaluation(
     return assignment, evaluation_objs, submission_result
 
 
+# ---------------------------------------------------------------------------
+# [Giảng viên] Danh sách bài nộp theo cờ is_peer_review
+# ---------------------------------------------------------------------------
+def get_submissions_by_quiz(
+    db: Session, quiz_id: UUID, is_peer_review: Optional[bool] = None
+) -> List[QuizSubmission]:
+    """Danh sách bài nộp của 1 đề thi, có thể lọc theo is_peer_review:
+    - False -> mục 'Bài nộp thường' (không chọn chấm chéo).
+    - True  -> mục 'Chấm chéo' (gồm cả bài đã tự động chốt điểm lẫn bài lệch điểm)."""
+    stmt = select(QuizSubmission).where(QuizSubmission.quiz_id == quiz_id)
+    if is_peer_review is not None:
+        stmt = stmt.where(QuizSubmission.is_peer_review == is_peer_review)
+    stmt = stmt.order_by(QuizSubmission.started_at.desc())
+    return list(db.exec(stmt).all())
+
+
 def _try_finalize_submission(db: Session, submission_id: UUID) -> dict:
     submission = db.get(QuizSubmission, submission_id)
     if not submission:

@@ -5,9 +5,11 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import LessonNotesPanel from '@/components/LessonNotesPanel';
 import { QuizSection } from '@/components/LessonQuizContainer';
+import PeerReviewSection from '@/components/course-learning/PeerReviewSection';
 import TesterFeedbackPanel from '@/components/course-learning/TesterFeedbackPanel';
 import { getLearningCourse } from '@/actions/getCourse';
 import { attachStatusToLessons, completeLessonAction } from '@/actions/getLesson';
+import { getQuizStatusByLessonAction } from '@/actions/getQuizSubmission';
 import { getLessonNotesAction, createNoteAction } from '@/actions/getNotes';
 import { getOrCreateVideoProgressAction, updateVideoProgressAction } from '@/actions/getVideoProgress';
 import { getLessonResourcesAction } from '@/actions/getLessonResource';
@@ -92,6 +94,9 @@ export default function CourseLearningPage() {
 
   const [activeQuizId, setActiveQuizId] = useState<string | null>(null);
   const [activeQuizStatus, setActiveQuizStatus] = useState<string | null>(null);
+  // Tăng mỗi khi 1 lượt chấm chéo được nộp -> ép QuizSection remount & tự fetch lại
+  // trạng thái mới nhất (GRADED/is_passed) từ server, không cần load lại trang.
+  const [quizStatusRefreshKey, setQuizStatusRefreshKey] = useState(0);
 
   const lessonContentScrollRef = useRef<HTMLDivElement>(null);
 
@@ -297,12 +302,20 @@ export default function CourseLearningPage() {
     }
   };
 
-  const handleQuizPassed = (submissionStatus?: string, isPass?: boolean) => {
+  /**
+   * Helper dùng chung: cập nhật submit_status của lesson hiện tại + (tùy chọn) đánh dấu
+   * lesson hiện tại COMPLETED + (tùy chọn) mở khóa lesson kế tiếp trên UI.
+   * Tách riêng 2 cờ `markCurrentCompleted` và `unlockNext` để phân biệt rõ 2 tình huống:
+   *  - Vừa nộp bài, status = SUBMITTED (đang chờ chấm chéo/giảng viên): chỉ unlockNext = true,
+   *    markCurrentCompleted = false (bài hiện tại CHƯA hoàn thành, chỉ mở khóa bài sau để học tiếp).
+   *  - Bài thi đã GRADED và is_passed = true (chấm xong, đạt): cả 2 đều true.
+   */
+  const syncLessonUiState = (
+    submissionStatus: string | undefined,
+    markCurrentCompleted: boolean,
+    unlockNext: boolean
+  ) => {
     if (!currentLesson || !course) return;
-
-    const isFailed = isPass === false;
-    const shouldMarkCompleted = !isFailed;
-    const shouldUnlockNext = !isFailed;
 
     const currentIndex = flatLessons.findIndex(
       (f) => f.lesson.lesson_id === currentLesson.lesson_id
@@ -317,7 +330,7 @@ export default function CourseLearningPage() {
       !!nextItem && nextItem.lesson.status !== LessonStatus.LOCKED && !nextItem.lesson.is_optional;
 
     const unlockTarget =
-      shouldUnlockNext && currentIndex !== -1 && !nextAlreadyAccessible
+      unlockNext && currentIndex !== -1 && !nextAlreadyAccessible
         ? findNextLockedLesson(currentIndex + 1)
         : null;
 
@@ -334,7 +347,7 @@ export default function CourseLearningPage() {
                 return {
                   ...les,
                   submit_status: submissionStatus ?? les.submit_status,
-                  ...(shouldMarkCompleted ? { status: LessonStatus.COMPLETED } : {}),
+                  ...(markCurrentCompleted ? { status: LessonStatus.COMPLETED } : {}),
                 };
               }
               if (unlockTarget && les.lesson_id === unlockTarget.lesson.lesson_id) {
@@ -352,10 +365,70 @@ export default function CourseLearningPage() {
         ? {
           ...prev,
           submit_status: (submissionStatus ?? prev.submit_status) as LessonWithStatus['submit_status'],
-          ...(shouldMarkCompleted ? { status: LessonStatus.COMPLETED } : {}),
+          ...(markCurrentCompleted ? { status: LessonStatus.COMPLETED } : {}),
         }
         : prev
     );
+  };
+
+  // 🎯 Bài thi đã chấm xong (GRADED) và đạt (is_passed = true) -> đánh dấu bài hiện tại
+  // hoàn thành VÀ mở khóa bài tiếp theo.
+  const handleQuizPassed = (submissionStatus?: string, isPass?: boolean) => {
+    const isFailed = isPass === false;
+    if (isFailed) return; // Chưa đạt -> không hoàn thành, không mở khóa bài sau
+    syncLessonUiState(submissionStatus, true, true);
+  };
+
+  /**
+   * 🎯 Vừa nộp bài và backend xác nhận đã mở khóa bài tiếp theo (`next_lesson_unlocked = true`)
+   * trong khi bài thi CHƯA được chấm xong (status = SUBMITTED, đang chờ chấm chéo/giảng viên).
+   * Chỉ cập nhật submit_status + mở khóa lesson kế tiếp trên UI — KHÔNG đánh dấu lesson hiện
+   * tại là COMPLETED (việc đó chỉ xảy ra khi thật sự GRADED + is_passed, xem handleQuizPassed).
+   */
+  const handleNextLessonUnlockedOnly = (submissionStatus?: string) => {
+    syncLessonUiState(submissionStatus, false, true);
+  };
+
+  /**
+   * 🎯 Được gọi khi học viên vừa nộp xong 1 lượt CHẤM CHÉO (PeerReviewSection.onReviewSubmitted).
+   *
+   * Backend (crud/peer_review.py -> submit_evaluation -> check_and_trigger_peer_review_completion)
+   * đã tự kiểm tra điều kiện và gọi sang Progress Service để chốt hoàn thành lesson NGAY LÚC ĐÓ nếu:
+   *   - Học viên đã chấm hết TẤT CẢ bài được giao (không còn PENDING), VÀ
+   *   - Bài nộp của chính học viên đã GRADED với is_passed = true.
+   *
+   * Vấn đề: việc chốt đó xảy ra ở server, FE không tự biết để cập nhật UI (tích hoàn thành,
+   * thanh tiến độ, mở khoá bài tiếp theo...). Nên sau mỗi lần nộp chấm chéo, ta chủ động
+   * gọi lại API lấy trạng thái bài thi mới nhất rồi đồng bộ vào state cục bộ.
+   *
+   * 🎯 FIX: chỉ cho phép cập nhật thanh tiến độ khi ĐỦ CẢ 2 ĐIỀU KIỆN, khớp đúng logic backend:
+   *   1. `isAllAssignmentsCompleted` = true (PeerReviewSection xác nhận không còn assignment PENDING)
+   *   2. Trạng thái bài thi của chính học viên = GRADED và is_passed = true
+   * Trước đây chỉ kiểm tra điều kiện 2 -> nếu bài nộp của học viên tình cờ đã được người khác
+   * chấm đạt từ trước, chỉ cần nộp BẤT KỲ lượt chấm chéo nào (kể cả lượt đầu) cũng bị tính
+   * là hoàn thành ngay, khiến thanh tiến độ nhảy % sớm hơn thực tế.
+   */
+  const handlePeerReviewSubmitted = async (isAllAssignmentsCompleted: boolean) => {
+    if (!currentLesson) return;
+
+    const res = await getQuizStatusByLessonAction(currentLesson.lesson_id);
+    if (res.success && res.data) {
+      const newStatus = res.data.status ?? null;
+      setActiveQuizStatus(newStatus);
+
+      // Đúng điều kiện: hết PENDING + GRADED + is_passing = true -> mới đánh tích hoàn thành
+      if (
+        isAllAssignmentsCompleted &&
+        newStatus === SubmissionStatus.GRADED &&
+        res.data.is_passed === true
+      ) {
+        handleQuizPassed(newStatus, true);
+      }
+    }
+
+    // Buộc QuizSection unmount/mount lại để tự fetch trạng thái mới nhất,
+    // tránh hiển thị "Đang chờ chấm chéo" bị cũ trên màn hình kết quả bài thi.
+    setQuizStatusRefreshKey((k) => k + 1);
   };
 
   const handleCompleteAndNext = async () => {
@@ -766,15 +839,28 @@ export default function CourseLearningPage() {
             {(activeTab === 'quiz' || currentLesson?.is_quiz) && currentLesson && (
               <div key="quiz" className="anim-fade-up space-y-6 pb-12">
                 <QuizSection
+                  key={`${currentLesson.lesson_id}-${quizStatusRefreshKey}`}
                   lessonId={currentLesson.lesson_id}
                   courseId={id}
                   onQuizPassed={handleQuizPassed}
+                  onNextLessonUnlocked={handleNextLessonUnlockedOnly}
                   isPeerReview={currentLesson.is_peer_review}
                   onQuizIdResolved={(quizId, status) => {
                     setActiveQuizId(quizId);
                     setActiveQuizStatus(status ?? null);
                   }}
                 />
+
+                {/* 🎯 Khu vực chấm chéo: chỉ hiện khi lesson hỗ trợ chấm chéo và học viên đã nộp bài */}
+                {currentLesson.is_peer_review &&
+                  activeQuizId &&
+                  (activeQuizStatus === SubmissionStatus.SUBMITTED ||
+                    activeQuizStatus === SubmissionStatus.GRADED) && (
+                    <PeerReviewSection
+                      quizId={activeQuizId}
+                      onReviewSubmitted={handlePeerReviewSubmitted}
+                    />
+                  )}
 
                 {(activeQuizStatus === SubmissionStatus.SUBMITTED ||
                   activeQuizStatus === SubmissionStatus.GRADED ||
