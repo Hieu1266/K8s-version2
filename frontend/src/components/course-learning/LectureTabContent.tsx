@@ -3,7 +3,8 @@ import { VideoProgress } from "@/types/video";
 import { LessonWithStatus } from "./types";
 import QuickNoteBox from "./QuickNoteBox";
 import CompleteLessonButton from "./CompleteLessonButton";
-import LessonSlideViewer from "@/components/LessonSlideViewer";
+//import LessonSlideViewer from "@/components/LessonSlideViewer";
+import PresentationViewer from "@/components/PresentationViewer";
 
 type LectureTabContentProps = {
   currentLesson?: LessonWithStatus;
@@ -112,50 +113,42 @@ export default function LectureTabContent({
         )
       ) : null}
 
-      {hasContentBody ? (
-        currentLesson.is_slide_presentation ? (
-          <LessonSlideViewer
-            lessonId={currentLesson.lesson_id}
-            lessonTitle={currentLesson.title}
-            content={currentLesson.content_body as string}
-            hasPreviousLesson={hasPreviousLesson}
-            hasNextLesson={hasNextLesson}
-            onPreviousLesson={onPreviousLesson}
-            onNextLesson={onNextLesson}
-          />
-        ) : (
-          <div className="bg-white border border-[#ECEAF0] rounded-3xl p-8 space-y-4 shadow-sm">
-            <div className="flex items-center gap-2 text-[#5B5FEF] font-bold text-sm uppercase tracking-wider">
-              <span>📖 Nội dung bài học</span>
-            </div>
-
-            <div
-              className="prose prose-base max-w-none text-[#2B2D3D] leading-relaxed font-normal"
-              dangerouslySetInnerHTML={{
-                __html: currentLesson.content_body as string,
-              }}
-            />
+      {currentLesson.is_slide_presentation ? (
+        <PresentationViewer
+          key={currentLesson.lesson_id}
+          lessonId={currentLesson.lesson_id}
+          lessonTitle={currentLesson.title}
+        />
+      ) : hasContentBody ? (
+        <div className="space-y-4 rounded-3xl border border-[#ECEAF0] bg-white p-8 shadow-sm">
+          <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-[#5B5FEF]">
+            <span>📖 Nội dung bài học</span>
           </div>
-        )
+
+          <div
+            className="prose prose-base max-w-none font-normal leading-relaxed text-[#2B2D3D]"
+            dangerouslySetInnerHTML={{
+              __html: currentLesson.content_body as string,
+            }}
+          />
+        </div>
       ) : (
         !hasVideo && (
-          <div className="bg-white border border-[#ECEAF0] rounded-3xl p-8 text-center text-sm text-[#8A8FA3]">
+          <div className="rounded-3xl border border-[#ECEAF0] bg-white p-8 text-center text-sm text-[#8A8FA3]">
             Bài học này hiện chưa có nội dung chi tiết.
           </div>
         )
       )}
 
       {/* NÚT HOÀN THÀNH BÀI ĐỌC: Chỉ hiển thị khi KHÔNG có video VÀ had_quiz == false */}
-      {!hasVideo &&
-        !currentLesson.had_quiz &&
-        (!currentLesson.is_slide_presentation || !hasNextLesson) && (
-          <CompleteLessonButton
-            completing={completing}
-            isOptional={currentLesson.is_optional}
-            status={currentLesson.status}
-            onClick={onCompleteAndNext}
-          />
-        )}
+      {!hasVideo && !currentLesson.had_quiz && (
+        <CompleteLessonButton
+          completing={completing}
+          isOptional={currentLesson.is_optional}
+          status={currentLesson.status}
+          onClick={onCompleteAndNext}
+        />
+      )}
     </>
   );
 }
