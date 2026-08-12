@@ -1,258 +1,528 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
-import { ArrowLeft, Server, Monitor, Edit2, X, Save, Loader2, Database, Key, Folder, Shield, Terminal } from 'lucide-react';
+import {
+  ArrowLeft,
+  Server,
+  Monitor,
+  Edit2,
+  X,
+  Save,
+  Loader2,
+  Terminal,
+  RefreshCw,
+  AlertTriangle,
+  Plus,
+  Trash2,
+  Circle,
+  Key,
+} from "lucide-react";
 
-// Cấu trúc dữ liệu CHỈ chứa IP và Port
-const initialConfig = {
-  // --- FRONTEND ENV ---
-  frontend: { ip: 'localhost', port: '3000' },
-  userBackend: { ip: 'localhost', port: '8000' },
-  courseBackend: { ip: 'localhost', port: '8001' },
-  progressBackend: { ip: 'localhost', port: '8003' },
-  examBackend: { ip: 'localhost', port: '8004' },
-  nginx: { ip: 'localhost', port: '80' },
-  googleClientId: '',
+// ============================================
+// CẤU HÌNH KẾT NỐI TỚI config_service
+// ============================================
+const CONFIG_API_BASE =
+  process.env.NEXT_PUBLIC_CONFIG_SERVICE_URL || "http://localhost:8005";
 
-  // --- BACKEND ENV ---
-  usersDb: { ip: 'localhost', port: '5434' },
-  coursesDb: { ip: 'localhost', port: '5433' },
-  mediaServer: { ip: '172.16.109.76', port: '8000' },
-  corsOrigins: 'localhost:3000, 127.0.0.1:8004', // Giữ nguyên chuỗi vì có thể có nhiều origin
-  clientSecretKey: '',
-  secretKey: '',
-  courseImagePath: '/var/www/lumer_media/uploads/course/images/',
-};
+const CONFIG_ADMIN_KEY =
+  process.env.NEXT_PUBLIC_CONFIG_ADMIN_KEY || "change-me-please";
+  
+const BACKEND_SERVICES = [
+  { id: "user_service", label: "user_service" },
+  { id: "course_service", label: "course_service" },
+  { id: "learning_progress_service", label: "progress_service" },
+  { id: "quiz_exam_service", label: "quiz_exam_service" },
+] as const;
 
-type ViewState = 'HOME' | 'FRONTEND' | 'BACKEND';
+const FRONTEND_SERVICE_ID = "frontend";
+
+const SECRET_KEY_HINTS = ["SECRET", "PASSWORD", "TOKEN"];
+const isSecretField = (key: string) =>
+  SECRET_KEY_HINTS.some((hint) => key.toUpperCase().includes(hint));
+
+type ConfigMap = Record<string, string>;
+type ViewState = "HOME" | "FRONTEND" | "BACKEND";
+
+// ============================================
+// GỌI API
+// ============================================
+async function fetchServiceConfig(serviceName: string): Promise<ConfigMap> {
+  const res = await fetch(`${CONFIG_API_BASE}/config/${serviceName}`, {
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    throw new Error(`Không lấy được config của "${serviceName}" (HTTP ${res.status})`);
+  }
+  const data = await res.json();
+  return data.config as ConfigMap;
+}
+
+async function saveServiceConfig(
+  serviceName: string,
+  config: ConfigMap,
+): Promise<ConfigMap> {
+  const res = await fetch(`${CONFIG_API_BASE}/config/${serviceName}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Admin-Key": CONFIG_ADMIN_KEY,
+    },
+    body: JSON.stringify({ config }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `Lưu thất bại (HTTP ${res.status})`);
+  }
+  const data = await res.json();
+  return data.config as ConfigMap;
+}
 
 export default function ConfigPage() {
-  const [view, setView] = useState<ViewState>('HOME');
-  const [config, setConfig] = useState(initialConfig);
+  const [view, setView] = useState<ViewState>("HOME");
+  const [activeBackendTab, setActiveBackendTab] = useState<string>(
+    BACKEND_SERVICES[0].id,
+  );
+
+  const [configCache, setConfigCache] = useState<Record<string, ConfigMap>>({});
+  const [loadingService, setLoadingService] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
   const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState(initialConfig);
+  const [formData, setFormData] = useState<ConfigMap>({});
   const [isSaving, setIsSaving] = useState(false);
 
-  // Xử lý thay đổi cho IP/Port
-  const handleIpPortChange = (field: string, key: 'ip' | 'port', value: string) => {
-    setFormData((prev: any) => ({
-      ...prev,
-      [field]: { ...prev[field], [key]: value }
-    }));
+  const [newKey, setNewKey] = useState("");
+  const [newValue, setNewValue] = useState("");
+  const [addFieldError, setAddFieldError] = useState<string | null>(null);
+
+  const currentServiceId =
+    view === "FRONTEND" ? FRONTEND_SERVICE_ID : activeBackendTab;
+
+  const loadConfig = useCallback(
+    async (serviceName: string, force = false) => {
+      if (!force && configCache[serviceName]) return;
+      setLoadingService(serviceName);
+      setErrorMsg(null);
+      try {
+        const data = await fetchServiceConfig(serviceName);
+        setConfigCache((prev) => ({ ...prev, [serviceName]: data }));
+      } catch (e: any) {
+        setErrorMsg(e.message || "Lỗi không xác định khi tải config.");
+      } finally {
+        setLoadingService(null);
+      }
+    },
+    [configCache],
+  );
+
+  useEffect(() => {
+    if (view === "FRONTEND") loadConfig(FRONTEND_SERVICE_ID);
+    if (view === "BACKEND") loadConfig(activeBackendTab);
+  }, [view, activeBackendTab, loadConfig]);
+
+  const openEditModal = () => {
+    setFormData(configCache[currentServiceId] || {});
+    setNewKey("");
+    setNewValue("");
+    setAddFieldError(null);
+    setIsEditing(true);
   };
 
-  // Xử lý thay đổi cho Text thường
-  const handleTextChange = (field: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+  const handleFieldChange = (key: string, value: string) => {
+    setFormData((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleRemoveField = (key: string) => {
+    setFormData((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  };
+
+  const handleAddField = () => {
+    const key = newKey.trim().toUpperCase().replace(/\s+/g, "_");
+    if (!key) {
+      setAddFieldError("Tên biến không được để trống.");
+      return;
+    }
+    if (formData.hasOwnProperty(key)) {
+      setAddFieldError(`Biến "${key}" đã tồn tại.`);
+      return;
+    }
+    setFormData((prev) => ({ ...prev, [key]: newValue }));
+    setNewKey("");
+    setNewValue("");
+    setAddFieldError(null);
+  };
+
+  const handleNewFieldKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleAddField();
+    }
   };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
+    setErrorMsg(null);
     try {
-      await new Promise(resolve => setTimeout(resolve, 600)); // Giả lập API
-      setConfig(formData);
+      const saved = await saveServiceConfig(currentServiceId, formData);
+      setConfigCache((prev) => ({ ...prev, [currentServiceId]: saved }));
       setIsEditing(false);
-    } catch (error) {
-      console.error(error);
+    } catch (e: any) {
+      setErrorMsg(e.message || "Lưu thất bại.");
     } finally {
       setIsSaving(false);
     }
   };
 
   // ==========================================
-  // GIAO DIỆN CHÍNH (HOME) - 2 Ô LỚN
+  // HOME 
   // ==========================================
   const renderHome = () => (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto h-[400px]">
-      <div 
-        onDoubleClick={() => setView('FRONTEND')}
-        className="group relative bg-white rounded-3xl p-10 border border-slate-200 hover:border-[#0066FF] shadow-lg shadow-blue-500/5 hover:shadow-blue-500/20 transition-all duration-300 cursor-pointer flex flex-col justify-center items-center text-center overflow-hidden hover:-translate-y-2"
-      >
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-        <div className="relative z-10">
-          <div className="w-20 h-20 mx-auto bg-blue-50 text-[#0066FF] rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
-            <Monitor size={40} />
-          </div>
-          <h2 className="text-2xl font-bold text-slate-800 mb-3">Frontend Configuration</h2>
-          <p className="text-sm text-slate-500 mb-6 px-4">Quản lý IP & Port cho các biến môi trường Client-side.</p>
-          <div className="inline-flex items-center px-4 py-2 bg-blue-50 text-[#0066FF] font-semibold rounded-lg text-sm animate-pulse">
-            Nhấp đúp để mở
-          </div>
-        </div>
-      </div>
-
-      <div 
-        onDoubleClick={() => setView('BACKEND')}
-        className="group relative bg-white rounded-3xl p-10 border border-slate-200 hover:border-[#0066FF] shadow-lg shadow-blue-500/5 hover:shadow-blue-500/20 transition-all duration-300 cursor-pointer flex flex-col justify-center items-center text-center overflow-hidden hover:-translate-y-2"
-      >
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-        <div className="relative z-10">
-          <div className="w-20 h-20 mx-auto bg-blue-50 text-[#0066FF] rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
-            <Server size={40} />
-          </div>
-          <h2 className="text-2xl font-bold text-slate-800 mb-3">Backend Configuration</h2>
-          <p className="text-sm text-slate-500 mb-6 px-4">Quản lý Database, Security & Services của Server.</p>
-          <div className="inline-flex items-center px-4 py-2 bg-blue-50 text-[#0066FF] font-semibold rounded-lg text-sm animate-pulse">
-            Nhấp đúp để mở
-          </div>
-        </div>
-      </div>
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto mt-8">
+      <HomeFileTile
+        icon={<Monitor size={24} />}
+        filename=".env.local"
+        title="Frontend Configuration"
+        description="Biến môi trường Client-side (Next.js)."
+        previewLines={["NEXT_PUBLIC_API_URL", "NEXT_PUBLIC_CONFIG_ADMIN_KEY"]}
+        onOpen={() => setView("FRONTEND")}
+      />
+      <HomeFileTile
+        icon={<Server size={24} />}
+        filename="services/*.env"
+        title="Backend Configuration"
+        description="Quản lý cấu hình 4 Microservices (User, Course, Progress, Quiz)."
+        previewLines={["DATABASE_URL", "JWT_SECRET", "PORT"]}
+        onOpen={() => setView("BACKEND")}
+      />
     </div>
   );
 
   // ==========================================
-  // GIAO DIỆN CHI TIẾT FRONTEND
+  // BẢNG CONFIG
+  // ==========================================
+  const renderConfigTable = (serviceName: string) => {
+    const config = configCache[serviceName];
+    const isLoading = loadingService === serviceName;
+
+    if (isLoading && !config) {
+      return (
+        <div className="flex flex-col items-center justify-center gap-3 py-24 text-sm font-mono text-slate-400">
+          <Loader2 size={24} className="animate-spin text-blue-500" />
+          <span>Đang tải cấu hình từ {serviceName}...</span>
+        </div>
+      );
+    }
+
+    if (!config) {
+      return (
+        <div className="flex flex-col items-center justify-center gap-4 py-24 text-sm font-mono text-slate-400">
+          <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center">
+            <AlertTriangle size={20} className="text-red-400" />
+          </div>
+          <span>Không thể tải cấu hình</span>
+          <button
+            onClick={() => loadConfig(serviceName, true)}
+            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg transition-colors font-sans font-medium"
+          >
+            Thử lại
+          </button>
+        </div>
+      );
+    }
+
+    const entries = Object.entries(config);
+
+    if (entries.length === 0) {
+      return (
+        <div className="flex flex-col items-center justify-center py-24 text-sm font-mono text-slate-500">
+          <Key size={32} className="opacity-20 mb-3" />
+          <p>{"// Chưa có biến môi trường nào"}</p>
+          <p className="mt-1 opacity-70 font-sans">Nhấn "Chỉnh sửa" để thêm cấu hình mới</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="py-2">
+        {entries.map(([key, value], i) => (
+          <div
+            key={key}
+            className="group flex items-start sm:items-center gap-4 px-6 py-3 hover:bg-slate-800/50 transition-colors font-mono text-sm border-b border-slate-800/50 last:border-0"
+          >
+            <div className="w-8 shrink-0 text-right text-slate-500 select-none text-xs pt-0.5 sm:pt-0">
+              {i + 1}
+            </div>
+            <div className="flex-1 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 min-w-0">
+              {/* Đổi màu Key sang blue-300 sang trọng hơn */}
+              <span className="shrink-0 text-blue-300 font-medium">{key}</span>
+              <span className="hidden sm:inline shrink-0 text-slate-600">=</span>
+              {/* Đổi màu Value normal sang slate-300 sạch sẽ */}
+              <span
+                className={`min-w-0 flex-1 truncate ${
+                  isSecretField(key)
+                    ? "text-amber-200/90 tracking-wider"
+                    : "text-slate-300"
+                }`}
+                title={value}
+              >
+                {isSecretField(key) && value
+                  ? "•".repeat(Math.min(value.length, 32))
+                  : value || <span className="text-slate-500 italic">""</span>}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  // ==========================================
+  // FRONTEND PANEL
   // ==========================================
   const renderFrontend = () => (
-    <div className="max-w-4xl mx-auto bg-white rounded-3xl border border-slate-200 shadow-xl shadow-blue-500/5 p-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
-      <Header title="Frontend Setup" icon={<Monitor />} onBack={() => setView('HOME')} onEdit={() => { setFormData(config); setIsEditing(true); }} />
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <DisplayIpPort label="Frontend Host" data={config.frontend} />
-        <DisplayIpPort label="User Service" data={config.userBackend} />
-        <DisplayIpPort label="Course Service" data={config.courseBackend} />
-        <DisplayIpPort label="Progress Service" data={config.progressBackend} />
-        <DisplayIpPort label="Exam Service" data={config.examBackend} />
-        <DisplayIpPort label="Nginx Server" data={config.nginx} />
-      </div>
-
-      <div className="mt-8 pt-6 border-t border-slate-100">
-        <DisplayText label="Google Client ID" value={config.googleClientId} icon={<Key size={16} />} />
-      </div>
-    </div>
+    <EditorPanel
+      breadcrumb={["frontend", ".env.local"]}
+      onBack={() => setView("HOME")}
+      onEdit={openEditModal}
+      onRefresh={() => loadConfig(FRONTEND_SERVICE_ID, true)}
+    >
+      {renderConfigTable(FRONTEND_SERVICE_ID)}
+    </EditorPanel>
   );
 
   // ==========================================
-  // GIAO DIỆN CHI TIẾT BACKEND
+  // BACKEND PANEL
   // ==========================================
   const renderBackend = () => (
-    <div className="max-w-4xl mx-auto bg-white rounded-3xl border border-slate-200 shadow-xl shadow-blue-500/5 p-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
-      <Header title="Backend Setup" icon={<Server />} onBack={() => setView('HOME')} onEdit={() => { setFormData(config); setIsEditing(true); }} />
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <DisplayIpPort label="Users Database" data={config.usersDb} icon={<Database size={16}/>} />
-        <DisplayIpPort label="Courses Database" data={config.coursesDb} icon={<Database size={16}/>} />
-        <DisplayIpPort label="Media Server" data={config.mediaServer} />
-      </div>
-
-      <div className="mt-8 pt-6 border-t border-slate-100 space-y-4">
-        <DisplayText label="CORS Origins" value={config.corsOrigins} icon={<Monitor size={16} />} />
-        <DisplayText label="Secret Key" value="••••••••••••••••••••••••" icon={<Shield size={16} />} />
-        <DisplayText label="Course Image Path" value={config.courseImagePath} icon={<Folder size={16} />} />
-      </div>
-    </div>
+    <EditorPanel
+      breadcrumb={["backend", "services", `${activeBackendTab}.env`]}
+      onBack={() => setView("HOME")}
+      onEdit={openEditModal}
+      onRefresh={() => loadConfig(activeBackendTab, true)}
+      tabs={
+        <div className="flex gap-2 px-4 pt-3 bg-slate-950 overflow-x-auto border-b border-slate-800 scrollbar-hide">
+          {BACKEND_SERVICES.map((svc) => (
+            <button
+              key={svc.id}
+              onClick={() => setActiveBackendTab(svc.id)}
+              className={`shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-t-xl text-sm font-mono transition-all duration-200 ${
+                activeBackendTab === svc.id
+                  ? "bg-slate-900 text-blue-400 border-t-2 border-t-[#0066FF] shadow-[0_-4px_20px_-10px_rgba(0,102,255,0.15)]"
+                  : "bg-transparent text-slate-500 hover:text-slate-300 hover:bg-slate-900/50 border-t-2 border-t-transparent"
+              }`}
+            >
+              <Circle
+                size={8}
+                className={
+                  activeBackendTab === svc.id
+                    ? "fill-blue-400 text-blue-400"
+                    : "fill-slate-600 text-slate-600"
+                }
+              />
+              {svc.label}.env
+            </button>
+          ))}
+        </div>
+      }
+    >
+      {renderConfigTable(activeBackendTab)}
+    </EditorPanel>
   );
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 pb-20 selection:bg-[#0066FF] selection:text-white">
-      <div className="relative z-40"><Navbar /></div>
+      <div className="relative z-40">
+        <Navbar />
+      </div>
 
-      {/* ==========================================
-          BANNER ĐỘNG
-          ========================================== */}
+      {/* ===== BANNER GIỮ NGUYÊN TONE MÀU ===== */}
       <section className="relative overflow-hidden text-white pt-12 pb-32 px-6 bg-gradient-to-br from-[#0066FF] via-[#0052cc] to-[#003d99]">
         <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-30">
-          <div className="absolute -top-24 -right-24 w-96 h-96 rounded-full bg-white/20 blur-3xl animate-pulse" style={{ animationDuration: '4s' }} />
+          <div
+            className="absolute -top-24 -right-24 w-96 h-96 rounded-full bg-white/20 blur-3xl animate-pulse"
+            style={{ animationDuration: "4s" }}
+          />
         </div>
 
         <div className="relative z-10 max-w-5xl mx-auto flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div>
             <div className="flex items-center gap-2 text-xs text-white/80 font-medium mb-6">
-              <Link href="/admin/" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 border border-white/10 backdrop-blur-md hover:bg-white/20 transition-all"><ArrowLeft size={14} /> Trang chủ</Link>
+              <Link
+                href="/admin/"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 border border-white/10 backdrop-blur-md hover:bg-white/20 transition-all"
+              >
+                <ArrowLeft size={14} /> Trang chủ
+              </Link>
               <span className="opacity-50">/</span>
-              <span className="flex items-center gap-1.5 font-semibold text-white bg-white/10 px-3 py-1.5 rounded-full backdrop-blur-md border border-white/5">Cấu hình</span>
+              <span className="flex items-center gap-1.5 font-semibold text-white bg-white/10 px-3 py-1.5 rounded-full backdrop-blur-md border border-white/5">
+                Cấu hình
+              </span>
             </div>
-            
+
             <div className="flex items-center gap-4 mb-4">
-              <div className="w-12 h-12 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center backdrop-blur-md"><Terminal size={24} className="text-white" /></div>
-              <h1 className="text-3xl md:text-5xl font-black uppercase tracking-tight leading-tight">ENVIRONMENT MENU</h1>
+              <div className="w-12 h-12 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center backdrop-blur-md">
+                <Terminal size={24} className="text-white" />
+              </div>
+              <h1 className="text-3xl md:text-5xl font-black uppercase tracking-tight leading-tight">
+                ENVIRONMENT MENU
+              </h1>
             </div>
             <p className="max-w-2xl text-[15px] md:text-base text-white/90 font-medium leading-relaxed opacity-90">
-              {view === 'HOME' && 'Chọn môi trường bạn muốn cấu hình bằng cách nhấp đúp vào ô tương ứng.'}
-              {view === 'FRONTEND' && 'Đang xem cấu hình của Client-side (Trình duyệt).'}
-              {view === 'BACKEND' && 'Đang xem cấu hình của Server-side (Máy chủ).'}
+              {view === "HOME" &&
+                "Chọn môi trường bạn muốn cấu hình bằng cách nhấp đúp vào ô tương ứng."}
+              {view === "FRONTEND" && "Đang xem cấu hình của Client-side (Trình duyệt)."}
+              {view === "BACKEND" && "Đang xem cấu hình của Server-side (Máy chủ)."}
             </p>
           </div>
         </div>
       </section>
 
-      {/* KHU VỰC NỘI DUNG CHÍNH (Đẩy lên trên một chút để chèn lên banner) */}
-      <main className="px-6 relative z-20 -mt-16">
-        {view === 'HOME' && renderHome()}
-        {view === 'FRONTEND' && renderFrontend()}
-        {view === 'BACKEND' && renderBackend()}
+      <main className="px-4 sm:px-6 relative z-20 -mt-16">
+        {errorMsg && (
+          <div className="max-w-4xl mx-auto mb-6 flex items-center gap-3 bg-red-50 border border-red-200 text-red-700 text-sm font-semibold px-5 py-4 rounded-xl shadow-sm">
+            <AlertTriangle size={18} className="shrink-0 text-red-500" /> {errorMsg}
+          </div>
+        )}
+        {view === "HOME" && renderHome()}
+        {view === "FRONTEND" && renderFrontend()}
+        {view === "BACKEND" && renderBackend()}
       </main>
 
       {/* ==========================================
-          MODAL CHỈNH SỬA (CHỈ NHẬP IP & PORT)
+          MODAL CHỈNH SỬA TONE ADMIN
           ========================================== */}
       {isEditing && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => !isSaving && setIsEditing(false)}></div>
-          
-          <div className="relative w-full max-w-3xl bg-white rounded-2xl shadow-2xl flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200 border-2 border-[#0066FF]">
-            <div className="flex items-center justify-between p-6 border-b border-slate-100 bg-slate-50/50 rounded-t-2xl">
-              <h3 className="text-xl font-bold flex items-center gap-2 text-[#0066FF]">
-                <Edit2 size={20} /> Cập nhật {view === 'FRONTEND' ? 'Frontend' : 'Backend'}
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
+          <div
+            className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"
+            onClick={() => !isSaving && setIsEditing(false)}
+          ></div>
+
+          <div className="relative w-full max-w-4xl bg-slate-900 rounded-2xl shadow-2xl shadow-slate-900/80 flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200 border border-slate-800 overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-950">
+              <h3 className="text-base font-mono font-semibold flex items-center gap-3 text-slate-200">
+                <span className="flex gap-1.5 opacity-80">
+                  <span className="w-3 h-3 rounded-full bg-red-500" />
+                  <span className="w-3 h-3 rounded-full bg-amber-400" />
+                  <span className="w-3 h-3 rounded-full bg-emerald-500" />
+                </span>
+                <span className="w-px h-4 bg-slate-700 mx-1"></span>
+                <Edit2 size={16} className="text-blue-400" />
+                {view === "FRONTEND"
+                  ? "frontend / .env.local"
+                  : `services / ${activeBackendTab}.env`}
               </h3>
-              <button onClick={() => setIsEditing(false)} className="p-2 text-slate-400 hover:bg-slate-200 hover:text-slate-700 rounded-full transition-colors"><X size={20} /></button>
+              <button
+                onClick={() => setIsEditing(false)}
+                className="p-2 text-slate-400 hover:bg-slate-800 hover:text-white rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-slate-700"
+              >
+                <X size={20} />
+              </button>
             </div>
 
-            <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-6 space-y-6">
-              {view === 'FRONTEND' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <InputIpPort label="Frontend Host" field="frontend" data={formData.frontend} onChange={handleIpPortChange} />
-                  <InputIpPort label="User Service" field="userBackend" data={formData.userBackend} onChange={handleIpPortChange} />
-                  <InputIpPort label="Course Service" field="courseBackend" data={formData.courseBackend} onChange={handleIpPortChange} />
-                  <InputIpPort label="Progress Service" field="progressBackend" data={formData.progressBackend} onChange={handleIpPortChange} />
-                  <InputIpPort label="Exam Service" field="examBackend" data={formData.examBackend} onChange={handleIpPortChange} />
-                  <InputIpPort label="Nginx Server" field="nginx" data={formData.nginx} onChange={handleIpPortChange} />
-                  
-                  <div className="md:col-span-2 mt-2">
-                    <label className="block text-xs font-bold text-slate-500 mb-2">Google Client ID</label>
-                    <input type="text" value={formData.googleClientId} onChange={(e) => handleTextChange('googleClientId', e.target.value)} className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm focus:border-[#0066FF] outline-none" />
-                  </div>
+            {/* Body */}
+            <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-6 space-y-4">
+              {Object.keys(formData).length === 0 && (
+                <div className="text-center py-10">
+                  <p className="text-sm font-mono text-slate-500">
+                    {"// Chưa có cấu hình nào. Hãy thêm ở bên dưới."}
+                  </p>
                 </div>
               )}
 
-              {view === 'BACKEND' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <InputIpPort label="Users Database" field="usersDb" data={formData.usersDb} onChange={handleIpPortChange} />
-                  <InputIpPort label="Courses Database" field="coursesDb" data={formData.coursesDb} onChange={handleIpPortChange} />
-                  <InputIpPort label="Media Server" field="mediaServer" data={formData.mediaServer} onChange={handleIpPortChange} />
-                  
-                  <div className="md:col-span-2 grid gap-4 mt-2">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 mb-2">CORS Origins</label>
-                      <input type="text" value={formData.corsOrigins} onChange={(e) => handleTextChange('corsOrigins', e.target.value)} className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm focus:border-[#0066FF] outline-none" />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 mb-2">Client Secret Key</label>
-                        <input type="password" value={formData.clientSecretKey} onChange={(e) => handleTextChange('clientSecretKey', e.target.value)} className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm focus:border-[#0066FF] outline-none" />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 mb-2">Secret Key</label>
-                        <input type="password" value={formData.secretKey} onChange={(e) => handleTextChange('secretKey', e.target.value)} className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm focus:border-[#0066FF] outline-none" />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 mb-2">Course Image Path</label>
-                      <input type="text" value={formData.courseImagePath} onChange={(e) => handleTextChange('courseImagePath', e.target.value)} className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm focus:border-[#0066FF] outline-none" />
-                    </div>
+              {Object.entries(formData).map(([key, value]) => (
+                <div key={key} className="group flex flex-col sm:flex-row sm:items-start gap-3">
+                  <div className="w-full sm:w-[35%] pt-2.5">
+                    <label className="block text-xs font-mono font-medium text-blue-300 px-1 truncate">
+                      {key}
+                    </label>
+                  </div>
+                  <div className="flex-1 flex items-center gap-3">
+                    <input
+                      type={isSecretField(key) ? "password" : "text"}
+                      value={value}
+                      onChange={(e) => handleFieldChange(key, e.target.value)}
+                      className="w-full px-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm font-mono text-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:bg-slate-900 outline-none transition-all placeholder:text-slate-600"
+                      placeholder="Nhập giá trị..."
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveField(key)}
+                      title="Xoá biến này"
+                      className="p-2.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all opacity-100 sm:opacity-0 group-hover:opacity-100 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-red-500/30"
+                    >
+                      <Trash2 size={18} />
+                    </button>
                   </div>
                 </div>
-              )}
+              ))}
+
+              {/* Add New Field Box */}
+              <div className="mt-8 pt-2">
+                <div className="bg-slate-950/50 border border-dashed border-slate-800 rounded-xl p-5 transition-colors focus-within:border-blue-500/50 focus-within:bg-slate-950">
+                  <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-4">
+                    <Plus size={16} className="text-blue-400" />
+                    Thêm biến môi trường mới
+                  </label>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <input
+                      placeholder="TÊN_BIẾN (KEY)"
+                      value={newKey}
+                      onChange={(e) => {
+                        setNewKey(e.target.value);
+                        if (addFieldError) setAddFieldError(null);
+                      }}
+                      onKeyDown={handleNewFieldKeyDown}
+                      className="flex-1 sm:w-1/3 px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm font-mono uppercase text-slate-200 placeholder:text-slate-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                    />
+                    <input
+                      placeholder="Giá trị (VALUE)"
+                      value={newValue}
+                      onChange={(e) => setNewValue(e.target.value)}
+                      onKeyDown={handleNewFieldKeyDown}
+                      className="flex-1 px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm font-mono text-slate-200 placeholder:text-slate-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddField}
+                      className="flex items-center justify-center gap-2 px-6 py-2.5 text-sm font-semibold text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl transition-colors whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-slate-600"
+                    >
+                      Thêm
+                    </button>
+                  </div>
+                  {addFieldError && (
+                    <p className="text-xs font-medium text-red-400 mt-3 flex items-center gap-1.5">
+                      <AlertTriangle size={14} /> {addFieldError}
+                    </p>
+                  )}
+                </div>
+              </div>
             </form>
 
-            <div className="p-4 border-t border-slate-100 flex justify-end gap-3 bg-slate-50 rounded-b-2xl">
-              <button type="button" onClick={() => setIsEditing(false)} className="px-5 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-200 rounded-xl transition-colors">Hủy bỏ</button>
-              <button onClick={handleSave} disabled={isSaving} className="flex items-center gap-2 px-6 py-2.5 text-sm font-bold text-white bg-[#0066FF] hover:bg-blue-700 rounded-xl transition-colors shadow-lg shadow-blue-500/30">
-                {isSaving ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
-                {isSaving ? 'Đang lưu...' : 'Lưu thay đổi'}
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-slate-800 flex justify-end gap-3 bg-slate-950">
+              <button
+                type="button"
+                onClick={() => setIsEditing(false)}
+                className="px-6 py-2.5 text-sm font-semibold text-slate-400 hover:bg-slate-800 hover:text-slate-200 rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-slate-700"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={isSaving}
+                className="flex items-center gap-2 px-8 py-2.5 text-sm font-bold text-white bg-[#0066FF] hover:bg-[#0052cc] rounded-xl transition-all shadow-lg shadow-blue-500/25 disabled:opacity-70 disabled:hover:bg-[#0066FF] focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-slate-950"
+              >
+                {isSaving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+                {isSaving ? "Đang lưu..." : "Lưu thay đổi"}
               </button>
             </div>
           </div>
@@ -263,84 +533,139 @@ export default function ConfigPage() {
 }
 
 // ==========================================
-// CÁC COMPONENT PHỤ TRỢ DÀNH CHO UI
+// COMPONENT PHỤ TRỢ (Tối ưu màu cho Admin)
 // ==========================================
 
-function Header({ title, icon, onBack, onEdit }: { title: string, icon: any, onBack: any, onEdit: any }) {
+function HomeFileTile({
+  icon,
+  filename,
+  title,
+  description,
+  previewLines,
+  onOpen,
+}: {
+  icon: React.ReactNode;
+  filename: string;
+  title: string;
+  description: string;
+  previewLines: string[];
+  onOpen: () => void;
+}) {
   return (
-    <div className="flex items-center justify-between border-b border-slate-100 pb-6 mb-6">
-      <div className="flex items-center gap-4">
-        <button onClick={onBack} className="p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-800 rounded-full transition-colors">
-          <ArrowLeft size={20} />
-        </button>
-        <h1 className="text-2xl font-bold flex items-center gap-3 text-slate-800">
-          <span className="text-[#0066FF]">{icon}</span> {title}
-        </h1>
+    <div
+      onDoubleClick={onOpen}
+      tabIndex={0}
+      onKeyDown={(e) => e.key === "Enter" && onOpen()}
+      className="group relative bg-white rounded-[24px] border border-slate-200 hover:border-[#0066FF]/40 shadow-lg shadow-slate-200/50 hover:shadow-2xl hover:shadow-blue-500/10 transition-all duration-300 cursor-pointer overflow-hidden hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#0066FF]/20"
+    >
+      <div className="p-7 flex items-start gap-5">
+        <div className="w-14 h-14 shrink-0 bg-blue-50/80 text-[#0066FF] rounded-2xl flex items-center justify-center group-hover:scale-110 group-hover:bg-[#0066FF] group-hover:text-white transition-all duration-300">
+          {icon}
+        </div>
+        <div className="min-w-0 pt-1">
+          <h2 className="text-lg font-bold text-slate-800 tracking-tight">{title}</h2>
+          <p className="text-sm text-slate-500 mt-1 leading-relaxed">{description}</p>
+        </div>
       </div>
-      <button onClick={onEdit} className="flex items-center gap-2 px-5 py-2.5 text-sm font-bold text-white bg-[#0066FF] hover:bg-blue-700 rounded-xl transition-colors shadow-lg shadow-blue-500/20">
-        <Edit2 size={16} /> Chỉnh sửa
-      </button>
-    </div>
-  );
-}
 
-// Component HIỂN THỊ IP và Port
-function DisplayIpPort({ label, data, icon = <Server size={16} /> }: { label: string, data: { ip: string, port: string }, icon?: any }) {
-  return (
-    <div className="flex flex-col p-4 bg-slate-50/50 border border-slate-100 rounded-2xl hover:border-blue-200 transition-colors">
-      <span className="text-xs font-bold text-slate-500 mb-3 flex items-center gap-2">
-        <span className="text-slate-400">{icon}</span> {label}
-      </span>
-      <div className="flex items-center gap-2">
-        <span className="px-3 py-1.5 bg-white border border-slate-200 text-slate-700 text-sm font-mono rounded-lg shadow-sm w-full truncate" title={data.ip}>
-          {data.ip}
+      {/* Mini editor preview tone slate */}
+      <div className="mx-7 mb-7 rounded-xl overflow-hidden border border-slate-800 bg-slate-900 shadow-inner">
+        <div className="flex items-center gap-2 px-4 py-2.5 bg-slate-950 border-b border-slate-800/80">
+          <div className="flex gap-1.5 opacity-80">
+            <span className="w-2.5 h-2.5 rounded-full bg-red-500" />
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+          </div>
+          <span className="ml-2 text-xs font-mono text-slate-400">{filename}</span>
+        </div>
+        <div className="px-5 py-4 space-y-2.5 bg-slate-900">
+          {previewLines.map((line) => (
+            <div key={line} className="flex items-center gap-3 text-xs font-mono">
+              <span className="text-blue-300">{line}</span>
+              <span className="text-slate-600">=</span>
+              <span className="text-slate-400 tracking-widest">••••••••</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="px-7 pb-6 flex items-center justify-between">
+        <span className="text-xs font-medium text-slate-400 group-hover:text-[#0066FF] transition-colors flex items-center gap-2">
+          Nhấp đúp chuột để cấu hình
         </span>
-        <span className="text-slate-400 font-bold">:</span>
-        <span className="px-3 py-1.5 bg-blue-50 border border-blue-100 text-[#0066FF] text-sm font-mono font-bold rounded-lg shadow-sm w-24 text-center">
-          {data.port}
-        </span>
+        <div className="w-8 h-8 rounded-full bg-slate-50 group-hover:bg-blue-50 flex items-center justify-center transition-colors">
+          <ArrowLeft size={16} className="rotate-180 text-slate-400 group-hover:text-[#0066FF] transition-colors" />
+        </div>
       </div>
     </div>
   );
 }
 
-// Component NHẬP LIỆU IP và Port
-function InputIpPort({ label, field, data, onChange }: { label: string, field: string, data: { ip: string, port: string }, onChange: any }) {
+function EditorPanel({
+  breadcrumb,
+  tabs,
+  onBack,
+  onEdit,
+  onRefresh,
+  children,
+}: {
+  breadcrumb: string[];
+  tabs?: React.ReactNode;
+  onBack: () => void;
+  onEdit: () => void;
+  onRefresh: () => void;
+  children: React.ReactNode;
+}) {
   return (
-    <div>
-      <label className="block text-xs font-bold text-slate-500 mb-2">{label}</label>
-      <div className="flex items-center gap-2">
-        <input 
-          type="text" 
-          value={data.ip} 
-          onChange={(e) => onChange(field, 'ip', e.target.value)}
-          placeholder="IP / Host"
-          className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-mono focus:border-[#0066FF] focus:ring-1 focus:ring-[#0066FF] outline-none transition-all"
-        />
-        <span className="text-slate-400 font-bold">:</span>
-        <input 
-          type="text" 
-          value={data.port} 
-          onChange={(e) => onChange(field, 'port', e.target.value)}
-          placeholder="Port"
-          className="w-24 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-mono text-center focus:border-[#0066FF] focus:ring-1 focus:ring-[#0066FF] outline-none transition-all"
-        />
+    <div className="max-w-5xl mx-auto rounded-2xl overflow-hidden border border-slate-800 bg-slate-900 shadow-2xl shadow-blue-900/10 animate-in fade-in slide-in-from-bottom-4 duration-300">
+      {/* Toolbar tone slate-950 */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-4 sm:px-6 py-4 bg-slate-950 border-b border-slate-800">
+        <div className="flex items-center gap-4 min-w-0">
+          <button
+            onClick={onBack}
+            className="p-2 shrink-0 text-slate-400 hover:bg-slate-800 hover:text-slate-200 rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <div className="hidden sm:flex gap-1.5 shrink-0 opacity-80">
+            <span className="w-3 h-3 rounded-full bg-red-500" />
+            <span className="w-3 h-3 rounded-full bg-amber-400" />
+            <span className="w-3 h-3 rounded-full bg-emerald-500" />
+          </div>
+          <div className="w-px h-5 bg-slate-800 hidden sm:block mx-1"></div>
+          <div className="min-w-0 truncate text-sm font-mono text-slate-400 flex items-center gap-2">
+            {breadcrumb.map((part, i) => (
+              <React.Fragment key={i}>
+                {i > 0 && <span className="text-slate-600">/</span>}
+                <span className={i === breadcrumb.length - 1 ? "text-blue-300 font-medium" : ""}>
+                  {part}
+                </span>
+              </React.Fragment>
+            ))}
+          </div>
+        </div>
+        <div className="flex items-center gap-3 shrink-0 self-end sm:self-auto">
+          <button
+            onClick={onRefresh}
+            title="Tải lại config mới nhất"
+            className="flex items-center justify-center p-2.5 text-slate-400 bg-slate-800/50 hover:bg-slate-800 hover:text-slate-200 rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-600"
+          >
+            <RefreshCw size={18} />
+          </button>
+          <button
+            onClick={onEdit}
+            className="flex items-center gap-2 px-5 py-2.5 text-sm font-bold text-white bg-[#0066FF] hover:bg-[#0052cc] rounded-xl transition-all shadow-lg shadow-blue-500/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
+          >
+            <Edit2 size={16} /> Chỉnh sửa
+          </button>
+        </div>
       </div>
-    </div>
-  );
-}
 
-// Component HIỂN THỊ text thông thường
-function DisplayText({ label, value, icon }: { label: string, value: string, icon: any }) {
-  return (
-    <div className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 transition-colors">
-      <div className="flex items-center gap-3">
-        <span className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500">{icon}</span>
-        <span className="text-sm font-bold text-slate-700">{label}</span>
+      {tabs}
+
+      <div className="bg-slate-900 min-h-[400px]">
+        {children}
       </div>
-      <span className="text-sm text-slate-600 font-mono truncate max-w-[300px] md:max-w-[500px] bg-white border border-slate-100 px-4 py-2 rounded-lg">
-        {value}
-      </span>
     </div>
   );
 }

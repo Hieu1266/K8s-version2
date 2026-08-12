@@ -65,13 +65,22 @@ const getFileNameFromUrl = (url: string | null): string => {
   return rawFileName;
 };
 
+const MEDIA_BASE_URL = process.env.NEXT_PUBLIC_MEDIA_URL || "http://127.0.0.1:8081";
+
 const getFullAssetUrl = (url: string | null): string => {
   if (!url) return "";
-  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  // Nếu là full URL cũ (có domain/port cứng) -> chỉ lấy phần path, bỏ domain gốc
+  if (url.startsWith("http://") || url.startsWith("https://")) {
+    try {
+      const parsed = new URL(url);
+      return `${MEDIA_BASE_URL}${parsed.pathname}`;
+    } catch {
+      return url;
+    }
+  }
   const cleanUrl = url.startsWith("/") ? url : `/${url}`;
-  return `http://127.0.0.1${cleanUrl}`;
+  return `${MEDIA_BASE_URL}${cleanUrl}`;
 };
-
 interface FormDataState {
   curriculumName: string;
   description: string;
