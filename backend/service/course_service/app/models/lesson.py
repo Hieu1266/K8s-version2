@@ -6,6 +6,7 @@ import uuid
 if TYPE_CHECKING:
     from app.models.module import Module
     from app.models.lesson_resource import LessonResource
+    from app.models.presentation import Presentation
 
 class Lesson(SQLModel, table=True):
     __tablename__ = "lesson"
@@ -29,6 +30,8 @@ class Lesson(SQLModel, table=True):
     
     # Bài học này là bắt buộc hay tự chọn
     is_optional: bool = Field(default=False, nullable=False)
+    # Có hiển thị nội dung bài học dưới dạng slide hay không
+    is_slide_presentation: bool = Field(default=False, nullable=False)
 
     # Có phải là bài thi/kiểm tra không
     is_quiz: bool = Field(default=False, nullable=False)
@@ -40,4 +43,14 @@ class Lesson(SQLModel, table=True):
     resources: List["LessonResource"] = Relationship(
         back_populates="lesson",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
+
+    # Một lesson có tối đa một bài trình chiếu.
+    presentation: Optional["Presentation"] = Relationship(
+        back_populates="lesson",
+        sa_relationship_kwargs={
+            "cascade": "all, delete-orphan",
+            "single_parent": True,
+            "uselist": False,
+        },
     )

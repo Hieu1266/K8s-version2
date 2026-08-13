@@ -145,6 +145,8 @@ def init_db() -> None:
     import app.models.subject
     import app.models.syllabus
     import app.models.tag
+    import app.models.presentation
+    import app.models.presentation_slide
     SQLModel.metadata.create_all(engine)
     with Session(engine) as session:
         seed_status_catalog(session)

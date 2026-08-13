@@ -18,6 +18,7 @@ class CRUDLesson(CRUDBase[Lesson, LessonCreate, LessonUpdate, UUID]):
         # 1. Logic nghiệp vụ Quiz
         if db_obj.is_quiz:
             db_obj.is_optional = False
+            db_obj.is_slide_presentation = False
 
         # 2. Xử lý order_index khi thêm mới
         max_order = db.scalar(
@@ -82,6 +83,7 @@ class CRUDLesson(CRUDBase[Lesson, LessonCreate, LessonUpdate, UUID]):
         # Logic nghiệp vụ Quiz
         if db_obj.is_quiz:
             db_obj.is_optional = False
+            db_obj.is_slide_presentation = False
 
         new_module_id = db_obj.module_id
         new_order_index = db_obj.order_index
