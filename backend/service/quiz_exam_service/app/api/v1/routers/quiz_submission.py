@@ -424,7 +424,7 @@ async def get_course_in_progress_count(
 def get_quizzes_by_subject(
     subject_id: UUID,
     db: SessionDep,
-    current_user: dict = Depends(RoleChecker(["Instructor"]))
+    current_user: dict = Depends(RoleChecker(["Instructor, Tester"]))
 ):
     """
     API dành cho Giảng viên lấy danh sách bài thi thuộc môn học cụ thể:

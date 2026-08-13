@@ -47,7 +47,15 @@ export default function TeacherDashboard() {
       icon: "💬",
       tag: "Nhận xét",
       badgeColor: "bg-blue-50 text-blue-600 border-blue-100",
-    }
+    },
+    {
+      title: "Phân công cộng tác viên",
+      desc: "Chọn môn học và phân công Tester làm cộng tác viên hỗ trợ kiểm thử.",
+      route: "/instructor-management/collaborator-manage",
+      icon: "🤝",
+      tag: "Cộng tác",
+      badgeColor: "bg-purple-50 text-purple-600 border-purple-100",
+    },
   ];
 
   return (
