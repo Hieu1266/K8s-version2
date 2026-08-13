@@ -5,30 +5,38 @@ export default function UnauthorizedPage() {
   const [role, setRole] = useState<string | null>(null);
 
   useEffect(() => {
-    // Đọc role từ localStorage bạn đã lưu lúc login để điều hướng thông minh
-    const storedRole = localStorage.getItem("role");
+    const storedRole = localStorage.getItem("role")?.toLowerCase() || null;
     setRole(storedRole);
   }, []);
 
   const handleGoHome = () => {
-    if (role === "admin") {
-      window.location.href = "/admin";
-    } else if (role === "faculty") {
-      window.location.href = "/instructor-management";
-    } else if (role === "student") {
-      window.location.href = "/dashboard-student";
-    } else if (role === "manager") {
-      window.location.href = "/training-management";
-    } else {
-      window.location.href = "/login?mode=login";
+    switch (role) {
+      case "admin":
+        window.location.href = "/admin";
+        break;
+      case "faculty":
+      case "instructor":
+        window.location.href = "/instructor-management";
+        break;
+      case "student":
+      case "user":
+        window.location.href = "/dashboard-student";
+        break;
+      case "manager":
+        window.location.href = "/training-management";
+        break;
+      case "tester":
+        window.location.href = "/tester-dashboard";
+        break;
+      default:
+        window.location.href = "/login?mode=login";
+        break;
     }
   };
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-gray-900">
       <div className="max-w-md w-full bg-white border border-gray-200 rounded-2xl p-8 shadow-sm text-center space-y-6">
-        
-        {/* Icon Cảnh báo lớn */}
         <div className="mx-auto w-16 h-16 bg-red-100 text-red-600 flex items-center justify-center rounded-full text-3xl font-bold animate-bounce">
           ⛔
         </div>
@@ -44,7 +52,6 @@ export default function UnauthorizedPage() {
 
         <hr className="border-gray-100" />
 
-        {/* Các nút hành động xử lý */}
         <div className="flex flex-col space-y-2">
           <button
             onClick={handleGoHome}
@@ -60,7 +67,6 @@ export default function UnauthorizedPage() {
             Đăng nhập tài khoản khác
           </button>
         </div>
-        
       </div>
     </div>
   );

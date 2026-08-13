@@ -252,4 +252,27 @@ class CRUDLesson(CRUDBase[Lesson, LessonCreate, LessonUpdate, UUID]):
 
         statement = statement.order_by(Module.order_index, Lesson.order_index)
         return db.exec(statement).all()
+    def get_ids_by_module_ids(self, db: Session, module_ids: list[UUID]) -> list[UUID]:
+        if not module_ids:
+            return []
+        statement = select(Lesson.lesson_id).where(Lesson.module_id.in_(module_ids))
+        return db.exec(statement).all()
+    
+    def get_content_body(self, db: Session, lesson_id: UUID) -> Optional[Dict[str, Any]]:
+        # Thêm .join(Module) để truy vấn được subject_id
+        statement = (
+            select(Lesson.content_body, Module.subject_id)
+            .join(Module)
+            .where(Lesson.lesson_id == lesson_id)
+        )
+        
+        result = db.exec(statement).first()
+        if not result:
+            return None
+
+        # result trả về tuple: (content_body, subject_id)
+        return {
+            "content_body": result[0],
+            "subject_id": result[1]
+        }
 crud_lesson = CRUDLesson(Lesson)

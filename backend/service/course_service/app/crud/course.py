@@ -232,4 +232,14 @@ class CRUDCourse(CRUDBase[Course, CourseCreate, CourseUpdate, UUID]):
             )
         )
         return db.exec(statement).first()
+
+
+    def get_by_instructor_id(self, db: Session, instructor_id: UUID, skip: int = 0, limit: int = 100):
+        return (
+            db.query(Course)
+            .filter(Course.instructor_id == instructor_id)
+            .offset(skip)
+            .limit(limit)
+            .all()
+    )
 crud_course = CRUDCourse(Course)

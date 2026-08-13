@@ -5,7 +5,7 @@ from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.models.enum import ReviewStatus
+from app.models.enum import ReviewStatus, SubmissionStatus
 
 
 # ---------------------------------------------------------------------------
@@ -99,3 +99,40 @@ class SubmitEvaluationOut(BaseModel):
     submission_fully_reviewed: bool
     submission_peer_avg_score: Optional[float] = None
     submission_is_discrepant: Optional[bool] = None
+
+
+# ---------------------------------------------------------------------------
+# [Giảng viên] Danh sách bài nộp theo cờ is_peer_review (2 mục: bài nộp thường / chấm chéo)
+# ---------------------------------------------------------------------------
+class QuizPeerReviewInfoOut(BaseModel):
+    """Thông tin tối thiểu để FE biết đề thi có bật chấm chéo hay không, dùng để
+    quyết định có hiển thị 2 mục (bài nộp thường / chấm chéo) hay không."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    quiz_id: UUID
+    title: str
+    is_peer_review: bool
+
+
+class SubmissionListItemOut(BaseModel):
+    """1 lượt nộp bài, dùng cho cả 2 mục:
+    - is_peer_review=False -> mục 'Bài nộp thường'.
+    - is_peer_review=True  -> mục 'Chấm chéo' (gồm cả bài đã tự động chốt điểm
+      lẫn bài lệch điểm cần chấm lại, phân biệt qua is_discrepant)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    submission_id: UUID
+    quiz_id: UUID
+    user_id: UUID
+    attempt_number: int
+    status: SubmissionStatus
+    is_peer_review: bool
+    is_discrepant: bool
+    peer_avg_score: Optional[float] = None
+    completed_review_count: int
+    total_score: Optional[float] = None
+    is_passed: Optional[bool] = None
+    started_at: datetime
+    submitted_at: Optional[datetime] = None

@@ -16,3 +16,8 @@ class TestingEnrollment(str, Enum):
     IN_PROGRESS = "IN_PROGRESS" #Đang học
     REJECTED = "REJECTED" #Từ chối
     APPROVED = "APPROVED" # Xác nhận
+
+class CommentStatus(str, Enum):
+    PENDING = "PENDING"     # Chưa xử lý
+    RESOLVED = "RESOLVED"   # Đã xử lý
+    

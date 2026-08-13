@@ -9,7 +9,7 @@ from app.models.course import Course
 from app.api.v1.deps import SessionDep
 from app.core.security import RoleChecker
 from app.crud.curriculum import crud_curriculum
-
+from typing import Optional
 from app.schemas.curriculum import CurriculumCreate, CurriculumUpdate, CurriculumRead, CurriculumFileUploadResponse
 from app.crud.curriculum import crud_curriculum
 from app.crud.curriculum_media import crud_curriculum_media
@@ -42,7 +42,7 @@ def create_curriculum(
 
 # 🔵 3. Lấy toàn bộ danh sách Curriculum
 @router.get("/", response_model=list[CurriculumRead])
-def get_curriculums(db: SessionDep, skip: int = 0, limit: int = 10):
+def get_curriculums(db: SessionDep, skip: int = 0, limit: Optional[int] = None):
     curriculums = crud_curriculum.get_multi(db, skip=skip, limit=limit)
     
     results = []

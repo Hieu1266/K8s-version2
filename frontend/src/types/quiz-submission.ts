@@ -68,7 +68,7 @@ export interface SubmissionStatusDetail {
     question_id: string;
     question_title: string;
     question_type: QuestionType;
-    video_trigger_seconds?: number | null; // 🆕
+    video_trigger_seconds?: number | null;
     body_content?: string | null;
     max_points?: number | null;
     options: SubmissionStatusOption[];
@@ -89,6 +89,7 @@ export interface QuizSubmissionStatusResponse {
     attempt_number: number;
     started_at: string;
     total_score?: number | null;
+    is_peer_review?: boolean | null;
     is_passed?: boolean | null;
     questions: SubmissionStatusDetail[];
 }

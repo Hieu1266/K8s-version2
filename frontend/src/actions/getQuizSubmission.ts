@@ -37,17 +37,22 @@ async function getAuthHeader(): Promise<Record<string, string>> {
 
 /**
  * 1. Bắt đầu bài thi dựa trên lesson_id
+ * @param isPeerReview - true nếu học viên chọn "Tham gia chấm chéo" thay vì nộp cho giảng viên chấm
  */
 export async function startQuizSubmissionAction(
-    lessonId: string
+    lessonId: string,
+    isPeerReview: boolean = false
 ): Promise<{ success: boolean; data?: QuizTakeResponse; error?: string }> {
     try {
         const headers = await getAuthHeader();
-        const res = await fetch(`${BASE_URL}/quiz-submissions/start/${lessonId}`, {
-            method: 'POST',
-            headers,
-            cache: 'no-store',
-        });
+        const res = await fetch(
+            `${BASE_URL}/quiz-submissions/start/${lessonId}?is_peer_review=${isPeerReview}`,
+            {
+                method: 'POST',
+                headers,
+                cache: 'no-store',
+            }
+        );
 
         const result = await res.json();
         if (!res.ok) {
@@ -169,8 +174,38 @@ export async function submitQuestionAction(
 }
 
 /**
- * 6. Lấy danh sách bài thi thuộc môn học kèm thống kê bài nộp (Giảng viên)
+ * 5b. Lấy số lượng thành viên đang trong quá trình học khóa học.
+ * Dùng để quyết định có cho phép học viên chọn "Tham gia chấm chéo" hay không
+ * (chỉ bật khi >= 3 người đang học).
  */
+export async function getCourseInProgressCountAction(
+    courseId: string
+): Promise<{ success: boolean; data?: number; error?: string }> {
+    try {
+        const headers = await getAuthHeader();
+        const res = await fetch(
+            `${BASE_URL}/quiz-submissions/courses/${courseId}/in-progress-count`,
+            {
+                method: 'GET',
+                headers,
+                cache: 'no-store',
+            }
+        );
+
+        if (!res.ok) {
+            const errBody = await res.json().catch(() => null);
+            return {
+                success: false,
+                error: errBody?.detail || 'Không thể kiểm tra số lượng học viên đang học khóa học',
+            };
+        }
+
+        const result = await res.json();
+        return { success: true, data: result };
+    } catch (err: any) {
+        return { success: false, error: err.message || 'Lỗi kết nối máy chủ' };
+    }
+}
 export async function getQuizzesSummaryBySubjectAction(
     subjectId: string
 ): Promise<{ success: boolean; data?: QuizSubmissionSummary[]; error?: string }> {

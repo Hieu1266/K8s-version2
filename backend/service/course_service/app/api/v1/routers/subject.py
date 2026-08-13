@@ -138,6 +138,46 @@ async def get_instructor_subjects_with_quizzes(
             response_data.append(subject_dict)
         
     return response_data
+
+@router.get("/collaborator-subjects-quizzes", response_model=List[SubjectInfoWithQuizzes])
+async def get_collaborator_subjects_with_quizzes(
+    db: SessionDep,
+    search: Optional[str] = Query(None, description="Từ khóa tìm kiếm tên hoặc mô tả môn học"), 
+    current_user: dict = Depends(RoleChecker(["Tester"]))
+):
+    collaborator_id = UUID(current_user["user_id"])
+
+    # Lấy danh sách các môn học mà cộng tác viên này được phân công
+    subjects = crud_subject.get_collaborator_subject_list(
+        db=db, 
+        collaborator_id=collaborator_id, 
+        search=search
+    )
+    
+    response_data = []
+    
+    # Gọi Asynchronous HTTP client lấy thông tin total_quizzes từ Quiz Service
+    async with httpx.AsyncClient() as client:
+        for subject in subjects:
+            subject_dict = subject.model_dump() 
+            
+            try:
+                # Endpoint lấy tổng số bài thi thuộc môn học
+                quiz_service_endpoint = f"{QUIZ_EXAM_URL}/quizzes/get-total-quizzes/{subject.subject_id}"
+                
+                response = await client.get(quiz_service_endpoint, timeout=5.0)
+                
+                if response.status_code == 200:
+                    subject_dict["total_quizzes"] = response.json() 
+                else:
+                    subject_dict["total_quizzes"] = 0
+            except httpx.RequestError:
+                # Xử lý dự phòng nếu Quiz Service gặp lỗi/kết nối không thành công
+                subject_dict["total_quizzes"] = 0
+            
+            response_data.append(subject_dict)
+        
+    return response_data
    
 # 🟢 Tạo Subject (Manager)
 @router.post("/", response_model=SubjectRead)
@@ -260,3 +300,28 @@ def get_subject_owner(
     subject_id: UUID
 ):
     return crud_subject.get_owner(db, subject_id)
+
+
+@router.get("/admin/instructor/{instructor_id}", response_model=List[GeneralInfoInstructorSubject])
+def get_subject_general_info_by_instructor_admin(
+    db: SessionDep,
+    instructor_id: UUID,
+    search: Optional[str] = Query(None, description="Từ khóa tìm kiếm tên hoặc mô tả môn học"),
+    current_user: dict = Depends(RoleChecker(["Admin"]))
+):
+    """
+    API dành cho ADMIN: lấy danh sách môn học được phân công cho
+    MỘT giảng viên bất kỳ, dựa theo instructor_id truyền vào path
+    (không phải người đang đăng nhập).
+    """
+    subjects = crud_subject.get_instructor_subject_list(db, instructor_id, search=search)
+ 
+    response_data = []
+    for subject in subjects:
+        subject_dict = subject.model_dump()
+        subject_dict["total_modules"] = crud_module.get_total_module_by_subject(db, subject.subject_id)
+        subject_dict["total_lessons"] = crud_subject.get_total_lessons(db, subject.subject_id)
+        response_data.append(subject_dict)
+ 
+    return response_data
+

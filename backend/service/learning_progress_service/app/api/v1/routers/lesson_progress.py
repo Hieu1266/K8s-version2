@@ -211,3 +211,64 @@ async def teacher_complete_quiz(
             )
 
     return updated_progress
+
+@router.put("/complete-peer-review-submission/{lesson_id}", response_model=LessonProgressResponse)
+async def complete_peer_review_submission(
+    lesson_id: UUID,
+    user_id: UUID = Query(..., description="ID của học viên nộp bài Peer Review"),
+    db: SessionDep = None,
+):
+    """
+    🤝 Dùng khi bài nộp Peer Review của học viên đã hoàn thành và đạt yêu cầu:
+    1. Đánh dấu bài học (lesson_id) của user_id thành COMPLETED.
+    2. Mở khóa bài học kế tiếp trong khóa học.
+    3. Tính toán và cập nhật lại tiến độ tổng thể (overall_progress) của khóa học.
+    """
+
+    # 1. Lấy thông tin tiến độ của user để kiểm tra tính hợp lệ
+    progress = crud_lesson_progress.get_by_lesson(db, user_id=user_id, lesson_id=lesson_id)
+    if not progress:
+        raise HTTPException(status_code=404, detail="Không tìm thấy tiến độ bài học của học viên.")
+    if progress.status == LessonStatus.LOCKED:
+        raise HTTPException(status_code=400, detail="Bài học đang bị khóa.")
+
+    # Nếu bài học đã hoàn thành từ trước, trả về tiến độ hiện tại ngay
+    if progress.status == LessonStatus.COMPLETED:
+        return progress
+
+    # 2. Lấy lộ trình các bài học từ Course Service
+    ordered_lessons = await fetch_ordered_lessons(progress.course_id)
+
+    # 3. Cập nhật trạng thái bài học thành COMPLETED và mở khóa bài tiếp theo
+    updated_progress = crud_lesson_progress.complete_and_unlock_next_by_lesson(
+        db=db,
+        user_id=user_id,
+        lesson_id=lesson_id,
+        ordered_lessons=ordered_lessons
+    )
+
+    if not updated_progress:
+        raise HTTPException(status_code=500, detail="Cập nhật tiến độ không thành công.")
+
+    # 4. Tính toán tiến độ tổng thể của toàn khóa học
+    total_lessons = await fetch_total_lessons(progress.course_id)
+    completed_lessons = crud_lesson_progress.count_completed_lessons(db, user_id=user_id, course_id=progress.course_id)
+
+    if total_lessons > 0:
+        overall_progress = round((completed_lessons / total_lessons) * 100, 2)
+        if overall_progress > 100.0:
+            overall_progress = 100.0
+
+        is_completed = (completed_lessons >= total_lessons) or (overall_progress == 100.0)
+
+        enroll = crud_course_enrollment.get_by_user_and_course(db, user_id=user_id, course_id=progress.course_id)
+        if enroll:
+            crud_course_enrollment.update_overall_progress(
+                db=db,
+                db_obj=enroll,
+                progress=overall_progress,
+                is_completed=is_completed
+            )
+
+    return updated_progress
+    

@@ -103,5 +103,24 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate, UUID]):
         except Exception as e:
             db.rollback()
             raise e
+
+    def is_tester(self, db: Session, user_id: UUID) -> bool:
+        statement = select(User.user_id).where(
+            User.user_id == user_id,
+            User.role_id == 3
+        )
+
+        rs = db.exec(statement).first()
+        return rs is not None
+
+    def get_tester_list(self, db: Session, skip: int = 0, limit: int = 100) -> list[User]:
+        statement = (
+            select(self.model)
+            .where(self.model.role_id == 3)
+            .offset(skip)
+            .limit(limit)
+        )
+        return db.exec(statement).all()
+
 crud_user = CRUDUser(User)
 

@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     FOLDER_PATH_COURSE_IMAGE: str = "static/uploads/courses"
     FOLDER_PATH_CURRICULUM: str = "static/uploads/curriculum"
     MEDIA_SERVER_URL: str = "http://172.16.109.76:8001"
+    VM_B_URL: str ="http://172.21.0.1:8000"
     BACKEND_URL: str = "http://localhost:8001"
     FRONTEND_HOST: str
     BACKEND_CORS_ORIGINS: Annotated[

@@ -1,363 +1,599 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
+
 import {
   AlertCircle,
   ArrowLeft,
   BookOpen,
-  Check,
   CheckCircle2,
   ChevronRight,
   CircleUserRound,
-  Clock3,
-  FileCheck2,
+  Clock,
   GraduationCap,
-  LayoutDashboard,
-  MessageSquareText,
+  Loader2,
   Search,
   ShieldCheck,
-  Sparkles,
   TestTube2,
-  UserCheck,
+  Trophy,
+  UserPlus,
   UsersRound,
-  XCircle,
 } from "lucide-react";
 
-type Tester = {
-  id: string;
-  name: string;
-  role: string;
-  progress: number;
-  isConfirmed: boolean;
-  feedback: string;
-};
+import {
+  getCourseApprovalData,
+} from "@/actions/getSyllabusApproval";
 
-type CourseModule = {
+import {
+  getAllTesters,
+} from "@/actions/getTester";
+
+import {
+  enrollTesterToCourse,
+} from "@/actions/getenrollTester";
+
+import {
+  getTestersCourseStatusBulk,
+  TesterCourseStatus,
+} from "@/actions/getTesterProgress";
+
+/* ============================================================
+   TYPES
+   ============================================================ */
+
+type Subject = {
+  subject_id: string;
   title: string;
-  lessons: string;
+  description: string | null;
+  course_id: string;
 };
 
-type PendingCourse = {
-  id: string;
-  name: string;
-  lecturerName: string;
-  submittedDate: string;
-  duration: string;
-  totalModules: number;
-  courseMaterialUrl: string;
-  lecturerNote: string;
-  modules: CourseModule[];
-  assignedTesterIds: string[];
+type Course = {
+  course_id: string;
+  title: string;
+  description?: string | null;
+  subjects: Subject[];
 };
 
-const availableTesters: Tester[] = [
-  {
-    id: "T01",
-    name: "Nguyễn Thúy Hằng",
-    role: "QA Kiểm định Chất lượng",
-    progress: 100,
-    isConfirmed: true,
-    feedback: "Video rõ nét, hệ thống lab Module 6 chạy mượt mà.",
-  },
-  {
-    id: "T02",
-    name: "Trần Minh Hoàng",
-    role: "Học viên xuất sắc K21",
-    progress: 100,
-    isConfirmed: true,
-    feedback:
-      "Nội dung nâng cao rất hay, bài tập Server Actions có tính thực tế cao.",
-  },
-  {
-    id: "T03",
-    name: "Lê Văn Nam",
-    role: "Chuyên gia Đánh giá Trải nghiệm",
-    progress: 45,
-    isConfirmed: false,
-    feedback: "Đang học đến Module 3, giao diện trực quan.",
-  },
-  {
-    id: "T04",
-    name: "Phạm Thị Ngọc",
-    role: "Trợ giảng chuyên môn",
-    progress: 0,
-    isConfirmed: false,
-    feedback: "Chưa bắt đầu học.",
-  },
-];
+type TesterUser = {
+  user_id: string;
+  username: string;
+  email: string;
+  role_id: number;
+};
 
-const initialCourses: PendingCourse[] = [
-  {
-    id: "COURSE-NEXTJS-2026",
-    name: "Khóa học Lập trình Next.js Toàn Diện & Triển khai Hệ thống",
-    lecturerName: "TS. Nguyễn Văn A",
-    submittedDate: "18/06/2026",
-    duration: "12 tuần",
-    totalModules: 6,
-    courseMaterialUrl: "#",
-    lecturerNote:
-      "Tôi đã bổ sung thêm 3 bài lab thực hành thực tế về Server Actions và cấu hình CI/CD trên AWS ở Module 6.",
-    modules: [
-      {
-        title: "Next.js Core Concepts & App Router Architecture",
-        lessons: "8 bài giảng",
-      },
-      {
-        title: "Data Fetching, Caching, and Server Actions",
-        lessons: "6 bài giảng",
-      },
-      {
-        title: "Advanced Authentication & Authorization",
-        lessons: "5 bài giảng",
-      },
-      {
-        title: "Database Integration (Prisma, PostgreSQL)",
-        lessons: "7 bài giảng",
-      },
-      {
-        title: "State Management & Performance Optimization",
-        lessons: "6 bài giảng",
-      },
-      {
-        title: "DevOps Pipeline: Dockerizing & AWS Deployment",
-        lessons: "4 bài giảng",
-      },
-    ],
-    assignedTesterIds: ["T01", "T02"],
-  },
-  {
-    id: "COURSE-PYTHON-2026",
-    name: "Khóa học Kỹ nghệ Dữ liệu & Ứng dụng Trí tuệ Nhân tạo",
-    lecturerName: "Chuyên gia Lê Hoàng C",
-    submittedDate: "19/06/2026",
-    duration: "16 tuần",
-    totalModules: 5,
-    courseMaterialUrl: "#",
-    lecturerNote:
-      "Giáo án chuẩn hóa theo khung Python AI mới nhất. Đã tích hợp API của OpenAI.",
-    modules: [
-      {
-        title: "Python Advanced & Data Structures",
-        lessons: "10 bài giảng",
-      },
-      {
-        title: "Data Analysis with Pandas & NumPy",
-        lessons: "8 bài giảng",
-      },
-      {
-        title: "Mathematics for Machine Learning",
-        lessons: "12 bài giảng",
-      },
-      {
-        title: "Supervised & Unsupervised Learning",
-        lessons: "9 bài giảng",
-      },
-      {
-        title: "Introduction to Deep Learning with PyTorch",
-        lessons: "7 bài giảng",
-      },
-    ],
-    assignedTesterIds: ["T03", "T04"],
-  },
-];
+type AssignMessage = {
+  type: "success" | "error";
+  text: string;
+  testerId: string;
+};
 
-export default function CourseApprovalDashboardWithTesting() {
-  const [pendingCourses, setPendingCourses] =
-    useState<PendingCourse[]>(initialCourses);
-  const [selectedCourseId, setSelectedCourseId] = useState(
-    initialCourses[0].id,
-  );
-  const [searchKeyword, setSearchKeyword] = useState("");
+/* ============================================================
+   COMPONENT
+   ============================================================ */
 
-  const activeCourse =
-    pendingCourses.find((course) => course.id === selectedCourseId) ||
-    pendingCourses[0];
+export default function CourseApprovalPage() {
+  /* ============================================================
+     STATE
+     ============================================================ */
 
-  const activeTesters = useMemo(() => {
-    if (!activeCourse) return [];
+  const [courses, setCourses] = useState<Course[]>([]);
 
-    return availableTesters.filter((tester) =>
-      activeCourse.assignedTesterIds.includes(tester.id),
+  const [testers, setTesters] = useState<TesterUser[]>([]);
+
+  const [
+    selectedCourseId,
+    setSelectedCourseId,
+  ] = useState<string | null>(null);
+
+  const [
+    searchKeyword,
+    setSearchKeyword,
+  ] = useState("");
+
+  const [
+    loading,
+    setLoading,
+  ] = useState(true);
+
+  const [
+    error,
+    setError,
+  ] = useState<string | null>(null);
+
+  /* ---------------- GÁN TESTER ---------------- */
+
+  const [
+    assigningId,
+    setAssigningId,
+  ] = useState<string | null>(null);
+
+  const [
+    assignedMap,
+    setAssignedMap,
+  ] = useState<Record<string, boolean>>({});
+
+  const [
+    assignMessage,
+    setAssignMessage,
+  ] = useState<AssignMessage | null>(null);
+
+  /* ---------------- TIẾN ĐỘ HỌC CỦA TESTER ---------------- */
+
+  const [
+    progressMap,
+    setProgressMap,
+  ] = useState<Record<string, TesterCourseStatus>>({});
+
+  const [
+    progressLoading,
+    setProgressLoading,
+  ] = useState(false);
+
+  /* ---------------- DUYỆT ---------------- */
+
+  const [
+    acknowledgingId,
+    setAcknowledgingId,
+  ] = useState<string | null>(null);
+
+  /* ============================================================
+     LOAD DATA
+     ============================================================ */
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadData() {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const [
+          courseResult,
+          testerResult,
+        ] = await Promise.all([
+          getCourseApprovalData(),
+          getAllTesters(),
+        ]);
+
+        if (!mounted) return;
+
+        if (!courseResult.success) {
+          setError(
+            courseResult.message ||
+              "Không thể tải khóa học"
+          );
+
+          return;
+        }
+
+        const courseList =
+          courseResult.data?.courses || [];
+
+        setCourses(courseList);
+
+        if (courseList.length > 0) {
+          setSelectedCourseId(
+            courseList[0].course_id
+          );
+        }
+
+        if (testerResult.success) {
+          setTesters(
+            testerResult.list || []
+          );
+        }
+      } catch (err: any) {
+        console.error(
+          "LOAD COURSE APPROVAL ERROR:",
+          err
+        );
+
+        if (mounted) {
+          setError(
+            err?.message ||
+              "Không thể tải dữ liệu"
+          );
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadData();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  /* ============================================================
+     SELECTED COURSE
+     ============================================================ */
+
+  const selectedCourse = useMemo(() => {
+    return (
+      courses.find(
+        (course) =>
+          course.course_id ===
+          selectedCourseId
+      ) || null
     );
-  }, [activeCourse]);
+  }, [
+    courses,
+    selectedCourseId,
+  ]);
+
+  /* ============================================================
+     SEARCH COURSE
+     ============================================================ */
 
   const filteredCourses = useMemo(() => {
-    const keyword = searchKeyword.trim().toLowerCase();
+    const keyword =
+      searchKeyword
+        .trim()
+        .toLowerCase();
 
-    if (!keyword) return pendingCourses;
+    if (!keyword) {
+      return courses;
+    }
 
-    return pendingCourses.filter(
-      (course) =>
-        course.name.toLowerCase().includes(keyword) ||
-        course.lecturerName.toLowerCase().includes(keyword) ||
-        course.id.toLowerCase().includes(keyword),
+    return courses.filter(
+      (course) => {
+        return (
+          course.title
+            ?.toLowerCase()
+            .includes(keyword) ||
+          course.course_id
+            ?.toLowerCase()
+            .includes(keyword)
+        );
+      }
     );
-  }, [pendingCourses, searchKeyword]);
+  }, [
+    courses,
+    searchKeyword,
+  ]);
 
-  const getCourseTesters = (course: PendingCourse) =>
-    availableTesters.filter((tester) =>
-      course.assignedTesterIds.includes(tester.id),
+  /* ============================================================
+     SUBJECTS
+     ============================================================ */
+
+  const selectedSubjects =
+    selectedCourse?.subjects || [];
+
+  /* ============================================================
+     KHI ĐỔI KHÓA HỌC
+     ============================================================ */
+
+  useEffect(() => {
+    setAssignMessage(null);
+  }, [selectedCourseId]);
+
+  /* ============================================================
+     LOAD TIẾN ĐỘ TESTER
+     ============================================================ */
+
+  useEffect(() => {
+    if (
+      !selectedCourseId ||
+      testers.length === 0
+    ) {
+      setProgressMap({});
+      return;
+    }
+
+    let mounted = true;
+
+    async function loadProgress() {
+      setProgressLoading(true);
+
+      const ids = testers.map(
+        (t) => t.user_id
+      );
+
+      const result =
+        await getTestersCourseStatusBulk(
+          ids,
+          selectedCourseId as string
+        );
+
+      if (mounted) {
+        setProgressMap(result);
+        setProgressLoading(false);
+      }
+    }
+
+    loadProgress();
+
+    return () => {
+      mounted = false;
+    };
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCourseId, testers]);
+
+  /* ============================================================
+     GÁN TESTER
+     ============================================================ */
+
+  async function handleAssignTester(
+    testerId: string
+  ) {
+    if (!selectedCourseId) return;
+
+    setAssigningId(testerId);
+    setAssignMessage(null);
+
+    try {
+      const result =
+        await enrollTesterToCourse(
+          testerId,
+          selectedCourseId
+        );
+
+      if (result.success) {
+        setAssignedMap((prev) => ({
+          ...prev,
+          [`${testerId}_${selectedCourseId}`]:
+            true,
+        }));
+
+        setAssignMessage({
+          type: "success",
+          text: "Đã gán tester vào khóa học",
+          testerId,
+        });
+
+        setProgressMap((prev) => ({
+          ...prev,
+          [testerId]: {
+            enrolled: true,
+            is_completed: false,
+            current_overall_progress: 0,
+            testing_course_status: null,
+          },
+        }));
+      } else {
+        setAssignMessage({
+          type: "error",
+          text:
+            result.message ||
+            "Gán tester thất bại",
+          testerId,
+        });
+      }
+    } finally {
+      setAssigningId(null);
+    }
+  }
+
+  /* ============================================================
+     MANAGER DUYỆT
+     ============================================================ */
+
+  async function handleManagerAcknowledge(
+    testerId: string
+  ) {
+    setAcknowledgingId(testerId);
+
+    // Placeholder
+    await new Promise(
+      (resolve) =>
+        setTimeout(resolve, 300)
     );
 
-  const isCourseReady = (course: PendingCourse) => {
-    const testers = getCourseTesters(course);
+    setAcknowledgingId(null);
+  }
 
-    return (
-      testers.length > 0 &&
-      testers.every((tester) => tester.progress === 100 && tester.isConfirmed)
-    );
-  };
+  /* ============================================================
+     LOADING
+     ============================================================ */
 
-  const isEligibleToPublish =
-    activeTesters.length > 0 &&
-    activeTesters.every(
-      (tester) => tester.progress === 100 && tester.isConfirmed,
-    );
-
-  const readyCoursesCount = pendingCourses.filter(isCourseReady).length;
-  const testingCoursesCount = pendingCourses.length - readyCoursesCount;
-
-  const handleToggleTester = (testerId: string) => {
-    if (!activeCourse) return;
-
-    setPendingCourses((previousCourses) =>
-      previousCourses.map((course) => {
-        if (course.id !== activeCourse.id) return course;
-
-        const isAssigned = course.assignedTesterIds.includes(testerId);
-
-        return {
-          ...course,
-          assignedTesterIds: isAssigned
-            ? course.assignedTesterIds.filter((id) => id !== testerId)
-            : [...course.assignedTesterIds, testerId],
-        };
-      }),
-    );
-  };
-
-  if (!activeCourse) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-slate-50">
         <Navbar />
-        <div className="mx-auto max-w-7xl px-4 py-16 text-center text-slate-500">
-          Chưa có khóa học nào đang chờ phê duyệt.
+
+        <div className="flex min-h-[70vh] items-center justify-center">
+          <div className="text-center">
+            <Loader2
+              size={32}
+              className="mx-auto animate-spin text-blue-600"
+            />
+
+            <p className="mt-3 text-sm font-medium text-slate-500">
+              Đang tải dữ liệu khóa học...
+            </p>
+          </div>
         </div>
       </div>
     );
   }
 
+  /* ============================================================
+     ERROR
+     ============================================================ */
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-slate-50">
+        <Navbar />
+
+        <div className="flex min-h-[70vh] items-center justify-center px-6">
+          <div className="w-full max-w-lg rounded-2xl border border-red-200 bg-white p-8 text-center shadow-sm">
+            <AlertCircle
+              size={40}
+              className="mx-auto text-red-500"
+            />
+
+            <h2 className="mt-4 text-lg font-bold text-slate-900">
+              Không thể tải dữ liệu
+            </h2>
+
+            <p className="mt-2 text-sm text-red-500">
+              {error}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  /* ============================================================
+     MAIN
+     ============================================================ */
+
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-slate-800 antialiased">
+    <div className="min-h-screen bg-slate-50">
       <Navbar />
 
-      {/* HEADER SECTION */}
+      {/* HEADER */}
+
       <section className="relative overflow-hidden bg-gradient-to-r from-[#0066FF] to-[#0052cc] px-6 pb-24 pt-10 text-white">
         <div className="pointer-events-none absolute inset-0 overflow-hidden opacity-20">
           <div className="absolute -right-24 -top-24 h-96 w-96 rounded-full bg-white blur-3xl" />
+
           <div className="absolute -bottom-40 left-1/3 h-72 w-72 rounded-full bg-cyan-200 blur-3xl" />
         </div>
 
-        <div className="relative z-10 mx-auto max-w-7xl space-y-4">
+        <div className="relative z-10 mx-auto max-w-7xl">
           <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-white/80">
             <Link
               href="/training-management"
-              className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/10 px-3 py-1.5 shadow-sm backdrop-blur-md transition-all hover:bg-white/20 hover:text-white"
+              className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/10 px-3 py-1.5 transition hover:bg-white/20"
             >
               <ArrowLeft size={14} />
               Quản lý đào tạo
             </Link>
-            <ChevronRight size={12} className="opacity-50" />
-            <span className="flex items-center gap-1.5 font-semibold tracking-wide text-white">
+
+            <ChevronRight
+              size={12}
+              className="opacity-50"
+            />
+
+            <span className="flex items-center gap-1.5 font-semibold text-white">
               <ShieldCheck size={14} />
               Duyệt khóa học
             </span>
           </div>
 
-          <div className="max-w-3xl">
-
-            <h1 className="text-3xl font-black uppercase tracking-tight drop-shadow-md md:text-4xl">
+          <div className="mt-5 max-w-3xl">
+            <h1 className="text-3xl font-black uppercase tracking-tight md:text-4xl">
               PHÊ DUYỆT KHÓA HỌC
             </h1>
 
-            <p className="mt-3 max-w-2xl text-sm font-medium leading-relaxed text-blue-100">
-              Theo dõi quá trình học thử, đánh giá phản hồi và quyết định phát
-              hành các khóa học đã hoàn thiện.
+            <p className="mt-3 text-sm font-medium leading-relaxed text-blue-100">
+              Xem thông tin khóa học, gán tester,
+              theo dõi tiến độ và xem kết quả
+              kiểm thử do tester chấm.
             </p>
           </div>
         </div>
       </section>
 
+      {/* CONTENT */}
+
       <main className="relative z-20 mx-auto -mt-14 w-full max-w-7xl px-6 pb-20">
-        <div className="rounded-[2rem] border border-white bg-white/80 p-6 shadow-[0_10px_40px_-10px_rgba(0,0,0,0.08)] backdrop-blur-xl md:p-8">
-          {/* Statistics */}
-          <section className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
+        <div className="rounded-[2rem] border border-white bg-white/90 p-6 shadow-xl backdrop-blur-xl md:p-8">
+
+          {/* STATISTICS */}
+
+          <section className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-3">
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-slate-500">
-                    Chờ phê duyệt
+                    Tổng khóa học
                   </p>
+
                   <p className="mt-2 text-3xl font-bold text-slate-900">
-                    {pendingCourses.length}
+                    {courses.length}
                   </p>
                 </div>
+
                 <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
-                  <FileCheck2 size={24} />
+                  <GraduationCap size={24} />
                 </div>
               </div>
             </div>
 
-            <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-slate-500">
-                    Đủ điều kiện
+                    Tổng môn học
                   </p>
-                  <p className="mt-2 text-3xl font-bold text-emerald-600">
-                    {readyCoursesCount}
+
+                  <p className="mt-2 text-3xl font-bold text-slate-900">
+                    {courses.reduce(
+                      (total, course) =>
+                        total +
+                        course.subjects.length,
+                      0
+                    )}
                   </p>
                 </div>
+
                 <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
-                  <CheckCircle2 size={24} />
+                  <BookOpen size={24} />
                 </div>
               </div>
             </div>
 
-            <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-slate-500">
-                    Đang thử nghiệm
+                    Nhân sự kiểm thử
                   </p>
-                  <p className="mt-2 text-3xl font-bold text-amber-500">
-                    {testingCoursesCount}
+
+                  <p className="mt-2 text-3xl font-bold text-slate-900">
+                    {testers.length}
                   </p>
                 </div>
+
                 <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
                   <TestTube2 size={24} />
                 </div>
               </div>
             </div>
+
           </section>
 
-          <section className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[360px_minmax(0,1fr)]">
-            {/* Course list */}
-            <aside className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm lg:sticky lg:top-6">
+          {/* TWO COLUMNS */}
+
+          <section className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
+
+            {/* LEFT */}
+
+            <aside className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm lg:sticky lg:top-6">
+
               <div className="border-b border-slate-100 p-5">
                 <div className="flex items-center justify-between">
                   <div>
                     <h2 className="font-bold text-slate-900">
-                      Khóa học chờ duyệt
+                      Khóa học
                     </h2>
+
                     <p className="mt-1 text-xs text-slate-500">
-                      {filteredCourses.length} khóa học được hiển thị
+                      {filteredCourses.length} khóa học
                     </p>
                   </div>
+
                   <span className="rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-600">
-                    {pendingCourses.length}
+                    {courses.length}
                   </span>
                 </div>
 
@@ -366,455 +602,725 @@ export default function CourseApprovalDashboardWithTesting() {
                     size={17}
                     className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
                   />
+
                   <input
                     type="text"
                     value={searchKeyword}
-                    onChange={(event) => setSearchKeyword(event.target.value)}
-                    placeholder="Tìm khóa học, giảng viên..."
+                    onChange={(event) =>
+                      setSearchKeyword(
+                        event.target.value
+                      )
+                    }
+                    placeholder="Tìm khóa học..."
                     className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100"
                   />
                 </div>
               </div>
 
-              <div className="max-h-[720px] space-y-3 overflow-y-auto p-3">
+              <div className="max-h-[700px] space-y-3 overflow-y-auto p-3">
                 {filteredCourses.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-slate-200 px-4 py-10 text-center">
-                    <Search size={28} className="mx-auto text-slate-300" />
+                    <Search
+                      size={28}
+                      className="mx-auto text-slate-300"
+                    />
+
                     <p className="mt-3 text-sm font-medium text-slate-600">
                       Không tìm thấy khóa học
                     </p>
                   </div>
                 ) : (
-                  filteredCourses.map((course) => {
-                    const selected = course.id === selectedCourseId;
-                    const courseTesters = getCourseTesters(course);
-                    const ready = isCourseReady(course);
+                  filteredCourses.map(
+                    (course) => {
+                      const selected =
+                        course.course_id ===
+                        selectedCourseId;
 
-                    return (
-                      <button
-                        type="button"
-                        key={course.id}
-                        onClick={() => setSelectedCourseId(course.id)}
-                        className={`group w-full rounded-xl border p-4 text-left transition-all ${selected
-                            ? "border-blue-500 bg-blue-50/70 shadow-sm ring-4 ring-blue-50"
-                            : "border-slate-200 bg-white hover:border-blue-200 hover:bg-slate-50"
+                      return (
+                        <button
+                          type="button"
+                          key={course.course_id}
+                          onClick={() =>
+                            setSelectedCourseId(
+                              course.course_id
+                            )
+                          }
+                          className={`group w-full rounded-xl border p-4 text-left transition-all ${
+                            selected
+                              ? "border-blue-500 bg-blue-50/70 shadow-sm ring-4 ring-blue-50"
+                              : "border-slate-200 bg-white hover:border-blue-200 hover:bg-slate-50"
                           }`}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p
-                              className={`line-clamp-2 text-sm font-bold leading-5 ${selected ? "text-blue-700" : "text-slate-900"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+
+                            <div className="min-w-0">
+                              <p
+                                className={`line-clamp-2 text-sm font-bold leading-5 ${
+                                  selected
+                                    ? "text-blue-700"
+                                    : "text-slate-900"
                                 }`}
-                            >
-                              {course.name}
-                            </p>
-                            <p className="mt-1 truncate text-xs text-slate-500">
-                              {course.lecturerName}
-                            </p>
+                              >
+                                {course.title}
+                              </p>
+
+                              <p className="mt-1 truncate font-mono text-[10px] text-slate-400">
+                                {course.course_id}
+                              </p>
+                            </div>
+
+                            <ChevronRight
+                              size={18}
+                              className={`mt-0.5 shrink-0 ${
+                                selected
+                                  ? "text-blue-600"
+                                  : "text-slate-300"
+                              }`}
+                            />
+
                           </div>
 
-                          <ChevronRight
-                            size={18}
-                            className={`mt-0.5 shrink-0 transition-transform ${selected
-                                ? "translate-x-0.5 text-blue-600"
-                                : "text-slate-300 group-hover:translate-x-0.5"
-                              }`}
-                          />
-                        </div>
+                          <div className="mt-4 flex flex-wrap gap-2">
+                            <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-600">
+                              <BookOpen size={12} />
 
-                        <div className="mt-4 flex flex-wrap items-center gap-2">
-                          <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-600">
-                            <UsersRound size={12} />
-                            {courseTesters.length} người học thử
-                          </span>
-
-                          {ready ? (
-                            <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700">
-                              <CheckCircle2 size={12} />
-                              Đủ điều kiện
+                              {course.subjects.length} môn học
                             </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 rounded-lg bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-700">
-                              <Clock3 size={12} />
-                              Đang thử nghiệm
-                            </span>
-                          )}
-                        </div>
-                      </button>
-                    );
-                  })
+                          </div>
+                        </button>
+                      );
+                    }
+                  )
                 )}
               </div>
             </aside>
 
-            {/* Course detail */}
+            {/* RIGHT */}
+
             <div className="space-y-6">
-              {/* General information */}
-              <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
-                <div className="border-b border-slate-100 p-6 sm:p-7">
-                  <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded-lg bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-600">
-                          {activeCourse.id}
-                        </span>
-                        <span
-                          className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-semibold ${isEligibleToPublish
-                              ? "bg-emerald-50 text-emerald-700"
-                              : "bg-amber-50 text-amber-700"
-                            }`}
-                        >
-                          {isEligibleToPublish ? (
-                            <CheckCircle2 size={12} />
-                          ) : (
-                            <Clock3 size={12} />
-                          )}
-                          {isEligibleToPublish
-                            ? "Sẵn sàng phát hành"
-                            : "Đang kiểm định"}
-                        </span>
-                      </div>
 
-                      <h2 className="mt-3 text-xl font-bold leading-snug text-slate-900 sm:text-2xl">
-                        {activeCourse.name}
-                      </h2>
+              {!selectedCourse ? (
+                <section className="rounded-2xl border border-dashed border-slate-200 bg-white p-12 text-center">
+                  <GraduationCap
+                    size={40}
+                    className="mx-auto text-slate-300"
+                  />
 
-                      <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-500">
-                        <span className="inline-flex items-center gap-1.5">
-                          <CircleUserRound size={15} />
-                          {activeCourse.lecturerName}
-                        </span>
-                        <span className="inline-flex items-center gap-1.5">
-                          <Clock3 size={15} />
-                          {activeCourse.duration}
-                        </span>
-                        <span className="inline-flex items-center gap-1.5">
-                          <BookOpen size={15} />
-                          {activeCourse.totalModules} chương
-                        </span>
+                  <p className="mt-4 text-sm font-medium text-slate-500">
+                    Chọn một khóa học
+                  </p>
+                </section>
+              ) : (
+                <>
+
+                  {/* COURSE INFORMATION */}
+
+                  <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+
+                    <div className="border-b border-slate-100 p-6 sm:p-7">
+                      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+
+                        <div className="min-w-0">
+
+                          <div className="flex flex-wrap items-center gap-2">
+
+                            <span className="rounded-lg bg-blue-50 px-2.5 py-1 font-mono text-[11px] font-bold text-blue-600">
+                              {selectedCourse.course_id.slice(
+                                0,
+                                8
+                              )}
+                            </span>
+
+                            <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
+                              <CheckCircle2 size={12} />
+                              Khóa học
+                            </span>
+
+                          </div>
+
+                          <h2 className="mt-3 text-xl font-bold leading-snug text-slate-900 sm:text-2xl">
+                            {selectedCourse.title}
+                          </h2>
+
+                          <div className="mt-3 flex flex-wrap gap-4 text-sm text-slate-500">
+
+                            <span className="inline-flex items-center gap-1.5">
+                              <BookOpen size={15} />
+                              {selectedSubjects.length} môn học
+                            </span>
+
+                            <span className="inline-flex items-center gap-1.5">
+                              <UsersRound size={15} />
+                              {testers.length} tester
+                            </span>
+
+                          </div>
+                        </div>
                       </div>
                     </div>
 
-                    <span className="shrink-0 text-xs text-slate-400">
-                      Gửi ngày {activeCourse.submittedDate}
-                    </span>
-                  </div>
-                </div>
+                    <div className="p-6 sm:p-7">
+                      <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-4">
 
-                <div className="p-6 sm:p-7">
-                  <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-4">
+                        <div className="flex items-start gap-3">
+
+                          <CircleUserRound
+                            size={20}
+                            className="mt-0.5 shrink-0 text-blue-600"
+                          />
+
+                          <div>
+                            <p className="text-sm font-semibold text-slate-800">
+                              Thông tin khóa học
+                            </p>
+
+                            <p className="mt-1.5 text-sm leading-6 text-slate-600">
+                              {selectedCourse.description ||
+                                "Không có mô tả khóa học."}
+                            </p>
+                          </div>
+
+                        </div>
+
+                      </div>
+                    </div>
+
+                  </section>
+
+                  {/* SUBJECT LIST */}
+
+                  <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-7">
+
+                    <div className="mb-5 flex items-center justify-between">
+
+                      <div>
+                        <div className="flex items-center gap-2">
+
+                          <BookOpen
+                            size={20}
+                            className="text-blue-600"
+                          />
+
+                          <h3 className="font-bold text-slate-900">
+                            Danh sách môn học
+                          </h3>
+
+                        </div>
+
+                        <p className="mt-1 text-xs text-slate-500">
+                          Các môn học thuộc khóa học đang được chọn
+                        </p>
+                      </div>
+
+                      <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
+                        {selectedSubjects.length} môn
+                      </span>
+
+                    </div>
+
+                    {selectedSubjects.length === 0 ? (
+
+                      <div className="rounded-xl border border-dashed border-slate-200 py-10 text-center">
+
+                        <BookOpen
+                          size={30}
+                          className="mx-auto text-slate-300"
+                        />
+
+                        <p className="mt-3 text-sm font-medium text-slate-600">
+                          Khóa học chưa có môn học
+                        </p>
+
+                      </div>
+
+                    ) : (
+
+                      <div className="space-y-3">
+
+                        {selectedSubjects.map(
+                          (subject, index) => (
+
+                            <div
+                              key={subject.subject_id}
+                              className="flex items-start gap-4 rounded-xl border border-slate-200 bg-slate-50/60 p-4 transition hover:border-blue-200 hover:bg-blue-50/30"
+                            >
+
+                              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-sm font-bold text-blue-600 shadow-sm">
+                                {index + 1}
+                              </div>
+
+                              <div className="min-w-0 flex-1">
+
+                                <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+
+                                  <h4 className="text-sm font-bold text-slate-900">
+                                    {subject.title}
+                                  </h4>
+
+                                  <span className="w-fit rounded-md bg-white px-2 py-1 font-mono text-[10px] text-slate-400">
+                                    {subject.subject_id.slice(
+                                      0,
+                                      8
+                                    )}
+                                  </span>
+
+                                </div>
+
+                                {subject.description && (
+                                  <p className="mt-1 text-xs leading-5 text-slate-500">
+                                    {subject.description}
+                                  </p>
+                                )}
+
+                              </div>
+
+                            </div>
+
+                          )
+                        )}
+
+                      </div>
+
+                    )}
+
+                  </section>
+
+                  {/* TESTER */}
+
+                  <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-7">
+
+                    <div className="mb-5 flex items-center justify-between">
+
+                      <div>
+
+                        <div className="flex items-center gap-2">
+
+                          <TestTube2
+                            size={20}
+                            className="text-blue-600"
+                          />
+
+                          <h3 className="font-bold text-slate-900">
+                            Người học thử
+                          </h3>
+
+                        </div>
+
+                        <p className="mt-1 text-xs text-slate-500">
+                          Gán tester và theo dõi kết quả kiểm thử do tester tự chấm
+                        </p>
+
+                      </div>
+
+                      <span className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600">
+                        {testers.length} tester
+                      </span>
+
+                    </div>
+
+                    {testers.length === 0 ? (
+
+                      <div className="rounded-xl border border-dashed border-slate-200 py-10 text-center">
+
+                        <UsersRound
+                          size={30}
+                          className="mx-auto text-slate-300"
+                        />
+
+                        <p className="mt-3 text-sm font-medium text-slate-600">
+                          Chưa có tester
+                        </p>
+
+                      </div>
+
+                    ) : (
+
+                      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+
+                        {testers.map((tester) => {
+
+                          const assignKey =
+                            `${tester.user_id}_${selectedCourseId}`;
+
+                          const justAssigned =
+                            !!assignedMap[assignKey];
+
+                          const isAssigning =
+                            assigningId === tester.user_id;
+
+                          const message =
+                            assignMessage?.testerId ===
+                            tester.user_id
+                              ? assignMessage
+                              : null;
+
+                          const status:
+                            | TesterCourseStatus
+                            | undefined =
+                            progressMap[
+                              tester.user_id
+                            ];
+
+                          const isEnrolled =
+                            justAssigned ||
+                            !!status?.enrolled;
+
+                          const isAcknowledging =
+                            acknowledgingId ===
+                            tester.user_id;
+
+                          return (
+
+                            <div
+                              key={tester.user_id}
+                              className="rounded-xl border border-slate-200 bg-white p-4 transition hover:border-blue-200 hover:shadow-sm"
+                            >
+
+                              <div className="flex items-center gap-3">
+
+                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-50 font-bold text-blue-600">
+                                  {tester.username
+                                    .split(" ")
+                                    .slice(-2)
+                                    .map(
+                                      (word: string) =>
+                                        word.charAt(0)
+                                    )
+                                    .join("")}
+                                </div>
+
+                                <div className="min-w-0">
+
+                                  <p className="truncate text-sm font-bold text-slate-900">
+                                    {tester.username}
+                                  </p>
+
+                                  <p className="mt-0.5 truncate text-xs text-slate-500">
+                                    {tester.email}
+                                  </p>
+
+                                </div>
+
+                              </div>
+
+                              <div className="mt-3 flex items-center justify-between gap-2">
+
+                                <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-600">
+                                  <UsersRound size={12} />
+                                  Người kiểm thử
+                                </span>
+
+                                <button
+                                  type="button"
+                                  disabled={
+                                    isAssigning ||
+                                    isEnrolled
+                                  }
+                                  onClick={() =>
+                                    handleAssignTester(
+                                      tester.user_id
+                                    )
+                                  }
+                                  className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                                    isEnrolled
+                                      ? "cursor-default bg-emerald-50 text-emerald-700"
+                                      : "bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
+                                  }`}
+                                >
+
+                                  {isAssigning ? (
+                                    <Loader2
+                                      size={13}
+                                      className="animate-spin"
+                                    />
+                                  ) : isEnrolled ? (
+                                    <CheckCircle2
+                                      size={13}
+                                    />
+                                  ) : (
+                                    <UserPlus size={13} />
+                                  )}
+
+                                  {isEnrolled
+                                    ? "Đã gán"
+                                    : isAssigning
+                                    ? "Đang gán..."
+                                    : "Gán"}
+
+                                </button>
+
+                              </div>
+
+                              {message && (
+                                <p
+                                  className={`mt-2 text-[11px] font-medium ${
+                                    message.type ===
+                                    "success"
+                                      ? "text-emerald-600"
+                                      : "text-red-500"
+                                  }`}
+                                >
+                                  {message.text}
+                                </p>
+                              )}
+
+                              {/* STATUS */}
+
+                              <div className="mt-3 border-t border-slate-100 pt-3">
+
+                                {progressLoading &&
+                                !status ? (
+
+                                  <div className="flex items-center gap-2 text-xs text-slate-400">
+
+                                    <Loader2
+                                      size={12}
+                                      className="animate-spin"
+                                    />
+
+                                    Đang tải tiến độ...
+
+                                  </div>
+
+                                ) : status?.message &&
+                                  !status.enrolled ? (
+
+                                  <span className="inline-flex items-center gap-1 rounded-lg bg-red-50 px-2 py-1 text-[11px] font-medium text-red-500">
+
+                                    <AlertCircle size={12} />
+
+                                    {status.message}
+
+                                  </span>
+
+                                ) : !isEnrolled ? (
+
+                                  <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-500">
+                                    Chưa đăng ký khóa này
+                                  </span>
+
+                                ) : status?.is_completed ? (
+
+                                  <div className="space-y-2">
+
+                                    <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700">
+
+                                      <Trophy size={12} />
+
+                                      Đã hoàn thành (
+                                      {Math.round(
+                                        status.current_overall_progress
+                                      )}
+                                      %)
+
+                                    </span>
+
+                                    {status.testing_course_status ===
+                                    "APPROVED" ? (
+
+                                      <div className="flex items-center justify-between gap-2">
+
+                                        <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2 py-1 text-[11px] font-bold text-emerald-700">
+
+                                          <CheckCircle2
+                                            size={12}
+                                          />
+
+                                          Tester đánh giá: Đạt
+
+                                        </span>
+
+                                        {/* <button
+                                          type="button"
+                                          disabled={
+                                            isAcknowledging
+                                          }
+                                          onClick={() =>
+                                            handleManagerAcknowledge(
+                                              tester.user_id
+                                            )
+                                          }
+                                          className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1.5 text-[11px] font-bold text-white transition hover:bg-blue-700 disabled:opacity-60"
+                                        >
+
+                                          {isAcknowledging ? (
+                                            <Loader2
+                                              size={12}
+                                              className="animate-spin"
+                                            />
+                                          ) : (
+                                            <ShieldCheck
+                                              size={12}
+                                            />
+                                          )}
+
+                                          Duyệt
+
+                                        </button> */}
+
+                                      </div>
+
+                                    ) : status.testing_course_status ===
+                                      "REJECTED" ? (
+
+                                      <div className="flex items-center justify-between gap-2">
+
+                                        <span className="inline-flex items-center gap-1 rounded-lg bg-red-50 px-2 py-1 text-[11px] font-bold text-red-600">
+
+                                          <AlertCircle
+                                            size={12}
+                                          />
+
+                                          Tester đánh giá: Không đạt
+
+                                        </span>
+
+                                        {/* <button
+                                          type="button"
+                                          disabled={
+                                            isAcknowledging
+                                          }
+                                          onClick={() =>
+                                            handleManagerAcknowledge(
+                                              tester.user_id
+                                            )
+                                          }
+                                          className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1.5 text-[11px] font-bold text-white transition hover:bg-blue-700 disabled:opacity-60"
+                                        >
+
+                                          {isAcknowledging ? (
+                                            <Loader2
+                                              size={12}
+                                              className="animate-spin"
+                                            />
+                                          ) : (
+                                            <ShieldCheck
+                                              size={12}
+                                            />
+                                          )}
+
+                                          Duyệt
+
+                                        </button> */}
+
+                                      </div>
+
+                                    ) : (
+
+                                      <span className="inline-flex items-center gap-1 rounded-lg bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-700">
+
+                                        <Clock size={12} />
+
+                                        Đang chờ tester chấm
+
+                                      </span>
+
+                                    )}
+
+                                  </div>
+
+                                ) : (
+
+                                  <div>
+
+                                    <div className="flex items-center justify-between text-[11px] font-medium text-slate-600">
+
+                                      <span className="inline-flex items-center gap-1">
+
+                                        <Clock size={12} />
+
+                                        Đang học
+
+                                      </span>
+
+                                      <span className="font-bold text-blue-600">
+
+                                        {Math.round(
+                                          status?.current_overall_progress ??
+                                            0
+                                        )}
+                                        %
+
+                                      </span>
+
+                                    </div>
+
+                                    <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+
+                                      <div
+                                        className="h-full rounded-full bg-blue-500 transition-all"
+                                        style={{
+                                          width: `${Math.min(
+                                            100,
+                                            Math.max(
+                                              0,
+                                              status?.current_overall_progress ??
+                                                0
+                                            )
+                                          )}%`,
+                                        }}
+                                      />
+
+                                    </div>
+
+                                  </div>
+
+                                )}
+
+                              </div>
+
+                            </div>
+
+                          );
+                        })}
+
+                      </div>
+
+                    )}
+
+                  </section>
+
+                  {/* NOTE */}
+
+                  <section className="rounded-2xl border border-blue-200 bg-blue-50/50 p-5">
+
                     <div className="flex items-start gap-3">
-                      <MessageSquareText
+
+                      <AlertCircle
                         size={20}
                         className="mt-0.5 shrink-0 text-blue-600"
                       />
+
                       <div>
-                        <p className="text-sm font-semibold text-slate-800">
-                          Ghi chú từ giảng viên
-                        </p>
-                        <p className="mt-1.5 text-sm leading-6 text-slate-600">
-                          {activeCourse.lecturerNote}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </section>
 
-              {/* Modules */}
-              <section className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm sm:p-7">
-                <div className="mb-5 flex items-center justify-between">
-                  <div>
-                    <h3 className="font-bold text-slate-900">
-                      Nội dung khóa học
-                    </h3>
-                    <p className="mt-1 text-xs text-slate-500">
-                      Danh sách chương được gửi để kiểm định
-                    </p>
-                  </div>
-                  <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
-                    {activeCourse.modules.length} chương
-                  </span>
-                </div>
+                        <p className="text-sm font-bold text-blue-800">
+                          Thông tin hiển thị
+                        </p>
 
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  {activeCourse.modules.map((module, index) => (
-                    <div
-                      key={`${activeCourse.id}-${index}`}
-                      className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50/70 p-4 transition-colors hover:border-blue-200 hover:bg-blue-50/30"
-                    >
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-sm font-bold text-blue-600 shadow-sm">
-                        {index + 1}
+                        <p className="mt-1 text-xs leading-5 text-blue-700">
+                          Tester tự chấm kết quả kiểm thử
+                          (Đạt / Không đạt) khi hoàn thành
+                          khóa học. Bên đây bạn chỉ xem kết
+                          quả và bấm Duyệt để xác nhận đã
+                          xem qua.
+                        </p>
+
                       </div>
 
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold leading-5 text-slate-800">
-                          {module.title}
-                        </p>
-                        <p className="mt-1 text-xs text-slate-500">
-                          {module.lessons}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </section>
-
-              {/* Tester results */}
-              <section className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm sm:p-7">
-                <div className="mb-5 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <TestTube2 size={20} className="text-blue-600" />
-                      <h3 className="font-bold text-slate-900">
-                        Kết quả học thử nghiệm
-                      </h3>
-                    </div>
-                    <p className="mt-1 text-xs text-slate-500">
-                      Tiến độ và phản hồi của các tài khoản kiểm định
-                    </p>
-                  </div>
-
-                  <span className="w-fit rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600">
-                    Đạt chuẩn:{" "}
-                    <strong className="text-blue-600">
-                      {
-                        activeTesters.filter(
-                          (tester) =>
-                            tester.isConfirmed && tester.progress === 100,
-                        ).length
-                      }
-                      /{activeTesters.length}
-                    </strong>
-                  </span>
-                </div>
-
-                {activeTesters.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-slate-200 py-10 text-center">
-                    <UsersRound size={30} className="mx-auto text-slate-300" />
-                    <p className="mt-3 text-sm font-medium text-slate-600">
-                      Chưa có người học thử
-                    </p>
-                    <p className="mt-1 text-xs text-slate-400">
-                      Hãy chọn nhân sự kiểm định ở phần bên dưới.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {activeTesters.map((tester) => (
-                      <div
-                        key={tester.id}
-                        className="rounded-xl border border-slate-200 p-4 transition-all hover:border-blue-200 hover:shadow-sm sm:p-5"
-                      >
-                        <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
-                          <div className="flex items-center gap-3">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-50 font-bold text-blue-600">
-                              {tester.name
-                                .split(" ")
-                                .slice(-2)
-                                .map((word) => word.charAt(0))
-                                .join("")}
-                            </div>
-
-                            <div>
-                              <h4 className="text-sm font-bold text-slate-900">
-                                {tester.name}
-                              </h4>
-                              <p className="mt-0.5 text-xs text-slate-500">
-                                {tester.role}
-                              </p>
-                            </div>
-                          </div>
-
-                          {tester.isConfirmed ? (
-                            <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-[11px] font-semibold text-emerald-700">
-                              <CheckCircle2 size={13} />
-                              Đã xác nhận đạt chuẩn
-                            </span>
-                          ) : (
-                            <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1.5 text-[11px] font-semibold text-amber-700">
-                              <Clock3 size={13} />
-                              Đang học và đánh giá
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="mt-4">
-                          <div className="mb-2 flex items-center justify-between text-xs">
-                            <span className="font-medium text-slate-500">
-                              Tiến độ học tập
-                            </span>
-                            <span
-                              className={`font-bold ${tester.progress === 100
-                                  ? "text-emerald-600"
-                                  : "text-blue-600"
-                                }`}
-                            >
-                              {tester.progress}%
-                            </span>
-                          </div>
-
-                          <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-                            <div
-                              className={`h-full rounded-full transition-all duration-500 ${tester.progress === 100
-                                  ? "bg-emerald-500"
-                                  : "bg-blue-500"
-                                }`}
-                              style={{ width: `${tester.progress}%` }}
-                            />
-                          </div>
-                        </div>
-
-                        {tester.feedback && (
-                          <div className="mt-4 flex items-start gap-2 rounded-lg bg-slate-50 p-3">
-                            <MessageSquareText
-                              size={15}
-                              className="mt-0.5 shrink-0 text-slate-400"
-                            />
-                            <p className="text-xs italic leading-5 text-slate-600">
-                              “{tester.feedback}”
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </section>
-
-              {/* Assign testers */}
-              <section className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm sm:p-7">
-                <div className="mb-5">
-                  <div className="flex items-center gap-2">
-                    <UserCheck size={20} className="text-blue-600" />
-                    <h3 className="font-bold text-slate-900">
-                      Phân công người học thử
-                    </h3>
-                  </div>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Chọn hoặc bỏ chọn tài khoản tham gia kiểm định khóa học
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  {availableTesters.map((tester) => {
-                    const assigned = activeCourse.assignedTesterIds.includes(
-                      tester.id,
-                    );
-
-                    return (
-                      <button
-                        type="button"
-                        key={tester.id}
-                        onClick={() => handleToggleTester(tester.id)}
-                        className={`flex items-center justify-between gap-3 rounded-xl border p-4 text-left transition-all ${assigned
-                            ? "border-blue-400 bg-blue-50/70 ring-2 ring-blue-50"
-                            : "border-slate-200 bg-white hover:border-blue-200 hover:bg-slate-50"
-                          }`}
-                      >
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-slate-900">
-                            {tester.name}
-                          </p>
-                          <p className="mt-1 truncate text-xs text-slate-500">
-                            {tester.role}
-                          </p>
-                        </div>
-
-                        <span
-                          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${assigned
-                              ? "border-blue-600 bg-blue-600 text-white"
-                              : "border-slate-300 bg-white"
-                            }`}
-                        >
-                          {assigned && <Check size={13} strokeWidth={3} />}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </section>
-
-              {/* Approval actions */}
-              <section
-                className={`rounded-2xl border p-5 shadow-sm sm:p-6 ${isEligibleToPublish
-                    ? "border-emerald-200 bg-emerald-50/50"
-                    : "border-amber-200 bg-amber-50/50"
-                  }`}
-              >
-                <div className="flex flex-col justify-between gap-5 xl:flex-row xl:items-center">
-                  <div className="flex items-start gap-3">
-                    <div
-                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${isEligibleToPublish
-                          ? "bg-emerald-100 text-emerald-700"
-                          : "bg-amber-100 text-amber-700"
-                        }`}
-                    >
-                      {isEligibleToPublish ? (
-                        <CheckCircle2 size={21} />
-                      ) : (
-                        <AlertCircle size={21} />
-                      )}
                     </div>
 
-                    <div>
-                      <p
-                        className={`text-sm font-bold ${isEligibleToPublish
-                            ? "text-emerald-800"
-                            : "text-amber-800"
-                          }`}
-                      >
-                        {isEligibleToPublish
-                          ? "Khóa học đã đủ điều kiện phát hành"
-                          : "Khóa học chưa đủ điều kiện phát hành"}
-                      </p>
-                      <p
-                        className={`mt-1 max-w-2xl text-xs leading-5 ${isEligibleToPublish
-                            ? "text-emerald-700"
-                            : "text-amber-700"
-                          }`}
-                      >
-                        {isEligibleToPublish
-                          ? "Tất cả người học thử đã hoàn thành 100% và xác nhận khóa học đạt chuẩn chất lượng."
-                          : "Tất cả người học thử phải hoàn thành 100% tiến độ và xác nhận đạt chuẩn trước khi khóa học được phát hành."}
-                      </p>
-                    </div>
-                  </div>
+                  </section>
 
-                  <div className="flex flex-col gap-3 sm:flex-row">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        alert(
-                          "Đã từ chối và gửi yêu cầu chỉnh sửa nội dung đến giảng viên.",
-                        )
-                      }
-                      className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-red-200 bg-white px-5 text-sm font-semibold text-red-600 transition hover:border-red-300 hover:bg-red-50"
-                    >
-                      <XCircle size={17} />
-                      Từ chối duyệt
-                    </button>
+                </>
+              )}
 
-                    <button
-                      type="button"
-                      disabled={!isEligibleToPublish}
-                      onClick={() =>
-                        alert(
-                          `🎉 Khóa học "${activeCourse.name}" đã được phê duyệt và phát hành thành công!`,
-                        )
-                      }
-                      className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#0066FF] px-5 text-sm font-semibold text-white shadow-md shadow-blue-500/20 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
-                    >
-                      <GraduationCap size={18} />
-                      Duyệt và phát hành
-                    </button>
-                  </div>
-                </div>
-              </section>
             </div>
+
           </section>
+
         </div>
       </main>
+
     </div>
   );
 }

@@ -232,6 +232,24 @@ async def get_lessons_by_subject(
 
     return valid_lessons
 
+@router.get("/get-content/{lesson_id}")
+def get_body_content(
+    db: SessionDep,
+    lesson_id: UUID,
+    current_user: dict = Depends(RoleChecker(["Instructor"]))
+):
+    # Lấy trực tiếp dict dữ liệu (chứa cả content_body và subject_id)
+    lesson_data = crud_lesson.get_content_body(db, lesson_id)
+    
+    if lesson_data is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Không tìm thấy bài học"
+        )
+
+    return lesson_data
+    
+
 @router.get("/is-existed/{lesson_id}")
 def is_existed(
     db: SessionDep,

@@ -10,6 +10,7 @@ from app.crud.certificate import crud_certificate
 from datetime import datetime, timezone
 import httpx
 from app.core.config import settings
+from app.models.lesson_progress import LessonProgress
 
 class CRUDCourseEnrollment(CRUDBase[CourseEnrollment, CourseEnrollmentCreate, CourseEnrollmentUpdate, UUID]):
     # Kiểm tra người dùng đã đăng ký khóa học chưa
@@ -226,4 +227,26 @@ class CRUDCourseEnrollment(CRUDBase[CourseEnrollment, CourseEnrollmentCreate, Co
         )
         return db.exec(statement).first() or 0
 
+    def update_testing_status(self, db: Session, db_obj: CourseEnrollment, status: str) -> CourseEnrollment:
+        db_obj.testing_course_status = status
+        db.add(db_obj)
+        db.commit()
+        db.refresh(db_obj)
+        return db_obj
+
+    
+    def check_enrolled_by_lesson(self, db: Session, user_id: UUID, lesson_id: UUID) -> bool:
+        # 1. Tìm course_id tương ứng với lesson này, qua bản ghi lesson_progress của chính user đó
+        statement = select(LessonProgress.course_id).where(
+            LessonProgress.user_id == user_id,
+            LessonProgress.lesson_id == lesson_id,
+        )
+        course_id = db.exec(statement).first()
+        if not course_id:
+            return False
+
+        # 2. Kiểm tra user có enrollment hợp lệ cho course_id đó không
+        return self.get_by_user_and_course(db, user_id=user_id, course_id=course_id) is not None
+
+    
 crud_course_enrollment = CRUDCourseEnrollment(CourseEnrollment)

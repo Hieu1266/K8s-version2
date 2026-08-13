@@ -13,7 +13,7 @@ import {
   FileText,
   Video,
   Settings,
-} from "lucide-react";
+} from "lucide-react";  
 
 export default function LessonPage() {
   const router = useRouter();
@@ -21,7 +21,7 @@ export default function LessonPage() {
   const params = useParams();
 
   const subjectId = params.subject_id as string;
-  const moduleId = params.module_id as string;
+  const moduleId = params.module_id as string;  
   const lessonId = params.lesson_id as string;
 
   // ==============================

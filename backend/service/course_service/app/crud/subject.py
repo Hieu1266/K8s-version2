@@ -3,6 +3,7 @@ from app.models.subject import Subject
 from app.models.syllabus import Syllabus
 from app.models.module import Module
 from app.models.lesson import Lesson
+from app.models.subject_collaborator_link import CourseCollaboratorLink
 from app.schemas.subject import SubjectCreate, SubjectUpdate, GeneralInfoInstructorSubject
 from app.schemas.enums import SubjectStatus
 from uuid import UUID
@@ -83,4 +84,39 @@ class CRUDSubject(CRUDBase[Subject, SubjectCreate, SubjectUpdate, UUID]):
         )
         return db.exec(statement).first()
 
+    def get_ids_by_instructor(self, db: Session, instructor_id: UUID) -> list[UUID]:
+        statement = (
+            select(Subject.subject_id)
+            .join(Syllabus, Syllabus.subject_id == Subject.subject_id)
+            .where(Syllabus.instructor_id == instructor_id)
+        )
+        return db.exec(statement).all()
+
+    def get_collaborator_subject_list(
+        self, 
+        db: Session, 
+        collaborator_id: UUID, 
+        search: Optional[str] = None
+    ) -> list[Subject]:
+        """
+        Lấy danh sách môn học mà Cộng tác viên (Collaborator) được phân công trong bảng CourseCollaboratorLink
+        """
+        # 1. Query môn học JOIN qua bảng liên kết CourseCollaboratorLink
+        statement = (
+            select(Subject)
+            .join(CourseCollaboratorLink, CourseCollaboratorLink.subject_id == Subject.subject_id)
+            .where(CourseCollaboratorLink.collaborator_id == collaborator_id)
+        )
+
+        # 2. Hỗ trợ tìm kiếm theo tiêu đề hoặc mô tả môn học nếu có
+        if search and search.strip():
+            keyword = f"%{search.strip()}%"
+            statement = statement.where(
+                or_(
+                    Subject.title.ilike(keyword),
+                    Subject.description.ilike(keyword)
+                )
+            )
+
+        return db.exec(statement).all()
 crud_subject = CRUDSubject(Subject)

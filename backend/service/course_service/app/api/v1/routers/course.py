@@ -198,10 +198,13 @@ def search_courses(
     )
 
 @router.post("/", response_model=CourseRead)
-def create_course(db: SessionDep, course_in: CourseCreate, current_user: dict = Depends(RoleChecker(["Admin", "Instructor", "Manager"]))):
+def create_course(
+    db: SessionDep,
+    course_in: CourseCreate,
+    current_user: dict = Depends(RoleChecker(["Admin", "Instructor", "Manager"]))
+):
     course_data = course_in.model_dump()
-    user_id = getattr(current_user, "id", None) or current_user.get("id")
-    course_data["instructor_id"] = user_id
+    course_data["instructor_id"] = current_user["user_id"]
     return crud_course.create(db, obj_in=course_data)
 
 @router.get("/{course_id}", response_model=CourseRead)
@@ -391,16 +394,21 @@ async def get_learning_course(
         async def fetch_lesson_status(lesson: LessonLearningStructure):
             try:
                 res = await client.get(
-                    f"{EXAM_QUIZ_SERVICE}/quiz-submissions/get-lastest-status/{lesson.lesson_id}",
+                    f"{EXAM_QUIZ_SERVICE}/quiz-submissions/get-quiz-status/{lesson.lesson_id}",
                     headers=headers,
                     timeout=5.0
                 )
                 if res.status_code == 200:
-                    lesson.submit_status = res.json()
+                    data = res.json()
+                    lesson.submit_status = data.get("submit_status")
+                    lesson.is_peer_review = data.get("is_peer_review")
                 else:
                     lesson.submit_status = None
+                    lesson.is_peer_review = False
             except httpx.RequestError:
                 lesson.submit_status = None
+                lesson.is_peer_review = False
+
 
         async def fetch_lesson_had_quiz(lesson: LessonLearningStructure):
             try:
@@ -410,12 +418,15 @@ async def get_learning_course(
                     timeout=5.0
                 )
                 if res.status_code == 200:
-                    lesson.had_quiz = res.json()  # Gán trực tiếp giá trị boolean (True/False)
+                    lesson.had_quiz = res.json()
+                    
+                    # Nếu bài học thường có đính kèm Quiz -> Lấy tiếp status & peer review
+                    if lesson.had_quiz:
+                        await fetch_lesson_status(lesson)
                 else:
                     lesson.had_quiz = False
             except httpx.RequestError:
                 lesson.had_quiz = False
-
         # 7. Gom tất cả request và gọi song song (Concurrent Async Calls)
         tasks = []
         if quiz_lessons:
@@ -427,3 +438,32 @@ async def get_learning_course(
             await asyncio.gather(*tasks)
 
         return course_data
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+@router.get("/instructor/{instructor_id}", response_model=list[CourseRead])
+def get_courses_by_instructor(
+    db: SessionDep,
+    instructor_id: UUID,
+    current_user: dict = Depends(RoleChecker(["Admin", "Instructor"]))
+):
+
+    return crud_course.get_by_instructor_id(db, instructor_id=instructor_id)
+ 

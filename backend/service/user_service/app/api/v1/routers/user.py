@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, status, Depends, Response
+from fastapi import APIRouter, HTTPException, status, Depends, Response, Query
 from sqlmodel import select
 from typing import List
 from app.api.v1.deps import SessionDep
@@ -15,7 +15,7 @@ router = APIRouter()
 def get_user_list(
     session: SessionDep,
     query: UserListQuery = Depends(),
-    current_user: dict = Depends(RoleChecker(["Admin"]))
+    current_user: dict = Depends(RoleChecker(["Admin", "Manager"]))
 ):
     if query.status_id is not None and query.role_id is not None:
         raise HTTPException(
@@ -104,6 +104,9 @@ def create_user(
         "message": "Tạo người " + new_user.username + " thành công!"
     }
 
+
+
+
 @router.get("/get-user/{user_id}", response_model=UserDetailInfo)
 def get_user(
     session: SessionDep,
@@ -121,6 +124,8 @@ def get_user(
     user_data = user.model_dump()
     user_data["role_name"] = role_name
     return user_data
+
+
 
 @router.patch("/update-role/{user_id}", response_model=UserDetailInfo)
 def update_user_role(
@@ -266,3 +271,49 @@ def logout(response: Response):
     response.delete_cookie(key="user_role", path="/")
 
     return {"message": "Đăng xuất thành công!"}
+
+
+@router.get("/is-tester/{user_id}")
+def is_tester(
+    db: SessionDep,
+    user_id: UUID,
+    current_user: dict = Depends(RoleChecker(["Instructor"]))
+):
+    user = crud_user.get_by_id(db, user_id)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Người dùng không tồn tại"
+        )
+    return crud_user.is_tester(db, user_id)
+
+
+@router.get("/get-tester-list", response_model=List[UserGeneralInfo])
+def get_tester_list(
+    session: SessionDep,
+    skip: int = Query(0, ge=0, description="Số lượng bản ghi bỏ qua"),
+    limit: int = Query(100, ge=1, le=1000, description="Số lượng bản ghi tối đa"),
+    current_user: dict = Depends(RoleChecker(["Admin", "Instructor", "Manager"]))
+):
+    # 1. Truy vấn danh sách Tester từ CSDL
+    testers = crud_user.get_tester_list(session, skip=skip, limit=limit)
+    
+    if not testers:
+        return []
+
+    # 2. Lấy tên Role (Role ID = 3)
+    role_name = crud_role.get_name_by_id(session, 3) or "Tester"
+    
+    # 3. Tối ưu hóa: Lấy status mapping 1 lần cho tất cả Tester (tránh N+1 query)
+    distinct_status_ids = list({user.status_id for user in testers if user.status_id is not None})
+    status_mapping = crud_status.get_status_mapping_by_ids(session, distinct_status_ids)
+
+    # 4. Trộn dữ liệu trả về cho Frontend
+    user_info_list = []
+    for user in testers:
+        user_data = user.model_dump()
+        user_data["role_name"] = role_name
+        user_data["display_status"] = status_mapping.get(user.status_id, "Unknown")
+        user_info_list.append(user_data)
+
+    return user_info_list

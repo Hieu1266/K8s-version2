@@ -281,7 +281,7 @@ export async function getInforUser(userId: string): Promise<ActionResponseDetail
     }
 
     const data = await res.json();
-    return { success: true, data: data }; 
+    return { success: true, data: data };
   } catch (error: any) {
     return { success: false, message: error.message || "Lỗi kết nối hệ thống" };
   }
@@ -293,8 +293,8 @@ export async function getInforUser(userId: string): Promise<ActionResponseDetail
 export async function getrInstructorList(
   page: number,
   limit: number,
-  roleId: number,     
-  statusId: string   
+  roleId: number,
+  statusId: string
 ): Promise<ActionResponseList> {
   try {
     if (roleId === undefined || !statusId) {
@@ -396,4 +396,40 @@ export async function updateUserProfile(data: ProfileUpdate): Promise<boolean> {
   return response.ok;
 }
 
+import { UserGeneralInfo } from "@/types/user";
 
+// 5. Lấy danh sách Tester (dùng cho màn phân công cộng tác viên)
+export async function getTesterListAction(
+  search: string = ""
+): Promise<ActionResponseList> {
+  try {
+    const headers = await getAuthHeaders();
+    if (!headers) {
+      return { success: false, message: "Không tìm thấy Token đăng nhập trong Cookie!" };
+    }
+
+    const res = await fetch(`${userBackendUrl}/get-tester-list?skip=0&limit=1000`, {
+      method: "GET",
+      headers,
+      cache: "no-store",
+    });
+
+    if (res.status === 401) {
+      return { success: false, message: "Phiên đăng nhập hết hạn hoặc bạn không có quyền truy cập!" };
+    }
+    if (!res.ok) {
+      return { success: false, message: `Lỗi hệ thống Backend: ${res.status}` };
+    }
+
+    let list: UserGeneralInfo[] = await res.json();
+    const q = search.trim().toLowerCase();
+    if (q) {
+      list = list.filter(
+        (u) => u.username?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q)
+      );
+    }
+    return { success: true, list };
+  } catch (error: any) {
+    return { success: false, message: error.message || "Lỗi kết nối mạng" };
+  }
+}

@@ -1,14 +1,14 @@
 import os
-import uuid
 from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status, UploadFile, File
-from fastapi.responses import FileResponse  # 🟢 Bổ sung import để trả về file stream
+from fastapi.responses import FileResponse
 
 from app.api.v1.deps import SessionDep
 from app.core.security import RoleChecker
 from app.crud.syllabus import crud_syllabus
+from app.crud.syllabus_media import crud_syllabus_media  # 🟢 Import module media vừa tạo
 from app.schemas.enums import SyllabusStatus
 from app.schemas.syllabus import (
     CheckSyllabusInstructor,
@@ -17,37 +17,21 @@ from app.schemas.syllabus import (
     SyllabusUpdate,
 )
 
+from fastapi.responses import RedirectResponse  # 🟢 Import RedirectResponse
+
+NGINX_MEDIA_URL = os.getenv("NGINX_MEDIA_URL", "http://localhost:8081")
+
 router = APIRouter(prefix="/syllabus", tags=["syllabus"])
-PHYSICAL_UPLOAD_DIR = "/var/www/lumer_media/uploads/documents/syllabus"
-
-# Nếu chạy local môi trường Dev chưa có thư mục /var/www/...
-if not os.path.exists("/var/www/lumer_media/uploads"):
-    PHYSICAL_UPLOAD_DIR = "documents/syllabus"
-
-os.makedirs(PHYSICAL_UPLOAD_DIR, exist_ok=True)
 
 
+# 🟢 1. API Upload file đề cương
 @router.post("/upload")
-async def upload_syllabus_file(file: UploadFile = File(...)):
-    try:
-        file_ext = os.path.splitext(file.filename)[1]
-        unique_filename = f"{uuid.uuid4()}{file_ext}"
-
-        # 🟢 Ghi file vào đĩa cứng bằng đường dẫn tuyệt đối
-        full_disk_path = os.path.join(PHYSICAL_UPLOAD_DIR, unique_filename)
-        with open(full_disk_path, "wb") as f:
-            content = await file.read()
-            f.write(content)
-
-        # 🟢 TRẢ VỀ ĐƯỜNG DẪN SẠCH ĐỂ LƯU VÀO DATABASE (Tương tự Hình 2)
-        clean_db_path = f"documents/syllabus/{unique_filename}"
-
-        return {
-            "status": "success",
-            "file_path": clean_db_path
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Lỗi khi lưu file: {str(e)}")
+def upload_file_only(
+    file: UploadFile = File(...), 
+    current_user: dict = Depends(RoleChecker(["Admin", "Instructor", "Manager"]))
+):
+    path = crud_syllabus_media.upload_file(file)
+    return {"file_path": path}
 
 
 # 🔵 2. API: Lấy thông tin đề cương theo ID Môn học
@@ -121,22 +105,14 @@ def download_syllabus_file(
     syllabus = crud_syllabus.get_by_id(db=db, id=syllabus_id)
     if not syllabus or not syllabus.syllabus_file_path:
         raise HTTPException(status_code=404, detail="Không tìm thấy tập tin đề cương.")
+    clean_path = syllabus.syllabus_file_path.lstrip('/')
+    file_url = f"{NGINX_MEDIA_URL}/{clean_path}"
+    
+    return RedirectResponse(url=file_url)
 
-    # Tìm đường dẫn tuyệt đối trên đĩa
-    base_dir = "/var/www/lumer_media/uploads" if os.path.exists("/var/www/lumer_media/uploads") else ""
-    full_path = os.path.join(base_dir, syllabus.syllabus_file_path)
 
-    if not os.path.exists(full_path):
-        raise HTTPException(status_code=404, detail="Tập tin không tồn tại trên máy chủ.")
 
-    file_name = os.path.basename(full_path)
-    return FileResponse(
-        path=full_path,
-        filename=file_name,
-        media_type="application/pdf"
-    )
-
-# 🔴 5. API: Xóa đề cương theo ID
+# 🔴 6. API: Xóa đề cương theo ID
 @router.delete("/{syllabus_id}", status_code=status.HTTP_200_OK)
 def delete_syllabus(
     syllabus_id: UUID,

@@ -1,4 +1,5 @@
 .env
+.env_backup
 documents/syllabus/*
 !documents/syllabus/.gitkeep
 documents/lesson_resources/*

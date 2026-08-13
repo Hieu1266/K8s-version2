@@ -2,7 +2,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { env } from "process";
 import { logoutUserAction } from "@/actions/authUser";
 
 export default function Navbar() {
@@ -26,7 +25,6 @@ export default function Navbar() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Cấu hình đường dẫn Quản lý/Giảng dạy/Học tập riêng trong Avatar
   const getUserMenuConfig = () => {
     switch (role) {
       case "admin":
@@ -36,6 +34,8 @@ export default function Navbar() {
       case "instructor":
       case "faculty":
         return { label: "Không gian giảng dạy", path: "/instructor-management" };
+      case "tester":
+        return { label: "Không gian kiểm thử", path: "/tester-dashboard" };
       case "user":
       case "student":
       default:
@@ -45,18 +45,22 @@ export default function Navbar() {
 
   const handleLogout = async () => {
     try {
-      // 1. Gọi Next.js Server Action để xóa Cookie HttpOnly
+      // 1. Gọi Next.js Server Action để xóa cookie httpOnly (token)
       await logoutUserAction();
 
-      // 2. Xóa dữ liệu trong localStorage
+      // 2. Xóa các cookie phía client (phòng khi có cookie không phải httpOnly)
+      document.cookie = "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;";
+      document.cookie = "user_role=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;";
+
+      // 3. Xóa dữ liệu trong localStorage
       localStorage.clear();
 
-      // 3. Cập nhật state
+      // 4. Cập nhật state
       setIsLoggedIn(false);
       setShowUserMenu(false);
       alert("Đã đăng xuất tài khoản!");
 
-      // 4. Chuyển hướng và làm sạch cache trình duyệt
+      // 5. Chuyển hướng và làm sạch cache trình duyệt
       window.location.href = "/";
     } catch (error) {
       console.error("Lỗi đăng xuất:", error);
@@ -71,15 +75,14 @@ export default function Navbar() {
       case "manager": return "MN";
       case "instructor":
       case "faculty": return "GV";
+      case "tester": return "TS";
       default: return "ST";
     }
   };
 
   return (
     <header className="bg-white border-b border-gray-200 sticky top-0 z-50 px-6 py-3.5 flex justify-between items-center font-sans">
-      {/* KHU VỰC BÊN TRÁI */}
       <div className="flex items-center space-x-6">
-        {/* LOGO: LUÔN VỀ /home NẾU ĐÃ ĐĂNG NHẬP (BẤT KỂ ROLE NÀO) */}
         <Link
           href={isLoggedIn ? "/home" : "/"}
           className="text-base font-black text-[#0066FF] tracking-tight no-underline"
@@ -88,7 +91,6 @@ export default function Navbar() {
         </Link>
       </div>
 
-      {/* KHU VỰC BÊN PHẢI */}
       <div className="flex items-center space-x-4">
         {isLoggedIn ? (
           <div className="relative" ref={userRef}>
@@ -100,11 +102,9 @@ export default function Navbar() {
               {getAvatarText()}
             </button>
 
-            {/* MENU AVATAR */}
             {showUserMenu && (
               <div className="absolute right-0 mt-2 w-52 bg-white border border-gray-200 rounded-xl shadow-lg py-1.5 z-50 divide-y divide-gray-100">
                 <div className="py-1">
-                  {/* Nút vào trang làm việc tương ứng với Role */}
                   <Link
                     href={menuConfig.path}
                     onClick={() => setShowUserMenu(false)}

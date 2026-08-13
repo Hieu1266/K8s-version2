@@ -1,15 +1,18 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import LessonNotesPanel from "@/components/LessonNotesPanel";
 import { QuizSection } from "@/components/LessonQuizContainer";
+import PeerReviewSection from "@/components/course-learning/PeerReviewSection";
+import TesterFeedbackPanel from "@/components/course-learning/TesterFeedbackPanel";
 import { getLearningCourse } from "@/actions/getCourse";
 import {
   attachStatusToLessons,
   completeLessonAction,
 } from "@/actions/getLesson";
+import { getQuizStatusByLessonAction } from "@/actions/getQuizSubmission";
 import { getLessonNotesAction, createNoteAction } from "@/actions/getNotes";
 import {
   getOrCreateVideoProgressAction,
@@ -21,7 +24,7 @@ import { CourseLearningStructure } from "@/types/course";
 import { SubjectLearningStructure } from "@/types/subjects";
 import { ModuleLearningStructure } from "@/types/modules";
 import { UserLessonNote, NoteCreatePayload } from "@/types/progresses";
-import { LessonStatus } from "@/types/statuses";
+import { LessonStatus, SubmissionStatus } from "@/types/statuses";
 import { VideoProgress } from "@/types/video";
 
 import { TabKey, LessonWithStatus } from "@/components/course-learning/types";
@@ -40,20 +43,23 @@ import LessonTitleHeader from "@/components/course-learning/LessonTitleHeader";
 import LessonTabsNav from "@/components/course-learning/LessonTabsNav";
 import LectureTabContent from "@/components/course-learning/LectureTabContent";
 import ResourcesTabContent from "@/components/course-learning/ResourcesTabContent";
+import TestModeNextButton from "@/components/course-learning/TestModeNextButton";
 
 const COURSE_URL = process.env.NEXT_PUBLIC_COURSE_BACKEND_URL;
 
 export default function CourseLearningPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const id = params?.id as string;
 
-  // State quản lý dữ liệu lấy từ Backend API
+  // Kiểm tra chính xác trên URL có tham số tester=1 hay không
+  const isTester = searchParams.get("tester") === "1";
+
   const [course, setCourse] = useState<CourseLearningStructure | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // State điều hướng cây thư mục bài học
   const [currentLesson, setCurrentLesson] = useState<
     LessonWithStatus | undefined
   >(undefined);
@@ -61,7 +67,6 @@ export default function CourseLearningPage() {
     SubjectLearningStructure | undefined
   >(undefined);
 
-  // State quản lý thu gọn / mở rộng
   const [expandedSubjects, setExpandedSubjects] = useState<
     Record<string, boolean>
   >({});
@@ -70,7 +75,6 @@ export default function CourseLearningPage() {
   >({});
   const [activeTab, setActiveTab] = useState<TabKey>("lecture");
 
-  // State thu gọn thanh sidebar bên trái (ghi nhớ lựa chọn của người dùng ở trình duyệt)
   const [sidebarCollapsed, setSidebarCollapsedState] = useState(false);
 
   useEffect(() => {
@@ -85,36 +89,33 @@ export default function CourseLearningPage() {
     });
   };
 
-  // State Ghi chú + Video
   const [notes, setNotes] = useState<UserLessonNote[]>([]);
   const [notesLoading, setNotesLoading] = useState(false);
   const [videoCurrentTime, setVideoCurrentTime] = useState(0);
   const [seekTarget, setSeekTarget] = useState<number | null>(null);
 
-  // Tiến độ video THẬT
   const [videoProgress, setVideoProgress] = useState<VideoProgress | null>(
-    null,
+    null
   );
   const [videoProgressLoading, setVideoProgressLoading] = useState(false);
 
-  // STATE TÀI LIỆU ĐÍNH KÈM (RESOURCES)
   const [resources, setResources] = useState<LessonResourceItem[]>([]);
   const [resourcesLoading, setResourcesLoading] = useState(false);
 
-  // Ô tạo ghi chú nhanh
   const [quickNoteOpen, setQuickNoteOpen] = useState(false);
   const [quickNoteContent, setQuickNoteContent] = useState("");
   const [quickNoteSaving, setQuickNoteSaving] = useState(false);
 
-  // State xử lý quá trình gửi API hoàn thành bài đọc
   const [completing, setCompleting] = useState(false);
-  // Chặn nhiều lần gửi hoàn thành trước khi React kịp cập nhật state.
+  // Chặn nhiều lần gửi hoàn thành trước khi React kịp cập nhật state (dùng cho Slide)
   const slideCompletionInFlightRef = useRef(false);
 
-  // Ref tới khung nội dung bài học bên phải, dùng để cuộn lên đầu mỗi khi đổi bài học
+  const [activeQuizId, setActiveQuizId] = useState<string | null>(null);
+  const [activeQuizStatus, setActiveQuizStatus] = useState<string | null>(null);
+  const [quizStatusRefreshKey, setQuizStatusRefreshKey] = useState(0);
+
   const lessonContentScrollRef = useRef<HTMLDivElement>(null);
 
-  // Call Server Action để lấy dữ liệu khóa học và status
   useEffect(() => {
     if (!id) return;
 
@@ -130,19 +131,19 @@ export default function CourseLearningPage() {
             const updatedModules = await Promise.all(
               subject.modules.map(async (mod) => {
                 const lessonsWithStatus = await attachStatusToLessons(
-                  mod.lessons,
+                  mod.lessons
                 );
                 return {
                   ...mod,
                   lessons: lessonsWithStatus,
                 };
-              }),
+              })
             );
             return {
               ...subject,
               modules: updatedModules,
             };
-          }),
+          })
         );
 
         const courseWithStatus: CourseLearningStructure = {
@@ -158,7 +159,6 @@ export default function CourseLearningPage() {
           | LessonWithStatus
           | undefined;
 
-        // Nếu người dùng đã từng mở một bài học trong khóa này, ưu tiên mở lại đúng bài đó
         let targetSubject = firstSubject;
         let targetModule = firstModule;
         let targetLesson = firstLesson;
@@ -168,7 +168,7 @@ export default function CourseLearningPage() {
           for (const subject of courseWithStatus.subjects) {
             for (const mod of subject.modules) {
               const found = mod.lessons.find(
-                (les) => les.lesson_id === savedLessonId,
+                (les) => les.lesson_id === savedLessonId
               ) as LessonWithStatus | undefined;
               if (found && found.status !== LessonStatus.LOCKED) {
                 targetSubject = subject;
@@ -200,12 +200,19 @@ export default function CourseLearningPage() {
     fetchLearningData();
   }, [id]);
 
-  // Reset các state phụ ngay khi đổi lesson, không phụ thuộc tab đang mở.
+  // Reset state phụ khi đổi bài học
   useEffect(() => {
     setVideoCurrentTime(0);
     setSeekTarget(null);
     setQuickNoteOpen(false);
     setQuickNoteContent("");
+    setActiveQuizId(null);
+    setActiveQuizStatus(null);
+  }, [currentLesson?.lesson_id]);
+
+  // Cuộn lên đầu trang khi thay đổi lesson
+  useEffect(() => {
+    lessonContentScrollRef.current?.scrollTo({ top: 0, behavior: "auto" });
   }, [currentLesson?.lesson_id]);
 
   // Lấy danh sách ghi chú
@@ -215,7 +222,6 @@ export default function CourseLearningPage() {
       return;
     }
 
-    // Chỉ tải ghi chú khi người dùng thực sự mở tab Ghi chú.
     if (activeTab !== "notes") {
       setNotes([]);
       setNotesLoading(false);
@@ -238,14 +244,13 @@ export default function CourseLearningPage() {
     };
   }, [currentLesson?.lesson_id, activeTab]);
 
-  // EFFECT TẢI DANH SÁCH TÀI LIỆU KHI CHỌN BÀI HỌC
+  // Lấy danh sách tài liệu
   useEffect(() => {
     if (!currentLesson?.lesson_id) {
       setResources([]);
       return;
     }
 
-    // Không tải tài liệu trong lúc người dùng đang trình chiếu bài giảng.
     if (activeTab !== "resources") {
       setResources([]);
       setResourcesLoading(false);
@@ -282,7 +287,7 @@ export default function CourseLearningPage() {
             subject,
             module: mod,
             lesson: lesson as LessonWithStatus,
-          }),
+          })
         );
       });
     });
@@ -290,12 +295,20 @@ export default function CourseLearningPage() {
   }, [course]);
 
   const completedCount = flatLessons.filter(
-    (f) => f.lesson.status === LessonStatus.COMPLETED,
+    (f) => f.lesson.status === LessonStatus.COMPLETED
   ).length;
 
   const progressPercent = flatLessons.length
     ? Math.round((completedCount / flatLessons.length) * 100)
     : 0;
+
+  const isLastLesson = useMemo(() => {
+    if (!currentLesson || flatLessons.length === 0) return false;
+    const idx = flatLessons.findIndex(
+      (f) => f.lesson.lesson_id === currentLesson.lesson_id
+    );
+    return idx === flatLessons.length - 1;
+  }, [currentLesson, flatLessons]);
 
   const findNextLockedLesson = (startIndex: number) => {
     for (let i = startIndex; i < flatLessons.length; i++) {
@@ -316,7 +329,7 @@ export default function CourseLearningPage() {
         max_watched_second: updatedProgress.max_watched_second,
         completion_percentage: updatedProgress.completion_percentage,
         is_finished: updatedProgress.is_finished,
-      },
+      }
     );
 
     if (!result.success) {
@@ -326,7 +339,7 @@ export default function CourseLearningPage() {
 
   const selectLesson = (
     subject: SubjectLearningStructure,
-    lesson: LessonWithStatus,
+    lesson: LessonWithStatus
   ) => {
     if (lesson.status === LessonStatus.LOCKED) return;
     setCurrentSubject(subject);
@@ -340,20 +353,37 @@ export default function CourseLearningPage() {
     }
   };
 
-  // Điều hướng trình chiếu: mỗi lesson là một slide và chỉ di chuyển
-  // giữa các lesson nằm trong cùng module hiện tại.
+  const handleGoToNextLesson = () => {
+    if (!currentLesson) return;
+    const currentIndex = flatLessons.findIndex(
+      (f) => f.lesson.lesson_id === currentLesson.lesson_id
+    );
+    if (currentIndex !== -1 && currentIndex + 1 < flatLessons.length) {
+      const nextItem = flatLessons[currentIndex + 1];
+      if (nextItem.lesson.status !== LessonStatus.LOCKED) {
+        selectLesson(nextItem.subject, nextItem.lesson);
+        setExpandedSubjects((prev) => ({
+          ...prev,
+          [nextItem.subject.subject_id]: true,
+        }));
+        setExpandedModules((prev) => ({
+          ...prev,
+          [nextItem.module.module_id]: true,
+        }));
+      }
+    }
+  };
+
+  // Điều hướng dạng SLIDE: chuyển giữa các lesson trong cùng module
   const moduleLessonNavigation = useMemo(() => {
     if (!course || !currentLesson) {
-      return {
-        previous: null,
-        next: null,
-      };
+      return { previous: null, next: null };
     }
 
     for (const subject of course.subjects) {
       for (const mod of subject.modules) {
         const currentLessonIndex = mod.lessons.findIndex(
-          (lesson) => lesson.lesson_id === currentLesson.lesson_id,
+          (lesson) => lesson.lesson_id === currentLesson.lesson_id
         );
 
         if (currentLessonIndex === -1) continue;
@@ -377,10 +407,7 @@ export default function CourseLearningPage() {
       }
     }
 
-    return {
-      previous: null,
-      next: null,
-    };
+    return { previous: null, next: null };
   }, [course, currentLesson]);
 
   const navigateToModuleLesson = (direction: "previous" | "next") => {
@@ -399,17 +426,16 @@ export default function CourseLearningPage() {
     }));
   };
 
-  const handleQuizPassed = (submissionStatus?: string, isPass?: boolean) => {
+  // Đồng bộ UI State cho Bài thi & Chấm chéo
+  const syncLessonUiState = (
+    submissionStatus: string | undefined,
+    markCurrentCompleted: boolean,
+    unlockNext: boolean
+  ) => {
     if (!currentLesson || !course) return;
 
-    const isPendingGrading = submissionStatus === "SUBMITTED";
-    const isFailed = isPass === false;
-
-    const shouldMarkCompleted = !isPendingGrading && !isFailed;
-    const shouldUnlockNext = shouldMarkCompleted || isPendingGrading;
-
     const currentIndex = flatLessons.findIndex(
-      (f) => f.lesson.lesson_id === currentLesson.lesson_id,
+      (f) => f.lesson.lesson_id === currentLesson.lesson_id
     );
 
     const nextItem =
@@ -417,15 +443,13 @@ export default function CourseLearningPage() {
         ? flatLessons[currentIndex + 1]
         : null;
 
-    // Nếu bài kế tiếp đã mở sẵn (không LOCKED) và không phải bài tùy chọn
-    // -> không cần tìm/mở thêm gì (tránh mở nhầm bài xa hơn, sai thứ tự)
     const nextAlreadyAccessible =
       !!nextItem &&
       nextItem.lesson.status !== LessonStatus.LOCKED &&
       !nextItem.lesson.is_optional;
 
     const unlockTarget =
-      shouldUnlockNext && currentIndex !== -1 && !nextAlreadyAccessible
+      unlockNext && currentIndex !== -1 && !nextAlreadyAccessible
         ? findNextLockedLesson(currentIndex + 1)
         : null;
 
@@ -442,7 +466,7 @@ export default function CourseLearningPage() {
                 return {
                   ...les,
                   submit_status: submissionStatus ?? les.submit_status,
-                  ...(shouldMarkCompleted
+                  ...(markCurrentCompleted
                     ? { status: LessonStatus.COMPLETED }
                     : {}),
                 };
@@ -460,19 +484,48 @@ export default function CourseLearningPage() {
       };
     });
 
-    setCurrentLesson(
-      (prev: LessonWithStatus | undefined): LessonWithStatus | undefined =>
-        prev
-          ? {
-              ...prev,
-              submit_status: (submissionStatus ??
-                prev.submit_status) as LessonWithStatus["submit_status"],
-              ...(shouldMarkCompleted
-                ? { status: LessonStatus.COMPLETED }
-                : {}),
-            }
-          : prev,
+    setCurrentLesson((prev: LessonWithStatus | undefined): LessonWithStatus | undefined =>
+      prev
+        ? {
+          ...prev,
+          submit_status: (submissionStatus ??
+            prev.submit_status) as LessonWithStatus["submit_status"],
+          ...(markCurrentCompleted
+            ? { status: LessonStatus.COMPLETED }
+            : {}),
+        }
+        : prev
     );
+  };
+
+  const handleQuizPassed = (submissionStatus?: string, isPass?: boolean) => {
+    const isFailed = isPass === false;
+    if (isFailed) return;
+    syncLessonUiState(submissionStatus, true, true);
+  };
+
+  const handleNextLessonUnlockedOnly = (submissionStatus?: string) => {
+    syncLessonUiState(submissionStatus, false, true);
+  };
+
+  const handlePeerReviewSubmitted = async (isAllAssignmentsCompleted: boolean) => {
+    if (!currentLesson) return;
+
+    const res = await getQuizStatusByLessonAction(currentLesson.lesson_id);
+    if (res.success && res.data) {
+      const newStatus = res.data.status ?? null;
+      setActiveQuizStatus(newStatus);
+
+      if (
+        isAllAssignmentsCompleted &&
+        newStatus === SubmissionStatus.GRADED &&
+        res.data.is_passed === true
+      ) {
+        handleQuizPassed(newStatus, true);
+      }
+    }
+
+    setQuizStatusRefreshKey((k) => k + 1);
   };
 
   const handleCompleteAndNext = async () => {
@@ -487,7 +540,7 @@ export default function CourseLearningPage() {
 
       if (result.success) {
         const currentIndex = flatLessons.findIndex(
-          (f) => f.lesson.lesson_id === currentLesson.lesson_id,
+          (f) => f.lesson.lesson_id === currentLesson.lesson_id
         );
 
         const nextItem =
@@ -526,7 +579,7 @@ export default function CourseLearningPage() {
         });
 
         setCurrentLesson((prev) =>
-          prev ? { ...prev, status: LessonStatus.COMPLETED } : prev,
+          prev ? { ...prev, status: LessonStatus.COMPLETED } : prev
         );
 
         if (!isOptionalLesson && nextItem) {
@@ -550,6 +603,8 @@ export default function CourseLearningPage() {
             ...prev,
             [nextItem.module.module_id]: true,
           }));
+        } else if (isLastLesson) {
+          alert("Chúc mừng! Bạn đã hoàn thành bài học cuối cùng của khóa học.");
         }
       } else {
         alert(result.error || "Có lỗi xảy ra khi xác nhận hoàn thành bài học.");
@@ -561,6 +616,7 @@ export default function CourseLearningPage() {
     }
   };
 
+  // Điều hướng chuyển Slide bài giảng và tự động hoàn thành bài học
   const handleSlideNext = async () => {
     if (
       !currentLesson ||
@@ -591,7 +647,6 @@ export default function CourseLearningPage() {
           : target.lesson.status,
     };
 
-    // Optimistic UI: đổi lesson ngay, không chờ độ trễ của API.
     slideCompletionInFlightRef.current = true;
     setCompleting(true);
 
@@ -635,13 +690,12 @@ export default function CourseLearningPage() {
 
       if (!result.success) {
         throw new Error(
-          result.error || "Không thể lưu trạng thái hoàn thành bài học.",
+          result.error || "Không thể lưu trạng thái hoàn thành bài học."
         );
       }
     } catch (error) {
       console.error("Đồng bộ tiến độ bài học thất bại:", error);
 
-      // API thất bại: hoàn tác đúng hai trạng thái vừa cập nhật.
       setCourse((prevCourse) => {
         if (!prevCourse) return prevCourse;
 
@@ -675,7 +729,7 @@ export default function CourseLearningPage() {
       alert(
         error instanceof Error
           ? error.message
-          : "Không thể lưu tiến độ. Vui lòng thử lại.",
+          : "Không thể lưu tiến độ. Vui lòng thử lại."
       );
     } finally {
       slideCompletionInFlightRef.current = false;
@@ -690,7 +744,7 @@ export default function CourseLearningPage() {
     const isOptionalLesson = Boolean(currentLesson.is_optional);
 
     const currentIndex = flatLessons.findIndex(
-      (f) => f.lesson.lesson_id === currentLesson.lesson_id,
+      (f) => f.lesson.lesson_id === currentLesson.lesson_id
     );
 
     const nextItem =
@@ -729,7 +783,7 @@ export default function CourseLearningPage() {
     });
 
     setCurrentLesson((prev) =>
-      prev ? { ...prev, status: LessonStatus.COMPLETED } : prev,
+      prev ? { ...prev, status: LessonStatus.COMPLETED } : prev
     );
 
     if (!isOptionalLesson && nextItem) {
@@ -755,6 +809,68 @@ export default function CourseLearningPage() {
       }));
     }
   };
+
+  // === CHẾ ĐỘ TESTER ===
+  const handleTestNext = () => {
+    handleCompleteAndNext();
+  };
+
+  const hideNextButton = useMemo(() => {
+    return isLastLesson && currentLesson?.status === LessonStatus.COMPLETED;
+  }, [isLastLesson, currentLesson?.status]);
+
+  const handleTestPrev = () => {
+    if (!currentLesson) return;
+    const currentIndex = flatLessons.findIndex(
+      (f) => f.lesson.lesson_id === currentLesson.lesson_id
+    );
+    if (currentIndex <= 0) return;
+    const prevItem = flatLessons[currentIndex - 1];
+    selectLesson(prevItem.subject, prevItem.lesson);
+
+    setExpandedSubjects((prev) => ({
+      ...prev,
+      [prevItem.subject.subject_id]: true,
+    }));
+    setExpandedModules((prev) => ({
+      ...prev,
+      [prevItem.module.module_id]: true,
+    }));
+  };
+
+  const testNextDisabled = useMemo(() => {
+    if (!currentLesson || completing) return true;
+    const idx = flatLessons.findIndex(
+      (f) => f.lesson.lesson_id === currentLesson.lesson_id
+    );
+    return idx === -1;
+  }, [currentLesson, flatLessons, completing]);
+
+  const testPrevDisabled = useMemo(() => {
+    if (!currentLesson) return true;
+    const idx = flatLessons.findIndex(
+      (f) => f.lesson.lesson_id === currentLesson.lesson_id
+    );
+    return idx <= 0;
+  }, [currentLesson, flatLessons]);
+
+  useEffect(() => {
+    if (!isTester) return;
+
+    const handler = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "n") {
+        e.preventDefault();
+        handleTestNext();
+      }
+      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "p") {
+        e.preventDefault();
+        handleTestPrev();
+      }
+    };
+
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [currentLesson, flatLessons, isTester]);
 
   const toggleSubject = (subjectId: string) =>
     setExpandedSubjects((prev) => ({ ...prev, [subjectId]: !prev[subjectId] }));
@@ -786,10 +902,9 @@ export default function CourseLearningPage() {
   };
 
   const hasVideo = Boolean(
-    currentLesson?.video_url && currentLesson.video_url.trim() !== "",
+    currentLesson?.video_url && currentLesson.video_url.trim() !== ""
   );
 
-  // Danh sách Tab Động (Chỉ thêm tab 'Bài thi' khi had_quiz == true VÀ KHÔNG CÓ video)
   const lessonTabs = useMemo(() => {
     const tabs: [TabKey, string][] = [
       ["lecture", "Bài giảng"],
@@ -818,7 +933,7 @@ export default function CourseLearningPage() {
       setVideoProgressLoading(true);
       const data = await getOrCreateVideoProgressAction(
         currentLesson.lesson_id,
-        currentLesson.duration_seconds ?? 0,
+        currentLesson.duration_seconds ?? 0
       );
       if (!cancelled) setVideoProgress(data);
       setVideoProgressLoading(false);
@@ -874,7 +989,7 @@ export default function CourseLearningPage() {
       <CourseHeaderBar
         courseTitle={course.title}
         progressPercent={progressPercent}
-        onLeaveCourse={() => router.push("/dashboard-student")}
+        onLeaveCourse={() => router.back()}
       />
 
       <div className="flex flex-1 min-h-0 overflow-hidden">
@@ -919,8 +1034,8 @@ export default function CourseLearningPage() {
               />
             )}
 
-            {/* TAB BÀI GIẢNG / BÀI ĐỌC */}
-            {activeTab === "lecture" && !currentLesson?.is_quiz && (
+            {/* TAB BÀI GIẢNG / BÀI ĐỌC (Tích hợp Trình chiếu Slide) */}
+            {activeTab === "lecture" && !currentLesson?.is_quiz && currentLesson && (
               <div key="lecture" className="anim-fade-up space-y-6 pb-12">
                 <LectureTabContent
                   currentLesson={currentLesson}
@@ -950,6 +1065,15 @@ export default function CourseLearningPage() {
                   onPreviousLesson={() => navigateToModuleLesson("previous")}
                   onNextLesson={handleSlideNext}
                 />
+
+                {/* CHỈ HIỂN THỊ KHUNG NHẬN XÉT KHI URL CÓ ?tester=1 */}
+                {isTester && (
+                  <TesterFeedbackPanel
+                    courseId={id}
+                    lessonId={currentLesson.lesson_id}
+                    lessonTitle={currentLesson.title}
+                  />
+                )}
               </div>
             )}
 
@@ -965,39 +1089,82 @@ export default function CourseLearningPage() {
             )}
 
             {/* TAB GHI CHÚ */}
-            {activeTab === "notes" &&
-              !currentLesson?.is_quiz &&
-              currentLesson && (
-                <div key="notes" className="anim-fade-up pb-12">
-                  <LessonNotesPanel
-                    courseId={id}
-                    lessonId={currentLesson.lesson_id}
-                    hasVideo={hasVideo}
-                    videoCurrentTime={videoCurrentTime}
-                    notes={notes}
-                    loading={notesLoading}
-                    onNotesChange={setNotes}
-                    onSeekRequest={(seconds) => {
-                      setSeekTarget(seconds);
-                      setActiveTab("lecture");
-                    }}
-                  />
-                </div>
-              )}
+            {activeTab === "notes" && !currentLesson?.is_quiz && currentLesson && (
+              <div key="notes" className="anim-fade-up pb-12">
+                <LessonNotesPanel
+                  courseId={id}
+                  lessonId={currentLesson.lesson_id}
+                  hasVideo={hasVideo}
+                  videoCurrentTime={videoCurrentTime}
+                  notes={notes}
+                  loading={notesLoading}
+                  onNotesChange={setNotes}
+                  onSeekRequest={(seconds) => {
+                    setSeekTarget(seconds);
+                    setActiveTab("lecture");
+                  }}
+                />
+              </div>
+            )}
 
-            {/* TAB BÀI THI / QUIZ SECTION */}
-            {(activeTab === "quiz" || currentLesson?.is_quiz) &&
-              currentLesson && (
-                <div key="quiz" className="anim-fade-up pb-12">
-                  <QuizSection
-                    lessonId={currentLesson.lesson_id}
-                    onQuizPassed={handleQuizPassed}
-                  />
-                </div>
-              )}
+            {/* TAB BÀI THI / QUIZ SECTION (Tích hợp Chấm chéo) */}
+            {(activeTab === "quiz" || currentLesson?.is_quiz) && currentLesson && (
+              <div key="quiz" className="anim-fade-up space-y-6 pb-12">
+                <QuizSection
+                  key={`${currentLesson.lesson_id}-${quizStatusRefreshKey}`}
+                  lessonId={currentLesson.lesson_id}
+                  courseId={id}
+                  onQuizPassed={handleQuizPassed}
+                  onNextLessonUnlocked={handleNextLessonUnlockedOnly}
+                  isPeerReview={currentLesson.is_peer_review}
+                  onQuizIdResolved={(quizId, status) => {
+                    setActiveQuizId(quizId);
+                    setActiveQuizStatus(status ?? null);
+                  }}
+                />
+
+                {/* Khu vực chấm chéo */}
+                {currentLesson.is_peer_review &&
+                  activeQuizId &&
+                  (activeQuizStatus === SubmissionStatus.SUBMITTED ||
+                    activeQuizStatus === SubmissionStatus.GRADED) && (
+                    <PeerReviewSection
+                      quizId={activeQuizId}
+                      onReviewSubmitted={handlePeerReviewSubmitted}
+                    />
+                  )}
+
+                {(activeQuizStatus === SubmissionStatus.SUBMITTED ||
+                  activeQuizStatus === SubmissionStatus.GRADED ||
+                  currentLesson.status === LessonStatus.COMPLETED) && (
+                    <div className="flex justify-end pt-4">
+                      <button
+                        onClick={handleGoToNextLesson}
+                        disabled={isLastLesson}
+                        className="px-6 py-2.5 bg-[#5B5FEF] text-white font-medium rounded-lg hover:bg-[#4B4FEF] transition-colors disabled:opacity-50 flex items-center gap-2 shadow-sm"
+                      >
+                        <span>Bài tiếp theo</span>
+                        <span>→</span>
+                      </button>
+                    </div>
+                  )}
+              </div>
+            )}
           </div>
         </div>
       </div>
+
+      {/* CHỈ HIỂN THỊ NÚT CHUYỂN BÀI MÀU VÀNG KHI URL CÓ ?tester=1 */}
+      {isTester && (
+        <TestModeNextButton
+          onNext={handleTestNext}
+          onPrev={handleTestPrev}
+          disabled={testNextDisabled}
+          disabledPrev={testPrevDisabled}
+          isLast={isLastLesson}
+          hideNext={hideNextButton}
+        />
+      )}
     </div>
   );
 }

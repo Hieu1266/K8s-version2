@@ -27,3 +27,14 @@ export interface ProfileUpdate {
     bio?: string;
     avatar_url?: string;
 }
+
+export interface UserGeneralInfo {
+    user_id: string;
+    role_name: string;
+    username: string;
+    email: string;
+    birthdate?: string | null;
+    created_at: string;
+    status_id: string;
+    display_status: string;
+}

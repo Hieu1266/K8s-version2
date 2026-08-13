@@ -5,6 +5,8 @@ import { useParams, useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import RichTextEditor from "@/components/editors/RichTextEditor";
 import PresentationSlideManager from "@/components/PresentationSlideManager";
+import CourseErrorScreen from "@/components/course-learning/CourseErrorScreen";
+
 import {
   ArrowLeft,
   Plus,
@@ -21,7 +23,7 @@ import {
   Download,
   Paperclip,
   GripVertical,
-  AlertTriangle,
+  AlertTriangle
 } from "lucide-react";
 import {
   getLessonListAction,
@@ -378,11 +380,11 @@ export default function ModuleDetailPage() {
       setEditingLesson((prev) =>
         prev
           ? {
-              ...prev,
-              resources: prev.resources.filter(
-                (r) => r.resource_id !== confirmDeleteResourceId,
-              ),
-            }
+            ...prev,
+            resources: prev.resources.filter(
+              (r) => r.resource_id !== confirmDeleteResourceId,
+            ),
+          }
           : prev,
       );
 
@@ -390,11 +392,11 @@ export default function ModuleDetailPage() {
         prev.map((l) =>
           l.lesson_id === editingLesson.lesson_id
             ? {
-                ...l,
-                resources: l.resources.filter(
-                  (r) => r.resource_id !== confirmDeleteResourceId,
-                ),
-              }
+              ...l,
+              resources: l.resources.filter(
+                (r) => r.resource_id !== confirmDeleteResourceId,
+              ),
+            }
             : l,
         ),
       );
@@ -418,6 +420,10 @@ export default function ModuleDetailPage() {
     );
   }
 
+  if (errorMessage) {
+    return <CourseErrorScreen errorMessage={errorMessage} onBackHome={() => router.back()} />;
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 pb-16">
       <Navbar />
@@ -426,13 +432,11 @@ export default function ModuleDetailPage() {
         {/* Navigation Header */}
         <div className="space-y-4">
           <button
-            onClick={() =>
-              router.push(`/instructor-management/course-content/${subjectId}`)
-            }
-            className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-blue-600 transition"
+            onClick={() => router.back()}
+            className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 px-3.5 py-1.5 rounded-lg transition cursor-pointer"
           >
             <ArrowLeft size={18} />
-            Quay lại danh sách Module
+            Quay lại trang trước
           </button>
 
           <div className="bg-white p-6 sm:p-8 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -449,7 +453,7 @@ export default function ModuleDetailPage() {
 
             <button
               onClick={handleOpenCreateModal}
-              className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-sm font-semibold transition shadow-sm"
+              className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-sm font-semibold transition shadow-sm cursor-pointer"
             >
               <Plus size={18} />
               Tạo Lesson Mới
@@ -479,11 +483,8 @@ export default function ModuleDetailPage() {
                 onDragStart={() => handleDragStart(index)}
                 onDragOver={handleDragOver}
                 onDrop={() => handleDrop(index)}
-                className={`py-4 space-y-3 transition ${
-                  draggedIndex === index
-                    ? "opacity-30 bg-blue-50 border-2 border-dashed border-blue-400 rounded-xl"
-                    : ""
-                }`}
+                className={`py-4 space-y-3 transition ${draggedIndex === index ? "opacity-30 bg-blue-50 border-2 border-dashed border-blue-400 rounded-xl" : ""
+                  }`}
               >
                 <div className="flex items-center justify-between gap-4 hover:bg-slate-50/80 p-2 rounded-xl transition">
                   <div className="flex items-center gap-3 min-w-0">
@@ -546,32 +547,22 @@ export default function ModuleDetailPage() {
                     <button
                       onClick={() => handleOpenEditModal(lesson)}
                       disabled={lesson.is_quiz}
-                      title={
-                        lesson.is_quiz
-                          ? "Bài thi không thể chỉnh sửa qua giao diện này"
-                          : "Sửa bài học"
-                      }
-                      className={`p-2 rounded-lg transition ${
-                        lesson.is_quiz
+                      title={lesson.is_quiz ? "Bài thi không thể chỉnh sửa qua giao diện này" : "Sửa bài học"}
+                      className={`p-2 rounded-lg transition ${lesson.is_quiz
                           ? "text-slate-300 cursor-not-allowed"
-                          : "text-slate-400 hover:text-blue-600 hover:bg-blue-50"
-                      }`}
+                          : "text-slate-400 hover:text-blue-600 hover:bg-blue-50 cursor-pointer"
+                        }`}
                     >
                       <Edit3 size={18} />
                     </button>
                     <button
                       onClick={() => setConfirmDeleteLesson(lesson)}
                       disabled={lesson.is_quiz}
-                      title={
-                        lesson.is_quiz
-                          ? "Bài thi không thể xóa qua giao diện này"
-                          : "Xóa bài học"
-                      }
-                      className={`p-2 rounded-lg transition ${
-                        lesson.is_quiz
+                      title={lesson.is_quiz ? "Bài thi không thể xóa qua giao diện này" : "Xóa bài học"}
+                      className={`p-2 rounded-lg transition ${lesson.is_quiz
                           ? "text-slate-300 cursor-not-allowed"
-                          : "text-slate-400 hover:text-rose-600 hover:bg-rose-50"
-                      }`}
+                          : "text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer"
+                        }`}
                     >
                       <Trash2 size={18} />
                     </button>
@@ -626,9 +617,8 @@ export default function ModuleDetailPage() {
       {showModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <div
-            className={`bg-white rounded-xl w-full max-h-[90vh] shadow-xl flex flex-col overflow-hidden my-auto ${
-              editingLesson && isSlidePresentation ? "max-w-6xl" : "max-w-2xl"
-            }`}
+            className={`bg-white rounded-xl w-full max-h-[90vh] shadow-xl flex flex-col overflow-hidden my-auto ${editingLesson && isSlidePresentation ? "max-w-6xl" : "max-w-2xl"
+              }`}
           >
             {/* Header */}
             <div className="flex justify-between items-center border-b border-slate-100 p-4 shrink-0 bg-white">
@@ -638,7 +628,7 @@ export default function ModuleDetailPage() {
               <button
                 type="button"
                 onClick={() => setShowModal(false)}
-                className="text-slate-400 hover:text-slate-600 transition p-1 rounded-lg hover:bg-slate-100"
+                className="text-slate-400 hover:text-slate-600 transition p-1 rounded-lg hover:bg-slate-100 cursor-pointer"
               >
                 <X size={18} />
               </button>
@@ -676,11 +666,8 @@ export default function ModuleDetailPage() {
                   </label>
 
                   <label
-                    className={`flex items-center gap-2 text-xs font-semibold cursor-pointer ${
-                      editingLesson
-                        ? "text-slate-300 cursor-not-allowed"
-                        : "text-slate-700"
-                    }`}
+                    className={`flex items-center gap-2 text-xs font-semibold cursor-pointer ${editingLesson ? "text-slate-300 cursor-not-allowed" : "text-slate-700"
+                      }`}
                   >
                     <input
                       type="checkbox"
@@ -766,7 +753,7 @@ export default function ModuleDetailPage() {
                             <button
                               type="button"
                               onClick={handleVideoUrlBlur}
-                              className="underline font-semibold hover:text-amber-700 ml-1"
+                              className="underline font-semibold hover:text-amber-700 ml-1 cursor-pointer"
                             >
                               Thử lại
                             </button>
@@ -843,10 +830,8 @@ export default function ModuleDetailPage() {
                                   e.stopPropagation();
                                   setConfirmDeleteResourceId(res.resource_id);
                                 }}
-                                disabled={
-                                  deletingResourceId === res.resource_id
-                                }
-                                className="text-rose-500 hover:text-rose-700 disabled:opacity-40 p-0.5 rounded hover:bg-rose-50"
+                                disabled={deletingResourceId === res.resource_id}
+                                className="text-rose-500 hover:text-rose-700 disabled:opacity-40 p-0.5 rounded hover:bg-rose-50 cursor-pointer"
                                 title="Xóa tài nguyên"
                               >
                                 {deletingResourceId === res.resource_id ? (
@@ -878,7 +863,7 @@ export default function ModuleDetailPage() {
                             type="button"
                             onClick={() => fileInputRef.current?.click()}
                             disabled={uploadingResource}
-                            className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-700 disabled:opacity-50"
+                            className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-700 disabled:opacity-50 cursor-pointer"
                           >
                             {uploadingResource ? (
                               <Loader2 size={14} className="animate-spin" />
