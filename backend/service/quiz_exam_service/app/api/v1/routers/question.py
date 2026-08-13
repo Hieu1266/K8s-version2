@@ -299,7 +299,6 @@ def generate_fill_in_blank_questions(
             if count == 0:
                 continue
 
-            # 🛑 KIỂM TRA TRÙNG LẶP: Nếu câu này ĐÃ CÓ trong CSDL thì BỎ QUA, lặp câu khác
             if blanked_sentence in existing_contents:
                 continue
 
