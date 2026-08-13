@@ -58,3 +58,25 @@ class QuestionDisplay(BaseModel):
     selected_option_id: Optional[UUID] = None
     # 🆕 True/False nếu câu này đã được chấm và trả lời đúng/sai, None nếu chưa trả lời hoặc là ESSAY
     is_answered_correct: Optional[bool] = None
+
+class GenerateFillInBlankConfig(BaseModel):
+    num_questions: int = Field(
+        default=5, 
+        ge=1, 
+        le=5, 
+        description="Số lượng câu hỏi cần tạo (từ 1 đến 5 câu)"
+    )
+    max_points: float = Field(
+        default=1.0, 
+        gt=0, 
+        description="Điểm tối đa cho mỗi câu hỏi"
+    )
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "num_questions": 5,
+                "max_points": 1.0
+            }
+        }
+    }

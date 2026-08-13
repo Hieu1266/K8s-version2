@@ -1,21 +1,24 @@
+import re
 import traceback
 from uuid import UUID
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Body
-
+from bs4 import BeautifulSoup
+from underthesea import pos_tag, sent_tokenize
 from app.api.v1.deps import SessionDep
+from app.api.v1.routers.quiz import get_owner
 from app.crud.question import crud_question
 from app.crud.question_option import crud_question_option
 from app.crud.quiz import crud_quiz
-from app.core.security import get_current_user_role, call_check_instructor_service
+from app.core.security import get_current_user_role, call_check_instructor_service, RoleChecker, oauth2_scheme
 from app.core.config import settings
-
-from app.schemas.question import QuestionCreate, QuestionType, QuestionItem, QuestionUpdate
+import random
+from app.schemas.question import QuestionCreate, QuestionType, QuestionItem, QuestionUpdate, GenerateFillInBlankConfig
 from app.schemas.question_option import QuestionOptionCreate, QuestionOptionAutoCreate
-
 from app.models.question import Question
 from app.models.question_option import QuestionOption
 from app.models.rubric_criteria import RubricCriteria
+import httpx
 
 router = APIRouter(prefix="/questions", tags=["questions"])
 
@@ -222,3 +225,201 @@ def total_lessons_in_subject(
     subject_id: UUID
 ):
     return crud_question.total_questions_in_subject(db, subject_id)
+
+
+NOUN_STOPWORDS = {
+    "sự", "việc", "loại", "cái", "chiếc", "cuộc", "người", "khi",
+    "mức", "tính", "ngày", "tháng", "năm", "khoảng", "trường hợp",
+    "khái niệm", "phần", "bản", "dạng", "kết quả", "bước", "điều",
+    "thứ", "tập", "khối", "trang", "số", "nội dung", "chiếu"
+}
+
+def clean_and_extract_sentences(html_content: str) -> list[str]:
+    """
+    Làm sạch HTML, loại bỏ hoàn toàn các thẻ tiêu đề (h1-h6),
+    xóa bullet points, &nbsp; và tách thành các câu hoàn chỉnh.
+    """
+    soup = BeautifulSoup(html_content, "html.parser")
+    
+    # 1. Xóa bỏ các thẻ tiêu đề (h1, h2, h3,...) vì không dùng tiêu đề làm câu hỏi
+    for heading in soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6']):
+        heading.decompose()
+
+    # 2. Lấy văn bản, dùng xuống dòng để phân tách các đoạn
+    text = soup.get_text(separator="\n")
+
+    # 3. Làm sạch ký tự đặc biệt & bullet points
+    text = text.replace("\xa0", " ") # Xóa non-breaking space
+    text = re.sub(r"[·•\-\*]", "", text) # Xóa ký tự bullet points
+    
+    cleaned_sentences = []
+    # Tách theo dòng hoặc dấu chấm câu
+    raw_lines = re.split(r'[\n\.]', text)
+    
+    for line in raw_lines:
+        line = re.sub(r"\s+", " ", line).strip()
+        # Chỉ lấy những câu có độ dài hợp lý (từ 6 từ trở lên) để làm câu hỏi
+        if len(line.split()) >= 6:
+            cleaned_sentences.append(line)
+            
+    return cleaned_sentences
+
+
+def generate_fill_in_blank_questions(
+    db: SessionDep,
+    text: str, 
+    subject_id: UUID, 
+    num_questions: int = 5, 
+    max_points: float = 1.0
+) -> list[Question]:
+    
+    # 1. TRUY VẤN DB: Lấy danh sách các câu đã có sẵn trong CSDL
+    existing_contents = crud_question.get_existing_fill_in_blank(db, subject_id)
+
+    # 2. Trích xuất các câu sạch từ văn bản
+    sentences = clean_and_extract_sentences(text)
+    candidate_questions: list[Question] = []
+
+    # 3. Tạo danh sách ứng viên câu hỏi
+    for sentence in sentences:
+        tokens = pos_tag(sentence)
+        candidate_words = [
+            word for word, tag in tokens 
+            if tag.startswith('N') and len(word) >= 2 and word.isalnum()
+            and word.lower() not in NOUN_STOPWORDS
+        ]
+
+        if not candidate_words:
+            continue
+
+        for target_word in set(candidate_words):
+            pattern = re.compile(re.escape(target_word), re.IGNORECASE)
+            blanked_sentence, count = pattern.subn("_____", sentence, count=1)
+
+            if count == 0:
+                continue
+
+            # 🛑 KIỂM TRA TRÙNG LẶP: Nếu câu này ĐÃ CÓ trong CSDL thì BỎ QUA, lặp câu khác
+            if blanked_sentence in existing_contents:
+                continue
+
+            question = Question(
+                subject_id=subject_id,
+                question_title="Điền từ còn thiếu vào chỗ trống",
+                question_type=QuestionType.FILL_IN_BLANK,
+                body_content=blanked_sentence,
+                max_points=max_points,
+                options=[
+                    QuestionOption(
+                        option_text=target_word,
+                        is_correct=True
+                    )
+                ]
+            )
+            candidate_questions.append(question)
+
+    if not candidate_questions:
+        return []
+
+    # 4. Trộn ngẫu nhiên danh sách câu hỏi hợp lệ (không trùng DB)
+    random.shuffle(candidate_questions)
+
+    # 5. Lấy đủ số lượng yêu cầu (num_questions)
+    selected_questions = candidate_questions[:num_questions]
+
+    return selected_questions
+
+COURSE_SERVICE_URL = settings.BACKEND_COURSE_URL
+
+@router.post(
+    "/generate-from-lesson/{lesson_id}", 
+    response_model=List[QuestionItem], 
+    status_code=status.HTTP_201_CREATED
+)
+async def generate_questions_from_lesson(
+    lesson_id: UUID,
+    payload: GenerateFillInBlankConfig,
+    db: SessionDep,
+    token: str = Depends(oauth2_scheme),  # Lấy token trực tiếp từ Depends
+    current_user: dict = Depends(RoleChecker(["Instructor", "Admin"]))
+):
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # --- Bước 1: Gọi Course Service lấy nội dung bài học ---
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        try:
+            response = await client.get(
+                f"{COURSE_SERVICE_URL}/lessons/get-content/{lesson_id}",
+                headers=headers
+            )
+            
+            if response.status_code == status.HTTP_404_NOT_FOUND:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Không tìm thấy bài học ở Course Service"
+                )
+            
+            response.raise_for_status()
+            course_data = response.json()  # Dict: {"content_body": ..., "subject_id": ...}
+            
+        except httpx.RequestError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"Không thể kết nối tới Course Service: {str(exc)}"
+            )
+
+    body_content = course_data.get("content_body")
+    subject_id_raw = course_data.get("subject_id")
+
+    if not body_content or not str(body_content).strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Bài học không có nội dung văn bản để sinh câu hỏi"
+        )
+        
+    if not subject_id_raw:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Course Service không trả về subject_id"
+        )
+
+    subject_id = UUID(str(subject_id_raw))
+
+    # --- Bước 2: Kiểm tra quyền sở hữu của Giảng viên ---
+    user_role = current_user.get("role_name")
+    instructor_id = UUID(str(current_user["user_id"]))
+
+    if user_role != "Admin":
+        owner_id = await get_owner(subject_id=subject_id)
+        
+        if owner_id != instructor_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Bạn không có quyền tạo câu hỏi cho môn học/bài học này"
+            )
+
+    # --- Bước 3: Sinh câu hỏi điền khuyết ---
+    generated_questions = generate_fill_in_blank_questions(
+        db=db,  
+        text=body_content,
+        subject_id=subject_id,
+        num_questions=payload.num_questions,
+        max_points=payload.max_points
+    )
+
+    if not generated_questions:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Tất cả các câu hỏi tạo từ bài học này đã tồn tại trong CSDL hoặc không đủ điều kiện!"
+        )
+
+    # --- Bước 4: Lưu vào CSDL ---
+    for question in generated_questions:
+        db.add(question)
+    
+    db.commit()
+
+    for question in generated_questions:
+        db.refresh(question)
+
+    return generated_questions

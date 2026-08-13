@@ -4,6 +4,8 @@ from uuid import UUID
 from app.models.question import Question
 from app.models.question_pool_link import QuestionPoolLink
 from app.schemas.question import QuestionCreate, QuestionUpdate
+from app.models.enum import QuestionType
+from typing import Set
 
 class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate, UUID]):
     def get_multi_by_subject_id(self, db: Session, subject_id: UUID):
@@ -43,4 +45,18 @@ class CRUDQuestion(CRUDBase[Question, QuestionCreate, QuestionUpdate, UUID]):
             .limit(limit)
         )
         return db.exec(statement).all()
+
+    def get_existing_fill_in_blank(self, db: Session, subject_id: UUID) -> Set[str]:
+        """
+        Lấy tập hợp tất cả body_content của câu hỏi FILL_IN_BLANK thuộc subject_id
+        """
+        statement = (
+            select(Question.body_content)
+            .where(
+                Question.subject_id == subject_id,
+                Question.question_type == QuestionType.FILL_IN_BLANK
+            )
+        )
+        results = db.exec(statement).all()
+        return set(results)
 crud_question = CRUDQuestion(Question)
