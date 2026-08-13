@@ -16,6 +16,11 @@ from app.core.config import settings
 import httpx
 import asyncio
 
+
+from app.schemas.course import CourseStatusUpdate
+from app.schemas.enums import CourseStatus
+
+
 router = APIRouter(prefix="/courses", tags=["courses"])
 
 PROGRESS_SERVICE_URL = settings.BACKEND_LEARNING_PROGRESS_URL
@@ -222,12 +227,13 @@ def get_course(
 @router.get("/", response_model=list[CourseRead])
 def get_courses(
     db: SessionDep,
-    skip: int = 0,
-    limit: int = 10,
     current_user: dict = Depends(get_current_user_role)
 ):
-    return crud_course.get_multi(db, skip=skip, limit=limit)
-
+    return crud_course.get_multi(
+        db,
+        skip=0,
+        limit=None
+    )
 
 @router.put("/{course_id}", response_model=CourseRead)
 def update_course(
@@ -444,7 +450,38 @@ async def get_learning_course(
 
 
 
+@router.patch("/{course_id}/approve")
+def approve_course(
+    db: SessionDep,
+    course_id: UUID,
+    current_user: dict = Depends(
+        RoleChecker(["Manager"])
+    ),
+):
+    course = crud_course.get_by_id(db, course_id)
 
+    if course is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Khóa học không tồn tại",
+        )
+
+    if course.status_id != CourseStatus.COURSE_DRAFT:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Chỉ có thể duyệt khóa học đang ở trạng thái 'Đang tạo khóa học'",
+        )
+
+    updated_course = crud_course.update_status(
+        db,
+        course_id,
+        CourseStatus.COURSE_REGISTRATION,
+    )
+
+    return {
+        "status": "success",
+        "message": f"Đã duyệt khóa học '{updated_course.title}', chuyển sang trạng thái Đang mở đăng ký",
+    }
 
 
 

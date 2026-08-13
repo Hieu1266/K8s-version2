@@ -13,7 +13,7 @@ from app.schemas.course import GeneralCourseInfo
 
 from sqlmodel import Session, select
 from sqlalchemy.orm import selectinload
-
+from app.schemas.enums import CourseStatus
 
 class CRUDCourseTagLink(
     CRUDBase[
@@ -79,41 +79,27 @@ class CRUDCourseTagLink(
         self,
         db: Session,
         tag_id: Optional[UUID] = None,
-    ) -> List[GeneralCourseInfo]:
-        statement = select(Course).options(
-            selectinload(Course.tags)
-        )
+        status_id: Optional[CourseStatus] = None,
+    ):
+        query = select(Course)
 
-        if tag_id is not None:
-            statement = (
-                statement
-                .join(
-                    CourseTagLink,
-                    Course.course_id
-                    == CourseTagLink.course_id,
-                )
-                .where(
-                    CourseTagLink.tag_id == tag_id
-                )
+        if tag_id:
+            query = query.join(
+                CourseTagLink,
+                CourseTagLink.course_id == Course.course_id,
+            ).where(
+                CourseTagLink.tag_id == tag_id
             )
 
-        courses = db.exec(statement).all()
-
-        return [
-            GeneralCourseInfo(
-                course_id=course.course_id,
-                title=course.title,
-                description=course.description,
-                price=course.price,
-                course_type=course.course_type,
-                tags=[
-                    tag.tag_name
-                    for tag in course.tags
-                ],
+        if status_id:
+            query = query.where(
+                Course.status_id == status_id
             )
-            for course in courses
-        ]
 
+        query = query.distinct()
+
+        return db.exec(query).all()
+        
     def replace_course_tags(
         self,
         db: Session,

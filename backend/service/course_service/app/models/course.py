@@ -58,4 +58,3 @@ class Course(SQLModel, table=True):
             "order_by": "Subject.order_index"
         }
     )
-    

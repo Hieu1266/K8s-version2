@@ -1,11 +1,23 @@
+
+"use client";
+import { useRouter } from "next/navigation";
+
+
 type CourseHeaderBarProps = {
   courseTitle: string;
   progressPercent: number;
-  onLeaveCourse: () => void;
 };
 
+
+
 /** Thanh header đen trên cùng: tên khóa học, thanh tiến độ và nút rời lớp */
-export default function CourseHeaderBar({ courseTitle, progressPercent, onLeaveCourse }: CourseHeaderBarProps) {
+export default function CourseHeaderBar({ courseTitle, progressPercent }: CourseHeaderBarProps) {
+  const router = useRouter();
+  const handleLeaveCourse = () => {
+    router.back(); // Quay lại trang liền trước trong lịch sử trình duyệt
+  };
+  
+  
   return (
     <div className="bg-[#12141C] text-white px-6 py-3.5 flex justify-between items-center border-b border-white/10 shadow-md">
       <div className="flex items-center gap-3 min-w-0 pr-4">
@@ -40,9 +52,11 @@ export default function CourseHeaderBar({ courseTitle, progressPercent, onLeaveC
           </div>
         )}
 
+        
+
         <button
           type="button"
-          onClick={onLeaveCourse}
+          onClick={handleLeaveCourse}
           className="text-xs font-bold px-4 py-2 rounded-xl transition-all duration-200 cursor-pointer hover:bg-red-500/20"
           style={{ backgroundColor: 'rgba(229,72,77,0.15)', color: '#FF6B6B', border: '1px solid rgba(229,72,77,0.3)' }}
         >

@@ -4,6 +4,7 @@ from uuid import UUID
 from app.schemas.enums import CourseType
 from app.schemas.subject import SubjectPreview, SubjectLearningStructure
 from pydantic import BaseModel
+from app.schemas.enums import CourseStatus
 
 
 # 📋 Schema cơ sở chứa các trường chung
@@ -80,3 +81,8 @@ class CoursePreview(BaseModel):
 class CourseLearningStructure(BaseModel):
     title: str
     subjects: List[SubjectLearningStructure]
+
+
+
+class CourseStatusUpdate(BaseModel):
+    status_id: CourseStatus

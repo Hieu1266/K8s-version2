@@ -102,7 +102,7 @@ function HomeContent() {
           });
           setCourses(searchRes.items);
         } else {
-          const listData = await getCourseList(selectedTag?.tag_id);
+          const listData = await getCourseList(selectedTag?.tag_id, "COURSE_REGISTRATION");
           setCourses(listData);
         }
       } catch (error) {

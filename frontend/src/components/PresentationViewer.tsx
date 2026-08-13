@@ -26,11 +26,13 @@ interface ViewerPresentation {
 interface PresentationViewerProps {
   lessonId: string;
   lessonTitle?: string;
+  onSlideProgressChange?: (hasViewedAllSlides: boolean) => void;
 }
 
 export default function PresentationViewer({
   lessonId,
   lessonTitle,
+  onSlideProgressChange,
 }: PresentationViewerProps) {
   const [presentation, setPresentation] = useState<ViewerPresentation | null>(
     null,
@@ -42,6 +44,10 @@ export default function PresentationViewer({
   const viewerRef = useRef<HTMLElement | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
+  // Đánh dấu đã báo lên component cha là học viên xem hết slide chưa,
+  // tránh gọi callback lặp lại nhiều lần không cần thiết.
+  const notifiedAllRef = useRef(false);
+
   useEffect(() => {
     let active = true;
 
@@ -49,6 +55,7 @@ export default function PresentationViewer({
       setLoading(true);
       setError(null);
       setCurrentIndex(0);
+      notifiedAllRef.current = false;
 
       const result = await getPresentationByLessonAction(lessonId);
 
@@ -60,6 +67,10 @@ export default function PresentationViewer({
         setPresentation(null);
         setError(result.error || "Không thể tải nội dung trình chiếu.");
         setLoading(false);
+
+        // Lỗi tải dữ liệu không nên khóa học viên lại, coi như đã "xem xong".
+        notifiedAllRef.current = true;
+        onSlideProgressChange?.(true);
         return;
       }
 
@@ -72,6 +83,15 @@ export default function PresentationViewer({
         slides: sortedSlides,
       });
 
+      if (sortedSlides.length === 0) {
+        // Không có slide nào thì không có gì để chặn cả.
+        notifiedAllRef.current = true;
+        onSlideProgressChange?.(true);
+      } else {
+        notifiedAllRef.current = false;
+        onSlideProgressChange?.(false);
+      }
+
       setLoading(false);
     };
 
@@ -80,6 +100,7 @@ export default function PresentationViewer({
     return () => {
       active = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lessonId]);
 
   const slides = presentation?.slides ?? [];
@@ -110,6 +131,21 @@ export default function PresentationViewer({
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [goToNextSlide, goToPreviousSlide]);
+
+  /**
+   * Báo lên component cha khi học viên đã lật tới slide cuối cùng.
+   * Chỉ báo một lần "true" duy nhất, không cần báo lại "false" khi họ lùi về slide trước.
+   */
+  useEffect(() => {
+    if (slides.length === 0 || notifiedAllRef.current) {
+      return;
+    }
+
+    if (currentIndex >= slides.length - 1) {
+      notifiedAllRef.current = true;
+      onSlideProgressChange?.(true);
+    }
+  }, [currentIndex, slides.length, onSlideProgressChange]);
 
   /**
    * Đồng bộ trạng thái khi người dùng vào hoặc thoát toàn màn hình,

@@ -242,4 +242,25 @@ class CRUDCourse(CRUDBase[Course, CourseCreate, CourseUpdate, UUID]):
             .limit(limit)
             .all()
     )
+
+
+
+    def update_status(
+        self,
+        db: Session,
+        course_id: UUID,
+        status_id: CourseStatus,
+    ):
+        course = self.get_by_id(db, course_id)
+
+        if course is None:
+            return None
+
+        course.status_id = status_id
+        db.add(course)
+        db.commit()
+        db.refresh(course)
+
+        return course
+
 crud_course = CRUDCourse(Course)

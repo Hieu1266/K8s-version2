@@ -196,30 +196,45 @@ export async function assignInstructorAction(payload: {
     };
   }
 }
-export async function getCourseList(tagId?: string): Promise<GeneralCourseInfo[]> {
+export async function getCourseList(
+  tagId?: string,
+  statusId: string = "COURSE_REGI"
+): Promise<GeneralCourseInfo[]> {
   try {
-    // Tạo URL động có hoặc không có query parameter `tag_id`
-    const url = new URL(`${BACKEND_URL}/course-tag-link/get-course-list`);
+    const url = new URL(
+      `${BACKEND_URL}/course-tag-link/get-course-list`
+    );
+
     if (tagId) {
       url.searchParams.append("tag_id", tagId);
     }
+
+    url.searchParams.append("status_id", statusId);
 
     const response = await fetch(url.toString(), {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
       },
-      cache: "no-store", // Tắt cache để luôn nhận dữ liệu mới nhất
+      cache: "no-store",
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch course list: ${response.statusText}`);
+      throw new Error(
+        `Failed to fetch course list: ${response.statusText}`
+      );
     }
 
-    const data: GeneralCourseInfo[] = await response.json();
+    const data: GeneralCourseInfo[] =
+      await response.json();
+
     return data;
   } catch (error) {
-    console.error("Error fetching course list:", error);
+    console.error(
+      "Error fetching course list:",
+      error
+    );
+
     return [];
   }
 }
@@ -406,4 +421,39 @@ export async function getLearningCourse(courseId: string): Promise<CourseLearnin
   // 4. Trả về kết quả
   const data: CourseLearningStructure = await response.json();
   return data;
+}
+
+
+export async function approveCourseAction(courseId: string) {
+  try {
+    const cleanToken = await getServerToken();
+
+    const res = await fetch(`${BACKEND_URL}/courses/${courseId}/approve`, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${cleanToken}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    const data = await res.json().catch(() => null);
+
+    if (!res.ok) {
+      return {
+        success: false,
+        message: data?.detail || "Duyệt khóa học thất bại.",
+      };
+    }
+
+    return {
+      success: true,
+      message: data?.message || "Đã duyệt khóa học thành công.",
+    };
+  } catch (error: any) {
+    console.error("❌ Lỗi tại approveCourseAction:", error.message);
+    return {
+      success: false,
+      message: error?.message || "Lỗi kết nối máy chủ.",
+    };
+  }
 }

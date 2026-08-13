@@ -18,6 +18,7 @@ from app.schemas.course_tag_link import (
 from app.schemas.tag import TagName
 from app.schemas.course import GeneralCourseInfo
 
+from app.schemas.enums import CourseStatus
 from app.crud.course import crud_course
 from app.crud.tag import crud_tag
 from app.crud.course_tag_link import (
@@ -173,7 +174,6 @@ def get_tag_list(
         )
     )
 
-
 @router.get(
     "/get-course-list",
     response_model=List[GeneralCourseInfo],
@@ -182,20 +182,37 @@ def get_course_list(
     db: SessionDep,
     tag_id: Optional[UUID] = Query(
         None,
-        description=(
-            "ID của Tag cần lọc; để trống "
-            "để lấy tất cả khóa học"
-        ),
+        description="ID của Tag cần lọc",
+    ),
+    status_id: Optional[CourseStatus] = Query(
+        CourseStatus.COURSE_REGISTRATION,
+        description="Trạng thái khóa học",
     ),
 ):
-    return (
+    courses = (
         crud_course_tag_link
         .get_multi_by_tag_id(
             db,
             tag_id=tag_id,
+            status_id=status_id,
         )
     )
 
+    result = []
+    for course in courses:
+        tags_list = [tag.tag_name for tag in course.tags] if course.tags else []
+        result.append(
+            GeneralCourseInfo(
+                course_id=course.course_id,
+                title=course.title,
+                description=course.description,
+                price=course.price,
+                course_type=course.course_type,
+                tags=tags_list,
+            )
+        )
+
+    return result
 
 @router.put("/update-tags")
 def update_course_tags(

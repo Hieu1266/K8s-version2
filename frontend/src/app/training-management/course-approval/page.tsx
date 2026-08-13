@@ -44,6 +44,10 @@ import {
   TesterCourseStatus,
 } from "@/actions/getTesterProgress";
 
+import {
+  approveCourseAction,
+} from "@/actions/getCourse";
+
 /* ============================================================
    TYPES
    ============================================================ */
@@ -59,6 +63,7 @@ type Course = {
   course_id: string;
   title: string;
   description?: string | null;
+  status_id?: string;
   subjects: Subject[];
 };
 
@@ -73,6 +78,11 @@ type AssignMessage = {
   type: "success" | "error";
   text: string;
   testerId: string;
+};
+
+type ApproveMessage = {
+  type: "success" | "error";
+  text: string;
 };
 
 /* ============================================================
@@ -143,6 +153,18 @@ export default function CourseApprovalPage() {
     acknowledgingId,
     setAcknowledgingId,
   ] = useState<string | null>(null);
+
+  /* ---------------- DUYỆT KHÓA HỌC (DRAFT -> REGISTRATION) ---------------- */
+
+  const [
+    approvingId,
+    setApprovingId,
+  ] = useState<string | null>(null);
+
+  const [
+    approveMessage,
+    setApproveMessage,
+  ] = useState<ApproveMessage | null>(null);
 
   /* ============================================================
      LOAD DATA
@@ -278,6 +300,7 @@ export default function CourseApprovalPage() {
 
   useEffect(() => {
     setAssignMessage(null);
+    setApproveMessage(null);
   }, [selectedCourseId]);
 
   /* ============================================================
@@ -394,6 +417,52 @@ export default function CourseApprovalPage() {
     );
 
     setAcknowledgingId(null);
+  }
+
+  /* ============================================================
+     DUYỆT KHÓA HỌC (DRAFT -> REGISTRATION)
+     ============================================================ */
+
+  async function handleApproveCourse(
+    courseId: string
+  ) {
+    setApprovingId(courseId);
+    setApproveMessage(null);
+
+    try {
+      const result =
+        await approveCourseAction(courseId);
+
+      if (result.success) {
+        setApproveMessage({
+          type: "success",
+          text:
+            result.message ||
+            "Đã duyệt khóa học thành công.",
+        });
+
+        setCourses((prev) =>
+          prev.map((course) =>
+            course.course_id === courseId
+              ? {
+                  ...course,
+                  status_id:
+                    "COURSE_REGISTRATION",
+                }
+              : course
+          )
+        );
+      } else {
+        setApproveMessage({
+          type: "error",
+          text:
+            result.message ||
+            "Duyệt khóa học thất bại.",
+        });
+      }
+    } finally {
+      setApprovingId(null);
+    }
   }
 
   /* ============================================================
@@ -686,6 +755,14 @@ export default function CourseApprovalPage() {
 
                               {course.subjects.length} môn học
                             </span>
+
+                            {course.status_id ===
+                              "COURSE_DRAFT" && (
+                              <span className="inline-flex items-center gap-1 rounded-lg bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-700">
+                                <Clock size={12} />
+                                Chờ duyệt
+                              </span>
+                            )}
                           </div>
                         </button>
                       );
@@ -736,11 +813,75 @@ export default function CourseApprovalPage() {
                               Khóa học
                             </span>
 
+                            {selectedCourse.status_id && (
+                              <span
+                                className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-semibold ${
+                                  selectedCourse.status_id ===
+                                  "COURSE_DRAFT"
+                                    ? "bg-amber-50 text-amber-700"
+                                    : "bg-blue-50 text-blue-700"
+                                }`}
+                              >
+                                {selectedCourse.status_id ===
+                                "COURSE_DRAFT"
+                                  ? "Đang tạo khóa học"
+                                  : selectedCourse.status_id}
+                              </span>
+                            )}
+
                           </div>
 
                           <h2 className="mt-3 text-xl font-bold leading-snug text-slate-900 sm:text-2xl">
                             {selectedCourse.title}
                           </h2>
+
+                          {/* NÚT DUYỆT — chỉ hiện khi đang DRAFT */}
+                          {selectedCourse.status_id ===
+                            "COURSE_DRAFT" && (
+                            <div className="mt-4">
+                              <button
+                                type="button"
+                                disabled={
+                                  approvingId ===
+                                  selectedCourse.course_id
+                                }
+                                onClick={() =>
+                                  handleApproveCourse(
+                                    selectedCourse.course_id
+                                  )
+                                }
+                                className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-blue-700 disabled:opacity-60"
+                              >
+                                {approvingId ===
+                                selectedCourse.course_id ? (
+                                  <Loader2
+                                    size={14}
+                                    className="animate-spin"
+                                  />
+                                ) : (
+                                  <ShieldCheck size={14} />
+                                )}
+
+                                {approvingId ===
+                                selectedCourse.course_id
+                                  ? "Đang duyệt..."
+                                  : "Duyệt khóa học"}
+                              </button>
+
+                              {approveMessage && (
+                                <p
+                                  className={`mt-2 text-xs font-medium ${
+                                    approveMessage.type ===
+                                    "success"
+                                      ? "text-emerald-600"
+                                      : "text-red-500"
+                                  }`}
+                                >
+                                  {approveMessage.text}
+                                </p>
+                              )}
+                            </div>
+                          )}
 
                           <div className="mt-3 flex flex-wrap gap-4 text-sm text-slate-500">
 
