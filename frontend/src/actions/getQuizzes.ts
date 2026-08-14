@@ -282,23 +282,19 @@ export const updatePoolRuleAction = async (
     }
 };
 
-// 11. 🆕 Xóa 1 luật pool
-export const deletePoolRuleAction = async (
-    quizId: string,
-    ruleId: string
-): Promise<{ success: boolean; error?: string }> => {
+// 12. 🆕 Lấy tổng số bài thi (quiz) của 1 môn học — dùng cho trang chọn môn học của Tester
+export const getTotalQuizzesBySubjectAction = async (subjectId: string): Promise<number> => {
     try {
-        const res = await fetch(`${EXAM_QUIZ_URL}/quizzes/${quizId}/pool-rules/${ruleId}`, {
-            method: "DELETE",
+        const res = await fetch(`${EXAM_QUIZ_URL}/quizzes/get-total-quizzes/${subjectId}`, {
+            method: "GET",
             headers: await authHeaders(),
+            cache: "no-store",
         });
-        if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            return { success: false, error: typeof err?.detail === "string" ? err.detail : "Xóa luật pool thất bại." };
-        }
-        return { success: true };
-    } catch (error: any) {
-        console.error("❌ deletePoolRuleAction:", error.message);
-        return { success: false, error: error.message || "Lỗi kết nối máy chủ." };
+        if (!res.ok) return 0;
+        const data = await res.json();
+        return typeof data === "number" ? data : 0;
+    } catch (error) {
+        console.error("❌ getTotalQuizzesBySubjectAction:", error);
+        return 0;
     }
 };

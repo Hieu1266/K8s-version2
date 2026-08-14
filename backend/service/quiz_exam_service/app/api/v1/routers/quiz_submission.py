@@ -18,6 +18,71 @@ from typing import List, Optional
 
 router = APIRouter(prefix="/quiz-submissions", tags=["Quiz Submissions"])
 
+# URL sang Course Service, dùng để kiểm tra Tester (cộng tác viên) có được Giảng viên
+# phân công (giao) môn học hay không trước khi cho phép truy cập các API chấm điểm.
+COURSE_SERVICE = getattr(settings, "BACKEND_COURSE_URL", "http://localhost:8002/api/v1")
+
+
+async def _verify_tester_subject_access(
+    subject_id: UUID,
+    current_user: dict,
+    token: str,
+) -> None:
+    """
+    Kiểm tra quyền truy cập môn học đối với các API chấm điểm (grading APIs).
+    - Instructor / Admin: không bị chặn bởi hàm này (giữ nguyên hành vi hiện tại).
+    - Tester (cộng tác viên): BẮT BUỘC phải được Giảng viên giao (phân công) đúng
+      subject_id này (bảng CourseCollaboratorLink bên Course Service), nếu không sẽ
+      bị từ chối truy cập (403), kể cả khi role hợp lệ.
+    """
+    if current_user.get("role") != "Tester":
+        return
+
+    tester_id = current_user.get("user_id")
+    if not tester_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Không tìm thấy thông tin xác thực người dùng."
+        )
+
+    url = f"{COURSE_SERVICE}/course-collab-link/check-assignment/{subject_id}/{tester_id}"
+    headers = {"Authorization": f"Bearer {token}"} if token else {}
+
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, headers=headers, timeout=5.0)
+    except httpx.RequestError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Không thể xác thực quyền truy cập môn học (Course Service không phản hồi): {exc}",
+        )
+
+    if response.status_code != status.HTTP_200_OK or response.json() is not True:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Bạn (Tester) chưa được Giảng viên phân công môn học này, không có quyền chấm điểm.",
+        )
+
+
+def _get_subject_id_for_quiz(db: SessionDep, quiz_id: UUID) -> UUID:
+    subject_id = crud_quiz.get_subject_id(db, quiz_id)
+    if not subject_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Không tìm thấy môn học tương ứng với bài thi này."
+        )
+    return subject_id
+
+
+def _get_subject_id_for_submission(db: SessionDep, submission_id: UUID) -> UUID:
+    submission = crud_quiz_submission.get_by_id(db, submission_id)
+    if not submission:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Không tìm thấy bài nộp"
+        )
+    return _get_subject_id_for_quiz(db, submission.quiz_id)
+
 @router.post("/start/{lesson_id}", response_model=QuizTakeResponse)
 def start_quiz_submission(
     lesson_id: UUID,
@@ -421,13 +486,15 @@ async def get_course_in_progress_count(
     response_model=List[QuizSubmissionSummaryResponse],
     summary="Lấy danh sách bài thi thuộc môn học kèm thống kê bài nộp"
 )
-def get_quizzes_by_subject(
+async def get_quizzes_by_subject(
     subject_id: UUID,
     db: SessionDep,
-    current_user: dict = Depends(RoleChecker(["Instructor, Tester"]))
+    token: str = Depends(oauth2_scheme),
+    current_user: dict = Depends(RoleChecker(["Instructor", "Tester"]))
 ):
     """
-    API dành cho Giảng viên lấy danh sách bài thi thuộc môn học cụ thể:
+    API dành cho Giảng viên và Tester (nếu được giao môn học) lấy danh sách bài thi
+    thuộc môn học cụ thể:
     - Báo cáo số lượng bài nộp đã hoàn thành và bài nộp chờ chấm.
     """
     user_id_str = current_user.get("user_id")
@@ -436,6 +503,9 @@ def get_quizzes_by_subject(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Không tìm thấy thông tin xác thực người dùng."
         )
+
+    # Tester chỉ được xem môn học đã được Giảng viên giao (phân công)
+    await _verify_tester_subject_access(subject_id, current_user, token)
 
     # Lấy dữ liệu bài thi kèm thống kê bài nộp từ DB
     quizzes_summary = crud_quiz_submission.get_quizzes_summary_by_subject(db=db, subject_id=subject_id)
@@ -446,13 +516,18 @@ def get_quizzes_by_subject(
     response_model=List[QuizUserSummaryResponse],
     summary="Lấy danh sách sinh viên đã nộp đề thi"
 )
-def get_quiz_users_summary(
+async def get_quiz_users_summary(
     quiz_id: UUID,
     db: SessionDep,
     authorization: str = Header(...),
-    current_user: dict = Depends(RoleChecker(["Instructor", "Admin"]))
+    current_user: dict = Depends(RoleChecker(["Instructor", "Admin", "Tester"]))
 ):
     token = authorization.replace("Bearer ", "").strip() if authorization else ""
+
+    # Tester chỉ được xem học viên của môn học đã được Giảng viên giao
+    subject_id = _get_subject_id_for_quiz(db, quiz_id)
+    await _verify_tester_subject_access(subject_id, current_user, token)
+
     return crud_quiz_submission.get_users_summary_by_quiz(db=db, quiz_id=quiz_id, token=token)
 
 
@@ -461,12 +536,17 @@ def get_quiz_users_summary(
     response_model=List[UserSubmissionItem],
     summary="Lấy các lượt nộp của 1 sinh viên trong 1 đề thi"
 )
-def get_user_submissions_for_quiz(
+async def get_user_submissions_for_quiz(
     quiz_id: UUID,
     user_id: UUID,
     db: SessionDep,
-    current_user: dict = Depends(RoleChecker(["Instructor", "Admin"]))
+    token: str = Depends(oauth2_scheme),
+    current_user: dict = Depends(RoleChecker(["Instructor", "Admin", "Tester"]))
 ):
+    # Tester chỉ được xem lượt nộp của học viên thuộc môn học đã được Giảng viên giao
+    subject_id = _get_subject_id_for_quiz(db, quiz_id)
+    await _verify_tester_subject_access(subject_id, current_user, token)
+
     return crud_quiz_submission.get_submissions_by_user_and_quiz(db, quiz_id, user_id)
 
 @router.get(
@@ -474,15 +554,19 @@ def get_user_submissions_for_quiz(
     response_model=QuizSubmissionDetailResponse,
     summary="Xem chi tiết nội dung bài làm"
 )
-def get_submission_detail(
+async def get_submission_detail(
     submission_id: UUID,
     db: SessionDep,
     request: Request,
-    current_user: dict = Depends(RoleChecker(["Instructor", "Admin"]))
+    current_user: dict = Depends(RoleChecker(["Instructor", "Admin", "Tester"]))
 ):
     auth_header = request.headers.get("Authorization", "")
     token = auth_header.replace("Bearer ", "").strip()
-    
+
+    # Tester chỉ được xem chi tiết bài làm thuộc môn học đã được Giảng viên giao
+    subject_id = _get_subject_id_for_submission(db, submission_id)
+    await _verify_tester_subject_access(subject_id, current_user, token)
+
     detail = crud_quiz_submission.get_submission_detail(
         db=db, submission_id=submission_id, token=token
     )
@@ -500,8 +584,12 @@ async def grade_submission(
     payload: GradeSubmissionRequest,
     db: SessionDep,
     token: str = Depends(oauth2_scheme),               
-    current_user = Depends(RoleChecker(["Instructor"])), 
+    current_user = Depends(RoleChecker(["Instructor", "Tester"])), 
 ):
+    # Tester chỉ được chấm điểm bài nộp thuộc môn học đã được Giảng viên giao
+    subject_id = _get_subject_id_for_submission(db, submission_id)
+    await _verify_tester_subject_access(subject_id, current_user, token)
+
     # 1. Cập nhật điểm, trạng thái, is_passed và gỡ cờ is_discrepant trực tiếp trong CRUD
     updated_submission = crud_quiz_submission.update_teacher_grading(
         db=db, submission_id=submission_id, gradings=payload.gradings

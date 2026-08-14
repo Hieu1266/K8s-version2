@@ -17,7 +17,7 @@ from app.schemas.peer_review import (
 
 router = APIRouter(prefix="/peer-reviews", tags=["Peer Review"])
 require_reviewer = RoleChecker(["User"])
-require_instructor = RoleChecker(["Instructor", "Admin"])
+require_instructor = RoleChecker(["Instructor", "Admin", "Tester"])
 
 
 @router.get("/my-assignments", response_model=list[MyAssignmentOut])

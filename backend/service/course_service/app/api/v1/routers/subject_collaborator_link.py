@@ -1,5 +1,6 @@
 from uuid import UUID
 import httpx
+from pydantic import BaseModel
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status, Query
 from typing import Optional, Any, Dict, List
 from app.api.v1.deps import SessionDep
@@ -13,6 +14,24 @@ import asyncio
 router = APIRouter(prefix="/course-collab-link", tags=["course-collab-link"])
 
 USER_SERVICE = settings.BACKEND_USER_URL
+
+
+class TesterSubjectSummary(BaseModel):
+    """
+    Thông tin môn học rút gọn cho Tester (chỉ những field có sẵn trực tiếp trên
+    Subject, KHÔNG dùng chung schema GeneralInfoInstructorSubject vì schema đó
+    yêu cầu thêm total_modules/total_lessons mà crud_subject.get_collaborator_subject_list
+    không tính toán).
+    """
+    subject_id: UUID
+    title: str
+    description: Optional[str] = None
+    status_id: str
+    course_id: UUID
+    order_index: Optional[int] = None
+
+    class Config:
+        from_attributes = True
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
@@ -126,6 +145,42 @@ async def delete_collab_link(
     )
 
     return {"message": "Đã xóa phân công cộng tác viên thành công"}
+
+@router.get("/check-assignment/{subject_id}/{collaborator_id}", response_model=bool)
+async def check_collaborator_assignment(
+    db: SessionDep,
+    subject_id: UUID,
+    collaborator_id: UUID,
+):
+    """
+    [Nội bộ - Service to Service] Kiểm tra xem một Tester (cộng tác viên) có đang
+    được giao (phân công) môn học subject_id hay không.
+
+    Được các service khác (vd: Quiz Service) gọi để xác thực quyền truy cập của
+    Tester trước khi cho phép thao tác trên dữ liệu của môn học đó (vd: chấm điểm
+    bài thi), tương tự cách course_service gọi User Service để kiểm tra "/is-tester".
+    """
+    link = crud_collab_subject.get_by_subject_and_collaborator(
+        db, subject_id=subject_id, collaborator_id=collaborator_id
+    )
+    return link is not None
+
+
+@router.get("/my-subjects", response_model=List[TesterSubjectSummary])
+async def get_my_assigned_subjects(
+    db: SessionDep,
+    search: Optional[str] = Query(None),
+    current_user: dict = Depends(RoleChecker(["Tester"])),
+):
+    """
+    [Tester] Lấy danh sách các môn học mà Tester (cộng tác viên) hiện tại đang
+    được Giảng viên giao, hỗ trợ tìm kiếm theo tên/mô tả môn học.
+    """
+    collaborator_id = UUID(current_user["user_id"])
+    return crud_subject.get_collaborator_subject_list(
+        db, collaborator_id=collaborator_id, search=search
+    )
+
 
 @router.get("/subject/{subject_id}", response_model=List[CourseCollaboratorRead])
 async def get_subject_collaborators(

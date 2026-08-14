@@ -9,7 +9,6 @@ import {
   ChevronRight,
   GraduationCap,
   UserRound,
-  ClipboardCheck,
   PenTool,
   LayoutGrid,
   ArrowRight,
@@ -23,11 +22,7 @@ import { getMyAssignedCourses, TesterCourseItem } from "@/actions/getTesterCours
 import { submitCourseTestResult } from "@/actions/submitCourseTestResult";
 
 const ROUTE_LEARNING_PREFIX = "/course";
-
-const MOCK_ASSIGNMENTS = [
-  { id: "a1", courseTitle: "Kiểm thử phần mềm cơ bản", assignmentTitle: "Bài thi trắc nghiệm cuối khóa", studentName: "Nguyễn Văn An", submittedAt: "10/08/2026 14:30", status: "PENDING", maxScore: 10 },
-  { id: "a2", courseTitle: "Kiểm thử tự động hóa API", assignmentTitle: "Nộp file script Postman", studentName: "Trần Minh Đức", submittedAt: "09/08/2026 09:15", status: "GRADED", score: 8.5, maxScore: 10 },
-];
+const ROUTE_SUBMISSION_MANAGE = "/tester-dashboard/submission-manage";
 
 /* =========================================================
    CONFIRM TEST MODAL
@@ -71,11 +66,10 @@ function ConfirmTestModal({
           <button
             type="button"
             onClick={() => setSelectedStatus("APPROVED")}
-            className={`flex flex-col items-center gap-2 py-4 rounded-2xl border-2 font-bold text-sm transition-all ${
-              selectedStatus === "APPROVED"
+            className={`flex flex-col items-center gap-2 py-4 rounded-2xl border-2 font-bold text-sm transition-all ${selectedStatus === "APPROVED"
                 ? "border-emerald-500 bg-emerald-50 text-emerald-700"
                 : "border-slate-200 text-slate-500 hover:border-emerald-200"
-            }`}
+              }`}
           >
             <CheckCircle2 size={22} />
             Đạt
@@ -83,11 +77,10 @@ function ConfirmTestModal({
           <button
             type="button"
             onClick={() => setSelectedStatus("REJECTED")}
-            className={`flex flex-col items-center gap-2 py-4 rounded-2xl border-2 font-bold text-sm transition-all ${
-              selectedStatus === "REJECTED"
+            className={`flex flex-col items-center gap-2 py-4 rounded-2xl border-2 font-bold text-sm transition-all ${selectedStatus === "REJECTED"
                 ? "border-red-500 bg-red-50 text-red-700"
                 : "border-slate-200 text-slate-500 hover:border-red-200"
-            }`}
+              }`}
           >
             <AlertCircle size={22} />
             Không đạt
@@ -204,11 +197,10 @@ function CourseCard({
         <div className="relative z-20 mt-5">
           {hasReviewed ? (
             <span
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border ${
-                course.testing_course_status === "APPROVED"
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border ${course.testing_course_status === "APPROVED"
                   ? "bg-emerald-50 text-emerald-700 border-emerald-100"
                   : "bg-red-50 text-red-600 border-red-100"
-              }`}
+                }`}
             >
               {course.testing_course_status === "APPROVED" ? <CheckCircle2 size={13} /> : <AlertCircle size={13} />}
               {course.testing_course_status === "APPROVED" ? "Đạt" : "Không đạt"}
@@ -240,50 +232,11 @@ function CourseCard({
   );
 }
 
-function AssignmentCard({ assignment }: { assignment: any }) {
-  const isGraded = assignment.status === "GRADED";
-  return (
-    <button type="button" className="group relative overflow-hidden w-full text-left bg-white border border-slate-200 rounded-[2rem] p-6 transition-all duration-300 hover:-translate-y-1 hover:border-orange-300 hover:shadow-[0_18px_40px_-15px_rgba(249,115,22,0.18)]">
-      <div className={`absolute top-0 right-0 w-24 h-24 bg-gradient-to-br ${isGraded ? 'from-emerald-50' : 'from-orange-50'} to-transparent rounded-bl-full opacity-50 group-hover:scale-110 transition-transform duration-500`} />
-      <div className="relative z-10 flex items-center gap-5">
-        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 shadow-sm group-hover:shadow-md transition-all ${isGraded ? "bg-emerald-50 text-emerald-500 border border-emerald-100 group-hover:bg-emerald-500 group-hover:text-white" : "bg-orange-50 text-orange-500 border border-orange-100 group-hover:bg-orange-500 group-hover:text-white"}`}>
-          <ClipboardCheck size={25} />
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex flex-wrap items-center gap-2 mb-2">
-            <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg bg-blue-50 text-[#0066FF] border border-blue-100">{assignment.courseTitle}</span>
-            {isGraded ? (
-              <span className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100">Đã chấm</span>
-            ) : (
-              <span className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-orange-50 text-orange-600 border border-orange-100">Chờ chấm</span>
-            )}
-          </div>
-          <h3 className="font-black text-lg text-slate-800 mb-2 truncate group-hover:text-slate-900">{assignment.assignmentTitle}</h3>
-          <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
-            <span className="flex items-center gap-1.5 font-semibold text-slate-700">{assignment.studentName}</span>
-            <span className="font-semibold">{assignment.submittedAt}</span>
-          </div>
-        </div>
-        {isGraded && (
-          <div className="text-center shrink-0">
-            <div className="text-2xl font-black text-emerald-600">{assignment.score}</div>
-            <div className="text-[10px] font-bold text-slate-400">/ {assignment.maxScore}</div>
-          </div>
-        )}
-        <div className="shrink-0 flex flex-col items-end gap-1">
-          <ChevronRight size={20} className="text-slate-300 group-hover:text-orange-500 group-hover:translate-x-1 transition-all" />
-          <span className="text-[10px] text-slate-400 font-semibold hidden md:block group-hover:text-orange-400 transition-colors">Double click</span>
-        </div>
-      </div>
-    </button>
-  );
-}
-
 /* =========================================================
    MAIN PAGE
 ========================================================= */
 
-type ViewState = "MENU" | "COURSES" | "EXAMS";
+type ViewState = "MENU" | "COURSES";
 type CourseFilter = "ALL" | "IN_PROGRESS" | "COMPLETED";
 
 export default function TesterProfilePage() {
@@ -422,7 +375,7 @@ export default function TesterProfilePage() {
             </button>
 
             <button
-              onClick={() => setCurrentView("EXAMS")}
+              onClick={() => router.push(ROUTE_SUBMISSION_MANAGE)}
               className="group relative overflow-hidden flex flex-col items-center justify-center text-center bg-white border border-slate-100 rounded-[2.5rem] p-12 transition-all duration-500 hover:-translate-y-2 shadow-sm hover:shadow-[0_20px_40px_-15px_rgba(249,115,22,0.25)] hover:border-orange-200"
             >
               <div className="absolute -bottom-10 -right-10 text-orange-50/50 group-hover:text-orange-50 group-hover:scale-110 transition-all duration-700 ease-out z-0">
@@ -473,11 +426,10 @@ export default function TesterProfilePage() {
                     key={tab.key}
                     type="button"
                     onClick={() => setCourseFilter(tab.key)}
-                    className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
-                      courseFilter === tab.key
+                    className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${courseFilter === tab.key
                         ? "bg-[#0066FF] text-white shadow-sm"
                         : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
-                    }`}
+                      }`}
                   >
                     {tab.label}
                   </button>
@@ -519,31 +471,6 @@ export default function TesterProfilePage() {
                 ))}
               </div>
             )}
-          </div>
-        )}
-
-        {currentView === "EXAMS" && (
-          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-500">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-orange-50 text-orange-500 flex items-center justify-center">
-                  <PenTool size={24} />
-                </div>
-                <div>
-                  <h3 className="text-2xl font-black text-slate-800 tracking-tight">Bài thi được giao</h3>
-                  <p className="text-sm text-slate-500 font-medium mt-1">Danh sách bài tập cần chấm điểm</p>
-                </div>
-              </div>
-              <button onClick={() => setCurrentView("MENU")} className="group flex items-center gap-2 px-5 py-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 rounded-xl font-bold text-sm transition-all hover:shadow-sm">
-                <LayoutGrid size={16} className="text-slate-400 group-hover:text-orange-500 transition-colors" /> Quay lại Menu
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {MOCK_ASSIGNMENTS.map((assignment) => (
-                <AssignmentCard key={assignment.id} assignment={assignment} />
-              ))}
-            </div>
           </div>
         )}
 
