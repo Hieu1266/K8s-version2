@@ -583,7 +583,19 @@ export default function PresentationSlideManager({
               />
 
               {mode === "edit" ? (
-                <RichTextEditor value={content} onChange={setContent} />
+                <RichTextEditor
+                  value={content}
+                  onChange={setContent}
+                  annotationContext={
+                    selectedId
+                      ? {
+                          contentType: "PRESENTATION_SLIDE",
+
+                          contentId: selectedId,
+                        }
+                      : undefined
+                  }
+                />
               ) : (
                 <div className="flex h-[350px] min-h-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white">
                   {title && (
