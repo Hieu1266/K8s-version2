@@ -30,14 +30,14 @@ export default function TesterQuizUsersPage({
 }) {
     const { subject_id, quiz_id } = use(params);
 
-    // Danh sách học viên (chỉ dùng để tra cứu username/email theo user_id cho cả 2 mục)
+    // Danh sách học viên
     const [users, setUsers] = useState<QuizUserSummaryItem[]>([]);
 
-    // 🆕 Thông tin đề thi có bật chấm chéo hay không (quyết định có hiển thị 2 mục hay không)
+    // Thông tin đề thi có bật chấm chéo hay không
     const [isPeerReviewQuiz, setIsPeerReviewQuiz] = useState(false);
     const [peerReviewInfoLoading, setPeerReviewInfoLoading] = useState(true);
 
-    // 🆕 Tab đang chọn: "normal" (bài nộp thường) hoặc "peer_review" (chấm chéo)
+    // Tab đang chọn: "normal" (bài nộp thường) hoặc "peer_review" (chấm chéo)
     const [activeTab, setActiveTab] = useState<SubmissionTabKey>("normal");
 
     // Mục 1: Bài nộp thường (is_peer_review = False)
@@ -45,7 +45,7 @@ export default function TesterQuizUsersPage({
     const [normalLoading, setNormalLoading] = useState(true);
     const [normalError, setNormalError] = useState<string | null>(null);
 
-    // Mục 2: Chấm chéo (is_peer_review = True) — gồm cả đã chốt điểm lẫn lệch điểm
+    // Mục 2: Chấm chéo (is_peer_review = True)
     const [peerSubmissions, setPeerSubmissions] = useState<SubmissionListItem[]>([]);
     const [peerLoading, setPeerLoading] = useState(false);
     const [peerError, setPeerError] = useState<string | null>(null);
@@ -76,8 +76,7 @@ export default function TesterQuizUsersPage({
         if (quiz_id) fetchPeerReviewInfo();
     }, [quiz_id]);
 
-    // Mục 1: Bài nộp thường — luôn lọc is_peer_review=false, kể cả khi quiz không bật chấm chéo
-    // (khi đó mọi bài nộp vốn dĩ đều có is_peer_review=false nên không ảnh hưởng gì)
+    // Mục 1: Bài nộp thường
     useEffect(() => {
         async function fetchNormal() {
             setNormalLoading(true);
@@ -93,7 +92,7 @@ export default function TesterQuizUsersPage({
         if (quiz_id) fetchNormal();
     }, [quiz_id]);
 
-    // Mục 2: Chấm chéo — chỉ tải khi đề thi có bật chấm chéo
+    // Mục 2: Chấm chéo
     useEffect(() => {
         async function fetchPeer() {
             setPeerLoading(true);
@@ -106,7 +105,7 @@ export default function TesterQuizUsersPage({
             }
             setPeerLoading(false);
         }
-        if (quiz_id && isPeerReviewQuiz) fetchPeer();
+        if (quiz_id) fetchPeer();
     }, [quiz_id, isPeerReviewQuiz]);
 
     const needsAttentionCount = peerSubmissions.filter((s) => s.is_discrepant).length;
@@ -115,21 +114,24 @@ export default function TesterQuizUsersPage({
         switch (item.status) {
             case "GRADED":
                 return (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                        <CheckCircle2 size={12} /> Đã chấm
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200/70">
+                        <CheckCircle2 size={12} className="text-emerald-600" />
+                        Đã chấm
                     </span>
                 );
             case "SUBMITTED":
                 return (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-                        <AlertCircle size={12} /> Cần chấm
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200/70">
+                        <AlertCircle size={12} className="text-amber-600" />
+                        Cần chấm
                     </span>
                 );
             case "IN_PROGRESS":
             default:
                 return (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
-                        <Clock size={12} /> Đang làm
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
+                        <Clock size={12} className="text-slate-400" />
+                        Đang làm
                     </span>
                 );
         }
@@ -138,72 +140,86 @@ export default function TesterQuizUsersPage({
     const renderPeerStatusBadge = (item: SubmissionListItem) => {
         if (item.is_discrepant) {
             return (
-                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-                    <Scale size={12} /> Lệch điểm - cần chấm lại
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-medium bg-rose-50 text-rose-700 border border-rose-200/70">
+                    <Scale size={12} className="text-rose-600" />
+                    Lệch điểm - cần chấm lại
                 </span>
             );
         }
         if (item.total_score !== null) {
             return (
-                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                    <CheckCircle2 size={12} /> Đã chấm chéo xong
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200/70">
+                    <CheckCircle2 size={12} className="text-emerald-600" />
+                    Đã chấm chéo xong
                 </span>
             );
         }
         return (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
-                <Clock size={12} /> Đang chờ đủ lượt chấm
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
+                <Clock size={12} className="text-slate-400" />
+                Đang chờ đủ lượt chấm
             </span>
         );
     };
 
     return (
-        <div className="min-h-screen bg-slate-100 text-slate-800">
+        <div className="min-h-screen bg-slate-50 text-slate-900 font-sans antialiased">
             <Navbar />
 
-            <section className="bg-gradient-to-r from-orange-600 via-orange-500 to-amber-500 text-white py-10 px-6">
+            {/* Header / Banner Section - Giữ màu Xanh bg-blue-600 chuẩn phong cách gốc */}
+            <section className="bg-blue-600 text-white py-7 px-4 sm:px-6 lg:px-8 border-b border-blue-700">
                 <div className="max-w-7xl mx-auto">
                     <Link
                         href={`/tester-dashboard/submission-manage/${subject_id}`}
-                        className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-white/10 hover:bg-white/20 border border-white/20 px-3 py-1 rounded-full mb-3 transition"
+                        className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-100 hover:text-white bg-blue-700/50 hover:bg-blue-700 px-2.5 py-1 rounded-md transition-colors border border-blue-500/30 mb-3"
                     >
-                        <ArrowLeft size={14} /> Quay lại danh sách bài thi
+                        <ArrowLeft size={13} /> Quay lại danh sách bài thi
                     </Link>
-                    <h1 className="text-3xl font-bold">Danh sách bài nộp</h1>
-                    <p className="text-orange-50 text-sm mt-1">
-                        Quiz ID: <span className="font-mono text-amber-100">{quiz_id}</span>
-                    </p>
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                        <h1 className="text-2xl font-bold tracking-tight text-white">
+                            Danh sách bài nộp
+                        </h1>
+                        <div className="flex items-center gap-2 text-xs text-blue-100">
+                            <span>Quiz ID:</span>
+                            <code className="font-mono bg-blue-900/40 px-2.5 py-0.5 rounded text-blue-50 border border-blue-400/30 text-[11px]">
+                                {quiz_id}
+                            </code>
+                        </div>
+                    </div>
                 </div>
             </section>
 
-            <section className="max-w-7xl mx-auto px-6 py-8">
-                {/* Tab switcher: chỉ hiển thị khi đề thi có bật chấm chéo */}
+            {/* Main Content */}
+            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+                {/* Tab Switcher */}
                 {!peerReviewInfoLoading && isPeerReviewQuiz && (
-                    <div className="flex items-center gap-2 mb-6 bg-white border border-slate-200 rounded-2xl p-1.5 w-fit shadow-sm">
+                    <div className="inline-flex items-center p-1 bg-slate-200/80 rounded-lg border border-slate-300/60 mb-6">
                         <button
                             onClick={() => setActiveTab("normal")}
-                            className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition ${activeTab === "normal"
-                                ? "bg-orange-500 text-white shadow"
-                                : "text-slate-500 hover:bg-slate-50"
-                                }`}
+                            className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                                activeTab === "normal"
+                                    ? "bg-white text-blue-600 shadow-2xs border border-slate-200/80"
+                                    : "text-slate-600 hover:text-slate-900"
+                            }`}
                         >
                             <ClipboardCheck size={14} /> Bài nộp thường
                         </button>
                         <button
                             onClick={() => setActiveTab("peer_review")}
-                            className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition ${activeTab === "peer_review"
-                                ? "bg-orange-500 text-white shadow"
-                                : "text-slate-500 hover:bg-slate-50"
-                                }`}
+                            className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                                activeTab === "peer_review"
+                                    ? "bg-white text-blue-600 shadow-2xs border border-slate-200/80"
+                                    : "text-slate-600 hover:text-slate-900"
+                            }`}
                         >
                             <Scale size={14} /> Chấm chéo
                             {peerSubmissions.length > 0 && (
-                                <span className="ml-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-white/25 text-current text-[10px] font-bold">
+                                <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-slate-200 text-slate-700">
                                     {peerSubmissions.length}
                                 </span>
                             )}
                             {needsAttentionCount > 0 && (
-                                <span className="ml-0.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold">
+                                <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-blue-600 text-white font-bold">
                                     {needsAttentionCount}
                                 </span>
                             )}
@@ -215,80 +231,86 @@ export default function TesterQuizUsersPage({
                 {activeTab === "normal" && (
                     <>
                         {normalLoading && (
-                            <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-slate-200">
-                                <Loader2 size={32} className="animate-spin text-orange-500 mb-2" />
-                                <span className="text-xs text-slate-500 font-medium">Đang tải danh sách bài nộp...</span>
+                            <div className="flex items-center justify-center py-16 bg-white rounded-xl border border-slate-200">
+                                <Loader2 size={20} className="animate-spin text-blue-600 mr-2" />
+                                <span className="text-xs text-slate-500 font-medium">Đang tải danh sách...</span>
                             </div>
                         )}
 
                         {!normalLoading && normalError && (
-                            <div className="flex flex-col items-center justify-center py-12 bg-red-50 rounded-2xl border border-red-200 text-center p-6">
-                                <AlertCircle size={36} className="text-red-500 mb-2" />
-                                <h3 className="text-sm font-bold text-red-700">Đã xảy ra lỗi</h3>
-                                <p className="text-xs text-red-600 mt-1">{normalError}</p>
+                            <div className="p-4 bg-rose-50 rounded-xl border border-rose-200 flex items-center gap-3 text-rose-700 text-xs">
+                                <AlertCircle size={16} className="shrink-0 text-rose-500" />
+                                <span>{normalError}</span>
                             </div>
                         )}
 
                         {!normalLoading && !normalError && normalSubmissions.length === 0 && (
-                            <div className="flex flex-col items-center justify-center py-16 bg-white rounded-2xl border border-slate-200 text-center p-6">
-                                <Inbox size={40} className="text-slate-300 mb-2" />
-                                <h3 className="text-base font-bold text-slate-700">Chưa có bài nộp nào</h3>
-                                <p className="text-xs text-slate-500 mt-1">
-                                    Chưa tìm thấy bài nộp thường (không chấm chéo) nào cho bài thi này.
+                            <div className="text-center py-16 bg-white rounded-xl border border-slate-200 p-6">
+                                <Inbox size={32} className="mx-auto text-slate-300 mb-2" />
+                                <p className="text-xs font-medium text-slate-700">Chưa có bài nộp nào</p>
+                                <p className="text-[11px] text-slate-400 mt-0.5">
+                                    Chưa tìm thấy bài nộp thường cho bài thi này.
                                 </p>
                             </div>
                         )}
 
                         {!normalLoading && !normalError && normalSubmissions.length > 0 && (
-                            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-2xs">
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-left border-collapse">
                                         <thead>
-                                            <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                                                <th className="py-3.5 px-6">Học viên</th>
-                                                <th className="py-3.5 px-6">Lượt</th>
-                                                <th className="py-3.5 px-6">Trạng thái</th>
-                                                <th className="py-3.5 px-6">Điểm</th>
-                                                <th className="py-3.5 px-6">Thời gian nộp</th>
-                                                <th className="py-3.5 px-6 text-right">Thao tác</th>
+                                            <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                                                <th className="py-3 px-4 sm:px-5">Học viên</th>
+                                                <th className="py-3 px-4 sm:px-5">Lượt</th>
+                                                <th className="py-3 px-4 sm:px-5">Trạng thái</th>
+                                                <th className="py-3 px-4 sm:px-5">Điểm</th>
+                                                <th className="py-3 px-4 sm:px-5">Thời gian nộp</th>
+                                                <th className="py-3 px-4 sm:px-5 text-right">Thao tác</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100 text-xs">
                                             {normalSubmissions.map((s) => {
                                                 const student = usersById.get(s.user_id);
+                                                const username = student?.username || s.user_id;
                                                 return (
-                                                    <tr key={s.submission_id} className="hover:bg-slate-50/80 transition">
-                                                        <td className="py-4 px-6">
-                                                            <div className="flex flex-col">
-                                                                <span className="font-bold text-slate-800 flex items-center gap-1.5">
-                                                                    <User size={14} className="text-slate-400" />
-                                                                    {student?.username || s.user_id}
-                                                                </span>
-                                                                {student?.email && (
-                                                                    <span className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
-                                                                        <Mail size={12} className="text-slate-400" />
-                                                                        {student.email}
-                                                                    </span>
-                                                                )}
+                                                    <tr key={s.submission_id} className="hover:bg-slate-50/70 transition-colors">
+                                                        <td className="py-3.5 px-4 sm:px-5">
+                                                            <div className="flex items-center gap-2.5">
+                                                                <div className="w-7 h-7 rounded-full bg-blue-50 text-blue-700 font-bold flex items-center justify-center text-xs shrink-0 border border-blue-100">
+                                                                    {username.charAt(0).toUpperCase()}
+                                                                </div>
+                                                                <div>
+                                                                    <div className="font-semibold text-slate-800">{username}</div>
+                                                                    {student?.email && (
+                                                                        <div className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
+                                                                            <Mail size={10} />
+                                                                            {student.email}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
                                                             </div>
                                                         </td>
-                                                        <td className="py-4 px-6 text-slate-600">Lần #{s.attempt_number}</td>
-                                                        <td className="py-4 px-6">{renderNormalStatusBadge(s)}</td>
-                                                        <td className="py-4 px-6 font-bold text-slate-800 text-sm">
-                                                            {s.total_score !== null ? s.total_score : "--"}
+                                                        <td className="py-3.5 px-4 sm:px-5">
+                                                            <span className="text-[11px] font-mono text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200/60 font-medium">
+                                                                #{s.attempt_number}
+                                                            </span>
                                                         </td>
-                                                        <td className="py-4 px-6 text-slate-600">
+                                                        <td className="py-3.5 px-4 sm:px-5">{renderNormalStatusBadge(s)}</td>
+                                                        <td className="py-3.5 px-4 sm:px-5 font-mono text-slate-900 font-semibold">
+                                                            {s.total_score !== null ? s.total_score : "—"}
+                                                        </td>
+                                                        <td className="py-3.5 px-4 sm:px-5 text-slate-500 text-[11px]">
                                                             {s.submitted_at
                                                                 ? new Date(s.submitted_at).toLocaleString("vi-VN")
-                                                                : "--"}
+                                                                : "—"}
                                                         </td>
-                                                        <td className="py-4 px-6 text-right">
+                                                        <td className="py-3.5 px-4 sm:px-5 text-right">
                                                             <Link
                                                                 href={`/tester-dashboard/submission-manage/grade/${s.submission_id}`}
-                                                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-orange-500 text-white font-semibold hover:bg-orange-600 transition"
+                                                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs transition-colors shadow-2xs"
                                                             >
                                                                 {s.status === "SUBMITTED" ? "Chấm bài" : "Xem chi tiết"}
-                                                                <ChevronRight size={14} />
+                                                                <ChevronRight size={13} />
                                                             </Link>
                                                         </td>
                                                     </tr>
@@ -305,103 +327,105 @@ export default function TesterQuizUsersPage({
                 {/* ---------------- MỤC 2: CHẤM CHÉO (is_peer_review = True) ---------------- */}
                 {activeTab === "peer_review" && (
                     <>
-                        <div className="mb-5 flex items-start gap-3 bg-blue-50 border border-blue-200 text-blue-800 px-4 py-3 rounded-2xl">
-                            <Scale size={18} className="shrink-0 mt-0.5" />
-                            <p className="text-xs leading-relaxed">
-                                Danh sách toàn bộ bài nộp mà học viên đã chọn tham gia chấm chéo. Bài lệch điểm giữa
-                                các người chấm (từ {"\u2265"} 5 điểm) cần giảng viên chấm lại thủ công; các bài còn lại
-                                đã được hệ thống tự động chốt điểm dựa trên điểm trung bình của các người chấm.
-                            </p>
+                        <div className="mb-4 p-3.5 bg-blue-50/80 border border-blue-200/80 rounded-xl text-blue-900 text-xs leading-relaxed flex items-start gap-2.5">
+                            <Scale size={16} className="text-blue-600 shrink-0 mt-0.5" />
+                            <span>
+                                Danh sách các bài nộp chấm chéo. Bài có chênh lệch điểm từ {"\u2265"} 5 điểm sẽ yêu cầu Giảng viên chấm lại thủ công. Các bài còn lại hệ thống tự động chốt theo điểm trung bình.
+                            </span>
                         </div>
 
                         {peerLoading && (
-                            <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-slate-200">
-                                <Loader2 size={32} className="animate-spin text-orange-500 mb-2" />
-                                <span className="text-xs text-slate-500 font-medium">Đang tải danh sách bài chấm chéo...</span>
+                            <div className="flex items-center justify-center py-16 bg-white rounded-xl border border-slate-200">
+                                <Loader2 size={20} className="animate-spin text-blue-600 mr-2" />
+                                <span className="text-xs text-slate-500 font-medium">Đang tải danh sách...</span>
                             </div>
                         )}
 
                         {!peerLoading && peerError && (
-                            <div className="flex flex-col items-center justify-center py-12 bg-red-50 rounded-2xl border border-red-200 text-center p-6">
-                                <AlertCircle size={36} className="text-red-500 mb-2" />
-                                <h3 className="text-sm font-bold text-red-700">Đã xảy ra lỗi</h3>
-                                <p className="text-xs text-red-600 mt-1">{peerError}</p>
+                            <div className="p-4 bg-rose-50 rounded-xl border border-rose-200 flex items-center gap-3 text-rose-700 text-xs">
+                                <AlertCircle size={16} className="shrink-0 text-rose-500" />
+                                <span>{peerError}</span>
                             </div>
                         )}
 
                         {!peerLoading && !peerError && peerSubmissions.length === 0 && (
-                            <div className="flex flex-col items-center justify-center py-16 bg-white rounded-2xl border border-slate-200 text-center p-6">
-                                <Inbox size={40} className="text-slate-300 mb-2" />
-                                <h3 className="text-base font-bold text-slate-700">Chưa có bài chấm chéo nào</h3>
-                                <p className="text-xs text-slate-500 mt-1">
-                                    Chưa có học viên nào chọn tham gia chấm chéo cho bài thi này.
+                            <div className="text-center py-16 bg-white rounded-xl border border-slate-200 p-6">
+                                <Inbox size={32} className="mx-auto text-slate-300 mb-2" />
+                                <p className="text-xs font-medium text-slate-700">Chưa có bài chấm chéo nào</p>
+                                <p className="text-[11px] text-slate-400 mt-0.5">
+                                    Chưa có học viên nào chọn tham gia chấm chéo ở bài thi này.
                                 </p>
                             </div>
                         )}
 
                         {!peerLoading && !peerError && peerSubmissions.length > 0 && (
-                            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-2xs">
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-left border-collapse">
                                         <thead>
-                                            <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                                                <th className="py-3.5 px-6">Học viên</th>
-                                                <th className="py-3.5 px-6">Lượt</th>
-                                                <th className="py-3.5 px-6">Trạng thái</th>
-                                                <th className="py-3.5 px-6">Số người đã chấm</th>
-                                                <th className="py-3.5 px-6">Điểm TB từ chấm chéo</th>
-                                                <th className="py-3.5 px-6">Điểm cuối cùng</th>
-                                                <th className="py-3.5 px-6">Thời gian nộp</th>
-                                                <th className="py-3.5 px-6 text-right">Thao tác</th>
+                                            <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                                                <th className="py-3 px-4 sm:px-5">Học viên</th>
+                                                <th className="py-3 px-4 sm:px-5">Lượt</th>
+                                                <th className="py-3 px-4 sm:px-5">Trạng thái</th>
+                                                <th className="py-3 px-4 sm:px-5">Đã chấm</th>
+                                                <th className="py-3 px-4 sm:px-5">Điểm TB</th>
+                                                <th className="py-3 px-4 sm:px-5">Điểm cuối</th>
+                                                <th className="py-3 px-4 sm:px-5">Thời gian nộp</th>
+                                                <th className="py-3 px-4 sm:px-5 text-right">Thao tác</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100 text-xs">
                                             {peerSubmissions.map((s) => {
                                                 const student = usersById.get(s.user_id);
+                                                const username = student?.username || s.user_id;
                                                 return (
-                                                    <tr key={s.submission_id} className="hover:bg-slate-50/80 transition">
-                                                        <td className="py-4 px-6">
-                                                            <div className="flex flex-col">
-                                                                <span className="font-bold text-slate-800 flex items-center gap-1.5">
-                                                                    <User size={14} className="text-slate-400" />
-                                                                    {student?.username || s.user_id}
-                                                                </span>
-                                                                {student?.email && (
-                                                                    <span className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
-                                                                        <Mail size={12} className="text-slate-400" />
-                                                                        {student.email}
-                                                                    </span>
-                                                                )}
+                                                    <tr key={s.submission_id} className="hover:bg-slate-50/70 transition-colors">
+                                                        <td className="py-3.5 px-4 sm:px-5">
+                                                            <div className="flex items-center gap-2.5">
+                                                                <div className="w-7 h-7 rounded-full bg-blue-50 text-blue-700 font-bold flex items-center justify-center text-xs shrink-0 border border-blue-100">
+                                                                    {username.charAt(0).toUpperCase()}
+                                                                </div>
+                                                                <div>
+                                                                    <div className="font-semibold text-slate-800">{username}</div>
+                                                                    {student?.email && (
+                                                                        <div className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
+                                                                            <Mail size={10} />
+                                                                            {student.email}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
                                                             </div>
                                                         </td>
-                                                        <td className="py-4 px-6 text-slate-600">Lần #{s.attempt_number}</td>
-                                                        <td className="py-4 px-6">{renderPeerStatusBadge(s)}</td>
-                                                        <td className="py-4 px-6">
-                                                            <span className="inline-flex items-center gap-1 font-bold text-slate-700 bg-slate-100 px-2.5 py-1 rounded-md">
+                                                        <td className="py-3.5 px-4 sm:px-5">
+                                                            <span className="text-[11px] font-mono text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200/60 font-medium">
+                                                                #{s.attempt_number}
+                                                            </span>
+                                                        </td>
+                                                        <td className="py-3.5 px-4 sm:px-5">{renderPeerStatusBadge(s)}</td>
+                                                        <td className="py-3.5 px-4 sm:px-5 text-slate-600">
+                                                            <span className="inline-flex items-center gap-1 text-[11px] font-medium bg-slate-100 px-2 py-0.5 rounded border border-slate-200/60">
+                                                                <User size={11} className="text-slate-400" />
                                                                 {s.completed_review_count} người
                                                             </span>
                                                         </td>
-                                                        <td className="py-4 px-6 text-slate-700">
-                                                            {s.peer_avg_score !== null ? s.peer_avg_score : "--"}
+                                                        <td className="py-3.5 px-4 sm:px-5 font-mono text-slate-600">
+                                                            {s.peer_avg_score !== null ? s.peer_avg_score : "—"}
                                                         </td>
-                                                        <td className="py-4 px-6 font-bold text-slate-800 text-sm">
-                                                            {s.total_score !== null ? s.total_score : "--"}
+                                                        <td className="py-3.5 px-4 sm:px-5 font-mono text-slate-900 font-semibold">
+                                                            {s.total_score !== null ? s.total_score : "—"}
                                                         </td>
-                                                        <td className="py-4 px-6 text-slate-600">
+                                                        <td className="py-3.5 px-4 sm:px-5 text-slate-500 text-[11px]">
                                                             {s.submitted_at
                                                                 ? new Date(s.submitted_at).toLocaleString("vi-VN")
-                                                                : "--"}
+                                                                : "—"}
                                                         </td>
-                                                        <td className="py-4 px-6 text-right">
+                                                        <td className="py-3.5 px-4 sm:px-5 text-right">
                                                             <Link
                                                                 href={`/tester-dashboard/submission-manage/grade/${s.submission_id}`}
-                                                                className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-white font-semibold transition ${s.is_discrepant
-                                                                    ? "bg-amber-500 hover:bg-amber-600"
-                                                                    : "bg-orange-500 hover:bg-orange-600"
-                                                                    }`}
+                                                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs transition-colors shadow-2xs"
                                                             >
-                                                                {s.is_discrepant ? "Chấm lại" : "Xem / Sửa điểm"}
-                                                                <ChevronRight size={14} />
+                                                                {s.is_discrepant ? "Chấm lại" : "Xem / Sửa"}
+                                                                <ChevronRight size={13} />
                                                             </Link>
                                                         </td>
                                                     </tr>
@@ -414,7 +438,7 @@ export default function TesterQuizUsersPage({
                         )}
                     </>
                 )}
-            </section>
+            </main>
         </div>
     );
 }

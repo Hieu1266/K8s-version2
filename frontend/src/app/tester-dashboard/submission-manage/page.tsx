@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
-import { Loader2, AlertCircle, Search, X, FileCheck, ChevronRight, Inbox } from "lucide-react";
+import { Loader2, AlertCircle, Search, X, FileCheck, ChevronRight, Inbox, ArrowLeft } from "lucide-react";
 import { getTesterAssignedSubjectsAction, TesterSubjectSummary } from "@/actions/getTesterSubject";
 import { getTotalQuizzesBySubjectAction } from "@/actions/getQuizzes";
 
@@ -41,27 +41,27 @@ export default function TesterSubmissionManageSubjectsPage() {
     }, [searchTerm]);
 
     return (
-        <div className="min-h-screen bg-slate-100 text-slate-800">
+        <div className="min-h-screen bg-slate-50 text-slate-900 font-sans antialiased pb-20">
             <Navbar />
 
             {/* Header Banner */}
-            <section className="bg-gradient-to-r from-orange-600 via-orange-500 to-amber-500 text-white py-10 px-6">
+            <section className="bg-blue-600 text-white py-6 px-4 sm:px-6 lg:px-8 border-b border-blue-700">
                 <div className="max-w-7xl mx-auto">
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                         <div>
-                            <div className="flex items-center gap-3 mb-3">
+                            <div className="flex items-center gap-2 mb-2.5">
                                 <Link
                                     href="/tester-dashboard"
-                                    className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-white/10 hover:bg-white/20 border border-white/20 px-3 py-1 rounded-full transition"
+                                    className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-100 hover:text-white bg-blue-700/50 hover:bg-blue-700 px-2.5 py-1 rounded-md transition-colors border border-blue-500/30 cursor-pointer"
                                 >
-                                    ← Bàn làm việc
+                                    <ArrowLeft size={13} /> Bàn làm việc
                                 </Link>
-                                <span className="text-xs font-bold uppercase tracking-wider bg-white/20 px-3 py-1 rounded-full">
+                                <span className="text-[11px] font-semibold uppercase tracking-wider bg-blue-700/40 text-blue-100 px-2.5 py-1 rounded-md border border-blue-500/30">
                                     Bài thi được giao
                                 </span>
                             </div>
-                            <h1 className="text-3xl font-bold">Chấm điểm bài thi</h1>
-                            <p className="text-orange-50 text-sm mt-1">
+                            <h1 className="text-xl font-bold tracking-tight text-white">Chấm điểm bài thi</h1>
+                            <p className="text-blue-100 text-xs mt-0.5">
                                 Bước 1: Chọn môn học bạn được Giảng viên phân công để xem các bài thi cần chấm điểm.
                             </p>
                         </div>
@@ -70,24 +70,24 @@ export default function TesterSubmissionManageSubjectsPage() {
             </section>
 
             {/* Main Content */}
-            <section className="max-w-7xl mx-auto px-6 py-8 space-y-6">
+            <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5">
                 {/* Tìm kiếm */}
-                <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex items-center gap-4">
+                <div className="bg-white p-4 rounded-xl shadow-2xs border border-slate-200 flex items-center gap-4">
                     <div className="relative flex-1">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                         <input
                             type="text"
                             placeholder="Tìm theo tên môn học..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-11 pr-10 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-orange-500 outline-none transition"
+                            className="w-full pl-10 pr-10 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
                         />
                         {searchTerm && (
                             <button
                                 onClick={() => setSearchTerm("")}
-                                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
                             >
-                                <X size={16} />
+                                <X size={15} />
                             </button>
                         )}
                     </div>
@@ -95,25 +95,25 @@ export default function TesterSubmissionManageSubjectsPage() {
 
                 {/* Loading */}
                 {loading && (
-                    <div className="flex flex-col items-center justify-center py-20 gap-3 text-slate-500 bg-white rounded-2xl border border-slate-200">
-                        <Loader2 size={32} className="animate-spin text-orange-500" />
-                        <p className="text-sm font-semibold">Đang tải danh sách môn học...</p>
+                    <div className="flex flex-col items-center justify-center py-20 gap-2.5 text-slate-500 bg-white rounded-xl border border-slate-200 shadow-2xs">
+                        <Loader2 size={22} className="animate-spin text-blue-600" />
+                        <p className="text-xs font-medium text-slate-500">Đang tải danh sách môn học...</p>
                     </div>
                 )}
 
                 {/* Error */}
                 {!loading && error && (
-                    <div className="bg-rose-50 border border-rose-200 rounded-2xl p-6 text-center text-rose-700 text-sm flex items-center justify-center gap-2">
-                        <AlertCircle size={20} />
+                    <div className="bg-rose-50 border border-rose-200 rounded-xl p-4 text-center text-rose-700 text-xs font-medium flex items-center justify-center gap-2">
+                        <AlertCircle size={16} className="text-rose-500 shrink-0" />
                         <span>{error}</span>
                     </div>
                 )}
 
                 {/* Empty */}
                 {!loading && !error && subjects.length === 0 && (
-                    <div className="flex flex-col items-center justify-center py-16 bg-white rounded-2xl border border-slate-200 text-center p-6">
-                        <Inbox size={40} className="text-slate-300 mb-2" />
-                        <h3 className="text-base font-bold text-slate-700">Chưa được giao môn học nào</h3>
+                    <div className="flex flex-col items-center justify-center py-16 bg-white rounded-xl border border-slate-200 text-center p-6 shadow-2xs">
+                        <Inbox size={36} className="text-slate-300 mb-2" />
+                        <h3 className="text-sm font-bold text-slate-700">Chưa được giao môn học nào</h3>
                         <p className="text-xs text-slate-500 mt-1">
                             Bạn chưa được Giảng viên phân công môn học nào để chấm điểm.
                         </p>
@@ -122,18 +122,18 @@ export default function TesterSubmissionManageSubjectsPage() {
 
                 {/* Dynamic List */}
                 {!loading && !error && subjects.length > 0 && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                         {subjects.map((sub) => (
                             <div
                                 key={sub.subject_id}
-                                className="bg-white rounded-2xl border border-slate-200 hover:border-orange-400 hover:shadow-lg transition flex flex-col justify-between overflow-hidden group"
+                                className="bg-white rounded-xl border border-slate-200 hover:border-blue-300 hover:shadow-md transition-all flex flex-col justify-between overflow-hidden group shadow-2xs"
                             >
-                                <div className="p-6">
+                                <div className="p-5">
                                     <div className="flex items-center gap-3 mb-3">
-                                        <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center text-orange-500">
-                                            <FileCheck size={20} />
+                                        <div className="w-9 h-9 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+                                            <FileCheck size={18} />
                                         </div>
-                                        <h2 className="text-base font-bold text-slate-800 group-hover:text-orange-500 transition line-clamp-1">
+                                        <h2 className="text-sm font-bold text-slate-800 group-hover:text-blue-600 transition-colors line-clamp-1">
                                             {sub.title}
                                         </h2>
                                     </div>
@@ -141,18 +141,20 @@ export default function TesterSubmissionManageSubjectsPage() {
                                         {sub.description || "Chưa có mô tả môn học."}
                                     </p>
 
-                                    <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-xs">
+                                    <div className="mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-between text-xs">
                                         <span className="text-slate-500">Tổng bài thi:</span>
-                                        <span className="font-bold text-slate-800">{sub.total_quizzes || 0} bài</span>
+                                        <span className="font-bold font-mono text-slate-800 bg-slate-100 px-2 py-0.5 rounded text-[11px] border border-slate-200">
+                                            {sub.total_quizzes || 0} bài
+                                        </span>
                                     </div>
                                 </div>
 
                                 <Link
                                     href={`/tester-dashboard/submission-manage/${sub.subject_id}`}
-                                    className="px-6 py-3.5 bg-slate-50 border-t border-slate-100 text-xs font-bold text-orange-500 hover:bg-orange-50 flex items-center justify-between transition"
+                                    className="px-5 py-3 bg-slate-50/80 border-t border-slate-100 text-xs font-semibold text-blue-600 hover:bg-blue-50/60 flex items-center justify-between transition-colors"
                                 >
                                     <span>Chọn bài thi cần chấm</span>
-                                    <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform" />
+                                    <ChevronRight size={15} className="group-hover:translate-x-1 transition-transform" />
                                 </Link>
                             </div>
                         ))}

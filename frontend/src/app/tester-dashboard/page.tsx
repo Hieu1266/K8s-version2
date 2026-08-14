@@ -1,5 +1,5 @@
 "use client";
-
+import { usePathname } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -243,6 +243,19 @@ export default function TesterProfilePage() {
   const router = useRouter();
 
   const [currentView, setCurrentView] = useState<ViewState>("MENU");
+  useEffect(() => {
+    const shouldReturnToCourses = sessionStorage.getItem(
+      "tester_return_to_courses"
+    );
+
+    if (shouldReturnToCourses === "1") {
+      setCurrentView("COURSES");
+
+      sessionStorage.removeItem("tester_return_to_courses");
+    }
+  }, []);
+
+
 
   const [courses, setCourses] = useState<TesterCourseItem[]>([]);
   const [coursesLoading, setCoursesLoading] = useState(false);
@@ -292,6 +305,8 @@ export default function TesterProfilePage() {
   const completedCount = courses.filter((c) => c.is_completed).length;
 
   function handleOpenCourse(courseId: string) {
+    sessionStorage.setItem("tester_return_to_courses", "1");
+
     router.push(`${ROUTE_LEARNING_PREFIX}/${courseId}?tester=1`);
   }
 
@@ -321,6 +336,7 @@ export default function TesterProfilePage() {
       setConfirmError(result.message || "Có lỗi xảy ra, vui lòng thử lại");
     }
   }
+ 
 
   return (
     <div className="min-h-screen bg-[#F8FAFC]">
@@ -334,9 +350,11 @@ export default function TesterProfilePage() {
         </div>
         <div className="relative z-10 max-w-7xl mx-auto">
           <div className="flex items-center gap-2 text-xs text-white/80 font-medium mb-6">
-            <Link href="/" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 border border-white/10 backdrop-blur-md hover:bg-white/20 hover:text-white transition-all">
+            {currentView != "MENU" && (
+            <button onClick={() => setCurrentView("MENU")} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 border border-white/10 backdrop-blur-md hover:bg-white/20 hover:text-white transition-all">
               <ArrowLeft size={14} /> Trang chủ
-            </Link>
+            </button>
+            )}
             <ChevronRight size={13} className="opacity-50" />
             <span className="flex items-center gap-1.5 font-semibold text-white bg-white/10 px-3 py-1.5 rounded-full backdrop-blur-md border border-white/5"><UserRound size={14} /> Khu vực Tester</span>
           </div>

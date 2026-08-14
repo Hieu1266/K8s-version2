@@ -7,6 +7,11 @@ import React, {
 } from "react";
 
 import Link from "next/link";
+import {
+  usePathname,
+  useRouter,
+  useSearchParams,
+} from "next/navigation";
 import Navbar from "@/components/Navbar";
 
 import {
@@ -90,6 +95,14 @@ type ApproveMessage = {
    ============================================================ */
 
 export default function CourseApprovalPage() {
+  /* ============================================================
+     URL STATE (giữ khóa học đang chọn khi reload)
+     ============================================================ */
+
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
   /* ============================================================
      STATE
      ============================================================ */
@@ -203,8 +216,22 @@ export default function CourseApprovalPage() {
         setCourses(courseList);
 
         if (courseList.length > 0) {
+          // Ưu tiên lấy courseId từ URL (giữ đúng vị trí khi reload)
+          const courseIdFromUrl =
+            searchParams.get("courseId");
+
+          const courseExistsInUrl =
+            courseIdFromUrl &&
+            courseList.some(
+              (course : any) =>
+                course.course_id ===
+                courseIdFromUrl
+            );
+
           setSelectedCourseId(
-            courseList[0].course_id
+            courseExistsInUrl
+              ? (courseIdFromUrl as string)
+              : courseList[0].course_id
           );
         }
 
@@ -293,6 +320,58 @@ export default function CourseApprovalPage() {
 
   const selectedSubjects =
     selectedCourse?.subjects || [];
+
+  /* ============================================================
+     ĐIỀU KIỆN DUYỆT KHÓA HỌC — CẦN TESTER BÁO ĐẠT
+     ============================================================ */
+
+  // Danh sách tester đã được gán (enrolled) vào khóa học đang chọn
+  const enrolledTesters = useMemo(() => {
+    return testers.filter(
+      (tester) => progressMap[tester.user_id]?.enrolled
+    );
+  }, [testers, progressMap]);
+
+  // true nếu có ít nhất 1 tester đã chấm "Đạt" (APPROVED)
+  const hasApprovedTester = useMemo(() => {
+    return testers.some(
+      (tester) =>
+        progressMap[tester.user_id]?.testing_course_status ===
+        "APPROVED"
+    );
+  }, [testers, progressMap]);
+
+  // Nếu muốn bắt buộc TẤT CẢ tester đã gán đều phải Đạt, dùng biến này thay
+  // cho hasApprovedTester ở nút bên dưới:
+  const allEnrolledApproved = useMemo(() => {
+    return (
+      enrolledTesters.length > 0 &&
+      enrolledTesters.every(
+        (tester) =>
+          progressMap[tester.user_id]?.testing_course_status ===
+          "APPROVED"
+      )
+    );
+  }, [enrolledTesters, progressMap]);
+
+  /* ============================================================
+     CHỌN KHÓA HỌC — đồng bộ vào URL để không mất vị trí khi reload
+     ============================================================ */
+
+  function handleSelectCourse(courseId: string) {
+    setSelectedCourseId(courseId);
+
+    const params = new URLSearchParams(
+      searchParams.toString()
+    );
+
+    params.set("courseId", courseId);
+
+    router.replace(
+      `${pathname}?${params.toString()}`,
+      { scroll: false }
+    );
+  }
 
   /* ============================================================
      KHI ĐỔI KHÓA HỌC
@@ -426,6 +505,16 @@ export default function CourseApprovalPage() {
   async function handleApproveCourse(
     courseId: string
   ) {
+    // Chặn phía client: chỉ cho duyệt khi đã có tester báo Đạt
+    if (!hasApprovedTester) {
+      setApproveMessage({
+        type: "error",
+        text:
+          "Cần ít nhất một tester đánh giá \"Đạt\" trước khi duyệt khóa học.",
+      });
+      return;
+    }
+
     setApprovingId(courseId);
     setApproveMessage(null);
 
@@ -710,7 +799,7 @@ export default function CourseApprovalPage() {
                           type="button"
                           key={course.course_id}
                           onClick={() =>
-                            setSelectedCourseId(
+                            handleSelectCourse(
                               course.course_id
                             )
                           }
@@ -843,14 +932,20 @@ export default function CourseApprovalPage() {
                                 type="button"
                                 disabled={
                                   approvingId ===
-                                  selectedCourse.course_id
+                                    selectedCourse.course_id ||
+                                  !hasApprovedTester
+                                }
+                                title={
+                                  !hasApprovedTester
+                                    ? "Cần ít nhất một tester đánh giá \"Đạt\" trước khi duyệt"
+                                    : undefined
                                 }
                                 onClick={() =>
                                   handleApproveCourse(
                                     selectedCourse.course_id
                                   )
                                 }
-                                className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-blue-700 disabled:opacity-60"
+                                className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
                               >
                                 {approvingId ===
                                 selectedCourse.course_id ? (
@@ -867,6 +962,16 @@ export default function CourseApprovalPage() {
                                   ? "Đang duyệt..."
                                   : "Duyệt khóa học"}
                               </button>
+
+                              {!hasApprovedTester &&
+                                approvingId !==
+                                  selectedCourse.course_id && (
+                                  <p className="mt-2 text-xs font-medium text-amber-600">
+                                    Cần ít nhất một tester đánh
+                                    giá &quot;Đạt&quot; trước khi
+                                    có thể duyệt khóa học.
+                                  </p>
+                                )}
 
                               {approveMessage && (
                                 <p

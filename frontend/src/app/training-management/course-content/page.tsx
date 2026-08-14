@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import {
@@ -123,6 +123,41 @@ export default function CourseContentPage() {
   const [subjectForm, setSubjectForm] = useState({ title: "", description: "", order_index: 1 });
   const [syllabusForm, setSyllabusForm] = useState({ description: "", instructor_id: "" });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
+  // ============================================================
+  // GIỮ NGUYÊN VỊ TRÍ ĐANG LÀM VIỆC KHI LOAD / RELOAD DATA
+  // ============================================================
+  const scrollPositionRef = useRef(0);
+  const shouldRestoreScrollRef = useRef(false);
+
+  const rememberScrollPosition = () => {
+    if (typeof window === "undefined") return;
+    scrollPositionRef.current = window.scrollY;
+    shouldRestoreScrollRef.current = true;
+  };
+
+  const restoreScrollPosition = () => {
+    if (typeof window === "undefined" || !shouldRestoreScrollRef.current) return;
+
+    const y = scrollPositionRef.current;
+    shouldRestoreScrollRef.current = false;
+
+    // Chờ React render DOM mới xong rồi mới trả scroll về vị trí cũ.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        window.scrollTo({
+          top: y,
+          left: 0,
+          behavior: "instant" as ScrollBehavior,
+        });
+      });
+    });
+  };
+
+  // Nếu component bị re-render sau khi data thay đổi, vẫn giữ đúng vị trí.
+  useLayoutEffect(() => {
+    restoreScrollPosition();
+  });
 
   useEffect(() => {
     async function loadInitialData() {
@@ -289,7 +324,6 @@ const saveSubjectOrder = async (orderedSubjects: any[]) => {
       }`
     );
 
-    await handleSelectCourse(selectedCourse);
   }
 };
 
@@ -312,6 +346,7 @@ const handleDrop = async (e: React.DragEvent, dropIndex: number) => {
 
 
   const handleSelectSubject = async (subject: any) => {
+    rememberScrollPosition();
     setSelectedSubject(subject);
     try {
       const res: any = await getSyllabusBySubjectAction(subject.subject_id);
@@ -338,6 +373,7 @@ const handleDrop = async (e: React.DragEvent, dropIndex: number) => {
     if (!selectedCourse) return alert("Vui lòng chọn khóa học trước!");
     if (!subjectForm.title.trim()) return alert("Vui lòng nhập tên môn học!");
 
+    rememberScrollPosition();
     setIsLoading(true);
 
     try {
@@ -423,6 +459,8 @@ const handleDrop = async (e: React.DragEvent, dropIndex: number) => {
   };
 
   const handleDeleteSubject = async (subject: any) => {
+    rememberScrollPosition();
+
     const confirmed = window.confirm(
       `Bạn có chắc muốn xóa môn học "${subject.title}"? Hành động này không thể hoàn tác.`
     );
@@ -447,6 +485,8 @@ const handleDrop = async (e: React.DragEvent, dropIndex: number) => {
   };
 
   const handleDeleteSyllabus = async (syl: any) => {
+    rememberScrollPosition();
+
     const confirmed = window.confirm(
       `Bạn có chắc muốn xóa đề cương này? Hành động này không thể hoàn tác.`
     );
@@ -469,6 +509,8 @@ const handleDrop = async (e: React.DragEvent, dropIndex: number) => {
     if (!selectedSubject) return alert("Vui lòng chọn môn học trước!");
     if (!syllabusForm.instructor_id) return alert("Vui lòng chọn Giảng viên phụ trách!");
     if (!syllabusForm.description.trim()) return alert("Vui lòng nhập mô tả đề cương!");
+
+    rememberScrollPosition();
     setIsLoading(true);
     try {
       // Giữ file cũ nếu không chọn file mới (chỉ áp dụng khi đang edit)
@@ -694,7 +736,7 @@ const handleDrop = async (e: React.DragEvent, dropIndex: number) => {
                   </button>
                 </div>
 
-                <div className="space-y-3 flex-1 overflow-y-auto pr-2 custom-scrollbar">
+                <div className="space-y-3 flex-1 overflow-y-auto pr-2 custom-scrollbar [overflow-anchor:none]">
                   {subjects.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-20 text-slate-400 space-y-4 bg-amber-50/30 rounded-2xl border border-dashed border-amber-200 h-full">
                       <Inbox size={48} className="text-amber-200" />
@@ -806,7 +848,7 @@ const handleDrop = async (e: React.DragEvent, dropIndex: number) => {
                 </div>
 
                 {selectedSubject ? (
-                  <div className="space-y-6 flex-1 overflow-y-auto pr-2 custom-scrollbar">
+                  <div className="space-y-6 flex-1 overflow-y-auto pr-2 custom-scrollbar [overflow-anchor:none]">
                     <div className="inline-flex items-center gap-2 bg-slate-50 border border-slate-200 px-4 py-2 rounded-xl shadow-sm">
                       <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse ring-4 ring-emerald-500/20"></div>
                       <p className="text-[13px] text-slate-600 font-medium">
