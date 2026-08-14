@@ -171,8 +171,7 @@ export default function LessonPage() {
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Enter lesson title..."
-                className="w-full rounded-xl border border-slate-300 px-4 py-3
-        focus:ring-2 focus:ring-[#0066FF] outline-none"
+                className="w-full rounded-xl border border-slate-300 px-4 py-3 focus:ring-2 focus:ring-[#0066FF] outline-none"
               />
             </div>
 
@@ -188,8 +187,7 @@ export default function LessonPage() {
                   type="number"
                   value={duration}
                   onChange={(e) => setDuration(Number(e.target.value))}
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3
-          focus:ring-2 focus:ring-[#0066FF] outline-none"
+                  className="w-full rounded-xl border border-slate-300 px-4 py-3 focus:ring-2 focus:ring-[#0066FF] outline-none"
                 />
               </div>
 
@@ -202,8 +200,7 @@ export default function LessonPage() {
                   type="number"
                   value={order}
                   onChange={(e) => setOrder(Number(e.target.value))}
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3
-          focus:ring-2 focus:ring-[#0066FF] outline-none"
+                  className="w-full rounded-xl border border-slate-300 px-4 py-3 focus:ring-2 focus:ring-[#0066FF] outline-none"
                 />
               </div>
 
@@ -235,8 +232,7 @@ export default function LessonPage() {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Describe this lesson..."
-                className="w-full rounded-xl border border-slate-300 px-4 py-3
-        resize-none focus:ring-2 focus:ring-[#0066FF] outline-none"
+                className="w-full rounded-xl border border-slate-300 px-4 py-3 resize-none focus:ring-2 focus:ring-[#0066FF] outline-none"
               />
             </div>
           </div>
