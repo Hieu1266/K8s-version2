@@ -1,10 +1,12 @@
 import { InVideoQuizWrapper } from "@/components/InVideoQuizWrapper";
 import { VideoProgress } from "@/types/video";
+import { LessonStatus } from "@/types/statuses";
 import { LessonWithStatus } from "./types";
 import QuickNoteBox from "./QuickNoteBox";
 import CompleteLessonButton from "./CompleteLessonButton";
 //import LessonSlideViewer from "@/components/LessonSlideViewer";
 import PresentationViewer from "@/components/PresentationViewer";
+import AnnotatedContent from "@/components/AnnotatedContent";
 
 type LectureTabContentProps = {
   currentLesson?: LessonWithStatus;
@@ -31,6 +33,8 @@ type LectureTabContentProps = {
   hasNextLesson: boolean;
   onPreviousLesson: () => void;
   onNextLesson: () => void;
+  hasViewedAllSlides: boolean;
+  onSlideProgressChange: (hasViewedAllSlides: boolean) => void;
 };
 
 /** Nội dung tab "Bài giảng": video (hoặc nội dung bài đọc) + ghi chú nhanh + nút hoàn thành */
@@ -56,6 +60,8 @@ export default function LectureTabContent({
   hasNextLesson,
   onPreviousLesson,
   onNextLesson,
+  hasViewedAllSlides,
+  onSlideProgressChange,
 }: LectureTabContentProps) {
   if (!currentLesson) {
     return (
@@ -118,6 +124,7 @@ export default function LectureTabContent({
           key={currentLesson.lesson_id}
           lessonId={currentLesson.lesson_id}
           lessonTitle={currentLesson.title}
+          onSlideProgressChange={onSlideProgressChange}
         />
       ) : hasContentBody ? (
         <div className="space-y-4 rounded-3xl border border-[#ECEAF0] bg-white p-8 shadow-sm">
@@ -125,11 +132,11 @@ export default function LectureTabContent({
             <span>📖 Nội dung bài học</span>
           </div>
 
-          <div
+          <AnnotatedContent
+            contentType="LESSON_CONTENT"
+            contentId={currentLesson.lesson_id}
+            html={currentLesson.content_body as string}
             className="prose prose-base max-w-none font-normal leading-relaxed text-[#2B2D3D]"
-            dangerouslySetInnerHTML={{
-              __html: currentLesson.content_body as string,
-            }}
           />
         </div>
       ) : (
@@ -141,14 +148,26 @@ export default function LectureTabContent({
       )}
 
       {/* NÚT HOÀN THÀNH BÀI ĐỌC: Chỉ hiển thị khi KHÔNG có video VÀ had_quiz == false */}
-      {!hasVideo && !currentLesson.had_quiz && (
-        <CompleteLessonButton
-          completing={completing}
-          isOptional={currentLesson.is_optional}
-          status={currentLesson.status}
-          onClick={onCompleteAndNext}
-        />
-      )}
+      {!hasVideo &&
+        !currentLesson.had_quiz &&
+        (!currentLesson.is_slide_presentation ||
+          hasViewedAllSlides ||
+          currentLesson.status === LessonStatus.COMPLETED) && (
+          <CompleteLessonButton
+            completing={completing}
+            isOptional={currentLesson.is_optional}
+            status={currentLesson.status}
+            onClick={onCompleteAndNext}
+          />
+        )}
+
+      {currentLesson.is_slide_presentation &&
+        !hasViewedAllSlides &&
+        currentLesson.status !== LessonStatus.COMPLETED && (
+          <p className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-center text-sm font-medium text-blue-700">
+            Hãy xem tất cả slide để mở nút chuyển sang bài tiếp theo.
+          </p>
+        )}
     </>
   );
 }

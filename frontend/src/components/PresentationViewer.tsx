@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 
 import { getPresentationByLessonAction } from "@/actions/getPresentation";
+import AnnotatedContent from "@/components/AnnotatedContent";
 
 interface ViewerSlide {
   slide_id: string;
@@ -48,6 +49,10 @@ export default function PresentationViewer({
   // tránh gọi callback lặp lại nhiều lần không cần thiết.
   const notifiedAllRef = useRef(false);
 
+  // Lưu các slide học viên đã thực sự mở. Nhờ vậy, việc bấm thẳng
+  // tới slide cuối sẽ không được tính là đã xem hết bài trình chiếu.
+  const viewedSlideIdsRef = useRef<Set<string>>(new Set());
+
   useEffect(() => {
     let active = true;
 
@@ -56,6 +61,7 @@ export default function PresentationViewer({
       setError(null);
       setCurrentIndex(0);
       notifiedAllRef.current = false;
+      viewedSlideIdsRef.current = new Set();
 
       const result = await getPresentationByLessonAction(lessonId);
 
@@ -88,8 +94,12 @@ export default function PresentationViewer({
         notifiedAllRef.current = true;
         onSlideProgressChange?.(true);
       } else {
-        notifiedAllRef.current = false;
-        onSlideProgressChange?.(false);
+        viewedSlideIdsRef.current = new Set([sortedSlides[0].slide_id]);
+
+        const hasViewedAllSlides = sortedSlides.length === 1;
+
+        notifiedAllRef.current = hasViewedAllSlides;
+        onSlideProgressChange?.(hasViewedAllSlides);
       }
 
       setLoading(false);
@@ -132,16 +142,17 @@ export default function PresentationViewer({
     };
   }, [goToNextSlide, goToPreviousSlide]);
 
-  /**
-   * Báo lên component cha khi học viên đã lật tới slide cuối cùng.
-   * Chỉ báo một lần "true" duy nhất, không cần báo lại "false" khi họ lùi về slide trước.
-   */
+  /** Báo lên component cha khi học viên đã từng mở tất cả slide. */
   useEffect(() => {
-    if (slides.length === 0 || notifiedAllRef.current) {
+    const viewedSlide = slides[currentIndex];
+
+    if (!viewedSlide || notifiedAllRef.current) {
       return;
     }
 
-    if (currentIndex >= slides.length - 1) {
+    viewedSlideIdsRef.current.add(viewedSlide.slide_id);
+
+    if (viewedSlideIdsRef.current.size >= slides.length) {
       notifiedAllRef.current = true;
       onSlideProgressChange?.(true);
     }
@@ -282,14 +293,15 @@ export default function PresentationViewer({
         )}
 
         <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-6 py-6 sm:px-8">
-          <div
+          <AnnotatedContent
+            key={currentSlide.slide_id}
+            contentType="PRESENTATION_SLIDE"
+            contentId={currentSlide.slide_id}
+            html={currentSlide.content_body}
             className="prose prose-slate max-w-none break-words
-              [&_img]:h-auto [&_img]:max-w-full
-              [&_table]:block [&_table]:max-w-full
-              [&_table]:overflow-x-auto"
-            dangerouslySetInnerHTML={{
-              __html: currentSlide.content_body,
-            }}
+    [&_img]:h-auto [&_img]:max-w-full
+    [&_table]:block [&_table]:max-w-full
+    [&_table]:overflow-x-auto"
           />
         </div>
       </div>
