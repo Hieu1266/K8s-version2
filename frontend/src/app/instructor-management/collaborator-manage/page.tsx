@@ -12,6 +12,7 @@ import {
     Loader2,
     AlertCircle,
     FolderX,
+    BookOpen,
 } from "lucide-react";
 import { GeneralInfoInstructorSubject } from "@/types/subject";
 import { getInstructorGeneralInfoAction } from "@/actions/getSubject";
@@ -70,31 +71,35 @@ export default function CollaboratorManagePage() {
     }, [searchTerm]);
 
     return (
-        <div className="min-h-screen bg-slate-100 text-slate-800 font-sans">
+        <div className="min-h-screen bg-slate-50/50 text-slate-800 font-sans">
             <Navbar />
 
-            <section className="relative overflow-hidden bg-gradient-to-r from-[#7C3AED] via-[#8B5CF6] to-[#A78BFA] text-white py-10 px-6 shadow-md">
-                <div className="absolute top-0 right-1/4 w-96 h-96 bg-white/10 rounded-full blur-3xl pointer-events-none" />
-                <div className="absolute bottom-0 right-10 w-80 h-80 bg-purple-300/20 rounded-full blur-3xl pointer-events-none" />
+            {/* Hero Banner - Màu Xanh Chuẩn LUMER */}
+            <section className="relative overflow-hidden bg-gradient-to-r from-[#0052CC] via-[#0066FF] to-[#3B82F6] text-white py-12 px-6 shadow-lg">
+                <div className="absolute -top-12 -right-12 w-96 h-96 bg-white/10 rounded-full blur-3xl pointer-events-none" />
+                <div className="absolute -bottom-12 right-1/3 w-80 h-80 bg-blue-300/15 rounded-full blur-3xl pointer-events-none" />
 
                 <div className="max-w-7xl mx-auto relative z-10">
-                    <div className="flex items-center gap-3 mb-3">
+                    <div className="flex flex-wrap items-center gap-2.5 mb-4">
                         <Link_button router={router} />
-                        <span className="text-xs font-bold uppercase tracking-wider bg-white/20 text-purple-50 px-3 py-1 rounded-full backdrop-blur-md">
-                            Cộng Tác Viên
+                        <span className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider bg-white/20 text-blue-50 px-3 py-1.5 rounded-full backdrop-blur-md border border-white/20">
+                            <span className="w-2 h-2 rounded-full bg-cyan-300 animate-pulse" />
+                            Quản lý Cộng Tác Viên
                         </span>
                     </div>
 
-                    <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-white flex items-center gap-3">
+                    <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-white leading-tight">
                         Phân Công Cộng Tác Viên
                     </h1>
-                    <p className="text-purple-100 mt-2 text-sm md:text-base max-w-2xl leading-relaxed">
-                        Chọn môn học để xem và phân công Tester làm cộng tác viên hỗ trợ kiểm thử.
+                    <p className="text-blue-100/90 mt-2 text-sm md:text-base max-w-2xl leading-relaxed font-normal">
+                        Chọn môn học bên dưới để xem danh sách và phân công Tester làm cộng tác viên hỗ trợ kiểm thử chất lượng môn học.
                     </p>
                 </div>
             </section>
 
+            {/* Main Content */}
             <main className="max-w-7xl mx-auto px-6 py-8 space-y-8">
+                {/* Search Bar */}
                 <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
                     <div className="relative w-full">
                         <Search
@@ -106,12 +111,12 @@ export default function CollaboratorManagePage() {
                             placeholder="Tìm kiếm môn học theo tên..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full rounded-xl bg-slate-50 border border-slate-200 py-2.5 pl-11 pr-10 text-sm text-slate-800 placeholder-slate-400 outline-none focus:bg-white focus:border-[#8B5CF6] focus:ring-2 focus:ring-[#8B5CF6]/20 transition"
+                            className="w-full rounded-xl bg-slate-50 border border-slate-200 py-3 pl-11 pr-10 text-sm text-slate-800 placeholder-slate-400 outline-none focus:bg-white focus:border-[#0066FF] focus:ring-4 focus:ring-[#0066FF]/10 transition-all"
                         />
                         {searchTerm && (
                             <button
                                 onClick={() => setSearchTerm("")}
-                                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+                                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition"
                             >
                                 <X size={16} />
                             </button>
@@ -119,20 +124,23 @@ export default function CollaboratorManagePage() {
                     </div>
                 </div>
 
+                {/* State Loading */}
                 {loading && (
                     <div className="flex flex-col items-center justify-center py-20 gap-3 text-slate-500 bg-white rounded-2xl border border-slate-200/80 shadow-sm">
-                        <Loader2 size={32} className="animate-spin text-[#8B5CF6]" />
-                        <p className="text-sm font-semibold">Đang tải danh sách môn học...</p>
+                        <Loader2 size={36} className="animate-spin text-[#0066FF]" />
+                        <p className="text-sm font-semibold text-slate-600">Đang tải danh sách môn học...</p>
                     </div>
                 )}
 
+                {/* State Error */}
                 {!loading && error && (
                     <div className="bg-rose-50 border border-rose-200 rounded-2xl p-6 text-center text-rose-700 text-sm flex items-center justify-center gap-2 shadow-sm">
-                        <AlertCircle size={20} />
+                        <AlertCircle size={20} className="shrink-0" />
                         <span className="font-medium">{error}</span>
                     </div>
                 )}
 
+                {/* Grid môn học */}
                 {!loading && !error && (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {subjects.map((subject) => {
@@ -143,29 +151,35 @@ export default function CollaboratorManagePage() {
                                     onClick={() =>
                                         router.push(`/instructor-management/collaborator-manage/${subject.subject_id}`)
                                     }
-                                    className="group bg-white rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-xl hover:border-purple-300 hover:-translate-y-1 transition-all duration-200 flex flex-col justify-between overflow-hidden relative cursor-pointer"
+                                    className="group bg-white rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-xl hover:border-blue-300 hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between overflow-hidden relative cursor-pointer"
                                 >
-                                    <div className="absolute top-0 left-0 right-0 h-1 bg-[#8B5CF6] opacity-0 group-hover:opacity-100 transition-opacity z-10" />
+                                    {/* Top Active Bar */}
+                                    <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#0052CC] to-[#0066FF] opacity-0 group-hover:opacity-100 transition-opacity z-10" />
 
                                     <div className="p-6 space-y-4 flex-1 flex flex-col">
-                                        <h3 className="text-lg font-bold text-slate-900 group-hover:text-[#8B5CF6] transition line-clamp-2 leading-snug">
-                                            {subject.title}
-                                        </h3>
+                                        <div className="flex items-start justify-between gap-3">
+                                            <h3 className="text-lg font-bold text-slate-900 group-hover:text-[#0066FF] transition-colors line-clamp-2 leading-snug">
+                                                {subject.title}
+                                            </h3>
+                                        </div>
 
-                                        <span
-                                            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold border whitespace-nowrap w-fit ${statusConfig.className}`}
-                                        >
-                                            <span className={`w-1.5 h-1.5 rounded-full ${statusConfig.dotColor}`} />
-                                            {statusConfig.text}
-                                        </span>
+                                        <div>
+                                            <span
+                                                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold border whitespace-nowrap ${statusConfig.className}`}
+                                            >
+                                                <span className={`w-1.5 h-1.5 rounded-full ${statusConfig.dotColor}`} />
+                                                {statusConfig.text}
+                                            </span>
+                                        </div>
 
-                                        <p className="text-slate-500 text-xs sm:text-sm leading-relaxed line-clamp-2 flex-1">
+                                        <p className="text-slate-500 text-xs sm:text-sm leading-relaxed line-clamp-2 flex-1 font-normal">
                                             {subject.description || "Chưa có mô tả chi tiết cho môn học này."}
                                         </p>
                                     </div>
 
-                                    <div className="p-4 pt-0">
-                                        <button className="w-full bg-[#8B5CF6] hover:bg-purple-700 text-white font-bold py-2.5 px-4 rounded-xl text-xs sm:text-sm transition flex items-center justify-center gap-2 shadow-sm group-hover:shadow-md">
+                                    {/* Card Footer Button */}
+                                    <div className="p-6 pt-0">
+                                        <button className="w-full bg-slate-50 group-hover:bg-[#0066FF] text-slate-700 group-hover:text-white border border-slate-200/80 group-hover:border-[#0066FF] font-semibold py-2.5 px-4 rounded-xl text-xs sm:text-sm transition-all flex items-center justify-center gap-2 shadow-xs group-hover:shadow-md group-hover:shadow-blue-500/20 active:scale-95">
                                             <Users size={16} />
                                             Quản lý cộng tác viên
                                             <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
@@ -177,15 +191,17 @@ export default function CollaboratorManagePage() {
                     </div>
                 )}
 
+                {/* State Empty */}
                 {!loading && !error && subjects.length === 0 && (
-                    <div className="bg-white rounded-2xl border border-slate-200/80 p-12 text-center text-slate-500 flex flex-col items-center justify-center gap-3 shadow-sm">
-                        <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400">
-                            <FolderX size={28} />
+                    <div className="bg-white rounded-2xl border border-slate-200/80 p-16 text-center text-slate-500 flex flex-col items-center justify-center gap-3 shadow-sm">
+                        <div className="w-16 h-16 rounded-2xl bg-blue-50/60 flex items-center justify-center text-blue-500 border border-blue-100">
+                            <FolderX size={32} />
                         </div>
-                        <p className="text-sm font-semibold text-slate-700">
+                        <h4 className="text-base font-bold text-slate-800">Không tìm thấy môn học nào</h4>
+                        <p className="text-xs text-slate-400 max-w-sm leading-relaxed">
                             {searchTerm
-                                ? `Không tìm thấy môn học nào khớp với từ khóa "${searchTerm}".`
-                                : "Bạn hiện chưa được phân công đảm nhận môn học nào."}
+                                ? `Không có môn học nào khớp với từ khóa tìm kiếm "${searchTerm}".`
+                                : "Bạn hiện chưa được phân công đảm nhận môn học nào trong hệ thống."}
                         </p>
                     </div>
                 )}
@@ -198,9 +214,9 @@ function Link_button({ router }: { router: ReturnType<typeof useRouter> }) {
     return (
         <button
             onClick={() => router.push("/instructor-management")}
-            className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-white/10 hover:bg-white/20 border border-white/20 px-3 py-1 rounded-full transition backdrop-blur-md"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-white/10 hover:bg-white/20 border border-white/25 px-3 py-1.5 rounded-full backdrop-blur-md transition-all active:scale-95"
         >
-            <ArrowLeft size={13} /> Bàn làm việc
+            <ArrowLeft size={14} /> Bàn làm việc
         </button>
     );
 }
