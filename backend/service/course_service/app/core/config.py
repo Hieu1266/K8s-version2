@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     BACKEND_CORS_ORIGINS: Annotated[
         list[str] | str, BeforeValidator(parse_cors)
     ] = []
-
+    STORAGE_API_URL: str
     BACKEND_USER_URL: str 
     BACKEND_COURSE_URL: str 
     BACKEND_QUIZ_EXAM_URL: str

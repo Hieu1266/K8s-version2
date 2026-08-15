@@ -34,8 +34,7 @@ import httpx
 from fastapi import UploadFile, HTTPException, status
 from app.core.config import settings
 
-STORAGE_API_URL = "http://localhost:9000"
-
+STORAGE_API_URL = settings.STORAGE_API_URL
 class CRUDCurriculumMedia:
     def upload_file(self, file: UploadFile) -> str:
         try:
