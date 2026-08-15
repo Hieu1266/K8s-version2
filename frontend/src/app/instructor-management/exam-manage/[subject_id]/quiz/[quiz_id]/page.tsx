@@ -18,7 +18,6 @@ import {
   updateFixedQuestionTriggerAction,
   addPoolRuleAction,
   updatePoolRuleAction,
-  deletePoolRuleAction,
 } from "@/actions/getQuizzes";
 
 export default function QuizConfigPage({
