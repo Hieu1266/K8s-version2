@@ -415,11 +415,25 @@ def _try_finalize_submission(db: Session, submission_id: UUID) -> dict:
                 submission.graded_at = datetime.utcnow()
                 submission.status = SubmissionStatus.GRADED
 
-                # Tính cờ hoàn thành (is_passed) dựa trên passing_score của Quiz
-                if submission.quiz and getattr(submission.quiz, "passing_score", None) is not None:
-                    submission.is_passed = submission.total_score >= submission.quiz.passing_score
-                else:
-                    submission.is_passed = True
+                # Tính cờ hoàn thành (is_passed) dựa trên passing_percentage của Quiz
+                # (Quiz KHÔNG có trường "passing_score" - trường đúng là "passing_percentage",
+                # tính theo % trên tổng điểm tối đa của đề thi, giống logic ở quiz_submission.py)
+                max_points_stmt = (
+                    select(Question.max_points)
+                    .join(SubmissionDetail, SubmissionDetail.question_id == Question.question_id)
+                    .where(SubmissionDetail.submission_id == submission.submission_id)
+                )
+                total_quiz_max_score = sum(
+                    (mp or 0.0) for mp in db.exec(max_points_stmt).all()
+                )
+
+                passing_percentage = (
+                    submission.quiz.passing_percentage
+                    if (submission.quiz and submission.quiz.passing_percentage is not None)
+                    else 0.0
+                )
+                passing_score = (passing_percentage / 100.0) * total_quiz_max_score
+                submission.is_passed = submission.total_score >= passing_score
 
     db.add(submission)
     db.commit()

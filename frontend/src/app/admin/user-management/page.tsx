@@ -34,11 +34,11 @@ type RoleDetailData =
   | { type: "courses"; courses: any[] } // Manager
   | { type: "subjects"; subjects: any[] } // Giảng viên
   | {
-      type: "student";
-      inProgress: any[];
-      completed: any[];
-      stats?: { inprogress_courses: number; completed_courses: number; certificate: number } | null;
-    }
+    type: "student";
+    inProgress: any[];
+    completed: any[];
+    stats?: { inprogress_courses: number; completed_courses: number; certificate: number } | null;
+  }
   | null;
 
 export default function UserManagementPage() {
@@ -422,7 +422,7 @@ export default function UserManagementPage() {
               <option value="Giảng viên">Giảng viên</option>
               <option value="Học viên">Học viên</option>
               <option value="Tester">Kiểm thử</option>
-              <option value="Manager">Quản lý</option>
+              <option value="Quản lý">Quản lý</option>
             </select>
 
             {/* Bộ lọc 3 Trạng thái dựa trên DB */}
