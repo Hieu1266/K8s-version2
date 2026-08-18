@@ -155,7 +155,7 @@ def update_question(
                     question_id=question_id,
                     title=rub.title,
                     description=rub.description or "",
-                    percentage=float(pct_val if pct_val is not None else 0.0)  # ✅ ĐÃ SỬA: percentage
+                    percentage=float(pct_val if pct_val is not None else 0.0) 
                 )
                 db.add(db_rubric)
             
@@ -229,9 +229,9 @@ def total_lessons_in_subject(
 
 NOUN_STOPWORDS = {
     "sự", "việc", "loại", "cái", "chiếc", "cuộc", "người", "khi",
-    "mức", "tính", "ngày", "tháng", "năm", "khoảng", "trường hợp",
-    "khái niệm", "phần", "bản", "dạng", "kết quả", "bước", "điều",
-    "thứ", "tập", "khối", "trang", "số", "nội dung", "chiếu"
+    "mức", "tính", "ngày", "tháng", "năm", "khoảng","khái niệm", 
+    "phần", "bản", "dạng", "kết quả", "bước", "điều", "thứ", 
+    "tập", "khối", "trang", "số", "chiếu", "bên", "đám", 
 }
 
 def clean_and_extract_sentences(html_content: str) -> list[str]:
@@ -241,24 +241,29 @@ def clean_and_extract_sentences(html_content: str) -> list[str]:
     """
     soup = BeautifulSoup(html_content, "html.parser")
     
-    # 1. Xóa bỏ các thẻ tiêu đề (h1, h2, h3,...) vì không dùng tiêu đề làm câu hỏi
+    # 1. Xóa các thẻ tiêu đề
     for heading in soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6']):
         heading.decompose()
 
-    # 2. Lấy văn bản, dùng xuống dòng để phân tách các đoạn
     text = soup.get_text(separator="\n")
 
-    # 3. Làm sạch ký tự đặc biệt & bullet points
-    text = text.replace("\xa0", " ") # Xóa non-breaking space
-    text = re.sub(r"[·•\-\*]", "", text) # Xóa ký tự bullet points
+    # 2. Làm sạch ký tự rác
+    text = text.replace("\xa0", " ")
+    text = re.sub(r"[·•\-\*]", "", text)
     
     cleaned_sentences = []
-    # Tách theo dòng hoặc dấu chấm câu
-    raw_lines = re.split(r'[\n\.]', text)
+    
+    # 3. CHỈ tách câu theo xuống dòng (\n) và dấu kết thúc câu (. ! ?), KHÔNG tách theo dấu ':'
+    raw_lines = re.split(r'[\n.!?]+', text)
     
     for line in raw_lines:
         line = re.sub(r"\s+", " ", line).strip()
-        # Chỉ lấy những câu có độ dài hợp lý (từ 6 từ trở lên) để làm câu hỏi
+        
+        # 4. LỌC BỎ câu kết thúc bằng dấu ':' (câu dẫn liệt kê)
+        if line.endswith(':'):
+            continue
+            
+        # 5. Chỉ nhận câu có đủ độ dài (từ 6 từ trở lên)
         if len(line.split()) >= 6:
             cleaned_sentences.append(line)
             

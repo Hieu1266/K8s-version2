@@ -6,336 +6,250 @@ import Navbar from "@/components/Navbar";
 import SubjectHeader from "@/components/question-bank/SubjectHeader";
 import SubjectInfoComponent from "@/components/SubjectInfo";
 import QuestionFilter from "@/components/question-bank/QuestionFilter";
-import QuestionCard from "@/components/question-bank//QuestionCard";
+import QuestionCard from "@/components/question-bank/QuestionCard";
 import Pagination from "@/components/question-bank/Pagination";
 import AddQuestionModal from "@/components/question-bank/AddQuestionModal";
 import { Question, SubjectInfo } from "@/types/questions-bank";
-import Link from "next/link";
+import { LessonShort } from "@/types/lessons";
 import {
-  Plus,
   SearchX,
   Loader2,
-  BookOpenCheck,
-  HelpCircle,
-  FileText
+  Sparkles,
+  X,
 } from "lucide-react";
 
 import {
   getQuestionsBySubjectAction,
   getSubjectDetailAction,
-  getQuestionDetailAction, // 🎯 Gọi API chi tiết khi mở modal Sửa
+  getQuestionDetailAction,
   saveQuestionAction,
-  deleteQuestionAction, // 🎯 1. Đã import thêm hàm Delete Action
-
+  deleteQuestionAction,
+  generateFillInBlankQuestions,
 } from "@/actions/getQuestionBank";
+
+import { getLessonsBySubjectAction } from "@/actions/getLesson";
 
 export default function QuestionBankDetailPage() {
   const params = useParams();
 
-  // Lấy mã môn học từ URL
+  // Mã môn học từ URL
   const subjectId = (params?.subject_id as string) || (params?.id as string) || "";
 
   // State quản lý bộ lọc
-  const [selectedModule, setSelectedModule] = useState("");
-  const [selectedDifficulty, setSelectedDifficulty] = useState("");
-  const [selectedTopic, setSelectedTopic] = useState("");
-  const [modules, setModules] = useState<string[]>([]);
-  const [topics, setTopics] = useState<string[]>([]);
+  const [selectedType, setSelectedType] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
 
-  // State quản lý dữ liệu
-  const [subjectData, setSubjectData] = useState<SubjectInfo | null>(null);
-  const [questions, setQuestions] = useState<Question[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [openModal, setOpenModal] = useState<boolean>(false);
-  const [editingQuestion, setEditingQuestion] = useState<Question | undefined>();
-  const [editLoadingId, setEditLoadingId] = useState<string | null>(null); // 🎯 Câu hỏi đang được tải chi tiết để sửa
-
-  // State bộ lọc
-  const [keyword, setKeyword] = useState<string>("");
-  const [selectedType, setSelectedType] = useState<string>("Tất cả loại");
-
-  // State phân trang
-  const [currentPage, setCurrentPage] = useState<number>(1);
+  // State quản lý phân trang
+  const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 5;
 
-  // 🎯 Danh sách câu hỏi (get-list) có thể không kèm đủ dữ liệu "rubrics" của câu tự luận.
-  // Nên với các câu ESSAY, gọi thêm API chi tiết từng câu để lấy đủ tiêu chí đánh giá,
-  // giúp hiển thị ngay ở danh sách ngoài mà không cần bấm Sửa.
-  const enrichEssayRubrics = useCallback(async (list: Question[]): Promise<Question[]> => {
-    const essayQuestions = list.filter(
-      (q) => String(q.question_type).toUpperCase() === "ESSAY" && (!q.rubrics || q.rubrics.length === 0)
-    );
+  // State dữ liệu môn học & câu hỏi
+  const [subject, setSubject] = useState<SubjectInfo | null>(null);
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editLoadingId, setEditLoadingId] = useState<string | null>(null);
 
-    if (essayQuestions.length === 0) return list;
+  // State Modal Thêm / Chỉnh sửa câu hỏi
+  const [openModal, setOpenModal] = useState(false);
+  const [editingQuestion, setEditingQuestion] = useState<Question | undefined>(undefined);
 
-    const details = await Promise.all(
-      essayQuestions.map((q) => getQuestionDetailAction(q.question_id))
-    );
+  // State Modal Sinh câu hỏi tự động từ Bài học (Lesson)
+  const [openGenerateModal, setOpenGenerateModal] = useState(false);
+  const [lessons, setLessons] = useState<LessonShort[]>([]);
+  const [selectedLessonId, setSelectedLessonId] = useState<string>("");
+  const [numQuestions, setNumQuestions] = useState<number>(5);
+  // 1. Thêm State lưu số điểm tối đa cho mỗi câu
+  const [maxPoints, setMaxPoints] = useState<number>(1.0);
+  const [isGenerating, setIsGenerating] = useState(false);
 
-    const detailMap = new Map<string, Question>();
-    essayQuestions.forEach((q, i) => {
-      const detail = details[i];
-      if (detail) detailMap.set(q.question_id, detail);
-    });
-
-    return list.map((q) => {
-      const detail = detailMap.get(q.question_id);
-      return detail ? { ...q, rubrics: detail.rubrics, options: detail.options } : q;
-    });
-  }, []);
-
-  // Fetch dữ liệu môn học & câu hỏi
+  // Tải thông tin môn học và danh sách câu hỏi
   const fetchData = useCallback(async () => {
     if (!subjectId) return;
     setLoading(true);
+
     try {
-      const [subjRes, questionsRes] = await Promise.all([
+      const [subjectRes, questionsRes] = await Promise.all([
         getSubjectDetailAction(subjectId),
         getQuestionsBySubjectAction(subjectId),
       ]);
 
-      if (subjRes) {
-        setSubjectData({
-          subject_id: subjRes.subject_id,
-          code: subjRes.code || subjRes.subject_id.substring(0, 8).toUpperCase(),
-          title: subjRes.title,
-          description: subjRes.description || "",
-          instructor: subjRes.instructor || "Giảng viên phụ trách",
-          status_id: subjRes.status_id,
-          totalQuestions: questionsRes?.length || 0,
-          totalModules: subjRes.totalModules || 0,
-        });
-      }
-
-      const baseQuestions = questionsRes || [];
-      setQuestions(baseQuestions);
-
-      // Bổ sung rubrics cho câu tự luận sau khi đã hiển thị danh sách cơ bản,
-      // tránh chặn màn hình chờ nếu có nhiều câu tự luận.
-      const enriched = await enrichEssayRubrics(baseQuestions);
-      setQuestions(enriched);
+      if (subjectRes) setSubject(subjectRes);
+      if (questionsRes) setQuestions(questionsRes);
     } catch (error) {
-      console.error("Lỗi tải dữ liệu:", error);
+      console.error("Lỗi khi tải dữ liệu ngân hàng câu hỏi:", error);
     } finally {
       setLoading(false);
     }
-  }, [subjectId, enrichEssayRubrics]);
+  }, [subjectId]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  // RESET VỀ TRANG 1 KHI BỘ LỌC THAY ĐỔI
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [keyword, selectedType]);
-
-  // Xử lý Thêm / Sửa câu hỏi
-  const handleSave = async (question: Question) => {
-    try {
-      const payload: any = {
-        ...question,
-        ...(editingQuestion?.question_id ? { question_id: editingQuestion.question_id } : {}),
-        subject_id: subjectId,
-      };
-
-      const result = await saveQuestionAction(payload);
-
-      if (result.success) {
-        alert("Lưu câu hỏi thành công!");
-        await fetchData();
-        setEditingQuestion(undefined);
-        setOpenModal(false);
-      } else {
-        alert(`Lỗi: ${result.error || "Vui lòng thử lại!"}`);
-      }
-    } catch (err) {
-      console.error("Lỗi khi lưu:", err);
-      alert("Đã xảy ra lỗi hệ thống!");
-    }
-  };
-
-  // 🎯 2. ĐÃ FIX HÀM DELETE: GỌI SERVER ACTION ĐỂ XÓA THỰC TRONG DATABASE
-  const handleDelete = async (questionId: string) => {
-    if (!confirm("Bạn có chắc chắn muốn xóa câu hỏi này khỏi ngân hàng đề?")) return;
-
-    try {
-      const result = await deleteQuestionAction(questionId, subjectId);
-
-      if (result.success) {
-        alert("Xóa câu hỏi thành công!");
-        // Cập nhật lại UI sau khi xóa thành công
-        setQuestions((prev) => prev.filter((q) => q.question_id !== questionId));
-        await fetchData(); // Đồng bộ lại dữ liệu
-      } else {
-        alert(`Xóa thất bại: ${result.error || "Vui lòng thử lại!"}`);
-      }
-    } catch (error) {
-      console.error("Lỗi khi xóa câu hỏi:", error);
-      alert("Đã xảy ra lỗi hệ thống khi xóa câu hỏi!");
-    }
-  };
-
-  // LOGIC LỌC CÂU HỎI ĐỘNG
+  // Lọc danh sách câu hỏi theo từ khóa và loại câu hỏi
   const filteredQuestions = useMemo(() => {
     return questions.filter((q) => {
-      // 1. Tìm kiếm theo từ khóa
-      const searchKeyword = keyword?.trim().toLowerCase() || "";
-      const cleanContent = (q.content || "").replace(/<[^>]*>/g, "").toLowerCase();
-      const matchKeyword =
-        !searchKeyword ||
-        String(q.question_id ?? "").toLowerCase().includes(searchKeyword) ||
-        cleanContent.includes(searchKeyword) ||
-        (q.question_title ?? "").toLowerCase().includes(searchKeyword);
+      // Tìm kiếm nội dung hoặc tiêu đề
+      const matchesSearch =
+        !searchTerm.trim() ||
+        (q.content && q.content.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (q.question_title && q.question_title.toLowerCase().includes(searchTerm.toLowerCase()));
 
-      // 2. Lọc theo Loại câu hỏi
-      let matchType = true;
-      if (
-        selectedType &&
-        selectedType !== "Tất cả loại" &&
-        selectedType !== "Tất cả" &&
-        selectedType !== "ALL"
-      ) {
-        const typeMap: Record<string, string[]> = {
-          "MULTIPLE_CHOICE": ["MULTIPLE_CHOICE", "Trắc nghiệm"],
-          "TRUE_FALSE": ["TRUE_FALSE", "Đúng / Sai", "Đúng/Sai"],
-          "ESSAY": ["ESSAY", "Tự luận"],
-          "Trắc nghiệm": ["MULTIPLE_CHOICE", "Trắc nghiệm"],
-          "Đúng / Sai": ["TRUE_FALSE", "Đúng / Sai", "Đúng/Sai"],
-          "Tự luận": ["ESSAY", "Tự luận"],
-        };
+      // Lọc theo loại câu hỏi (hỗ trợ cả Enum lẫn tiếng Việt)
+      const qType = String(q.question_type || "").toUpperCase();
+      const sType = String(selectedType || "").toUpperCase();
 
-        const validTypes = typeMap[selectedType] || [selectedType];
-        matchType = validTypes.includes(q.question_type);
+      let matchesType = !selectedType;
+
+      if (selectedType) {
+        if (sType === "MULTIPLE_CHOICE") {
+          matchesType = qType === "MULTIPLE_CHOICE" || qType === "TRẮC NGHIỆM";
+        } else if (sType === "TRUE_FALSE") {
+          matchesType = qType === "TRUE_FALSE" || qType.includes("ĐÚNG");
+        } else if (sType === "FILL_IN_BLANK") {
+          matchesType = qType === "FILL_IN_BLANK" || qType.includes("ĐIỀN");
+        } else if (sType === "ESSAY") {
+          matchesType = qType === "ESSAY" || qType.includes("TỰ LUẬN");
+        } else {
+          matchesType = qType === sType;
+        }
       }
 
-      return matchKeyword && matchType;
+      return matchesSearch && matchesType;
     });
-  }, [questions, keyword, selectedType]);
+  }, [questions, searchTerm, selectedType]);
 
   // Phân trang
   const totalPages = Math.ceil(filteredQuestions.length / pageSize) || 1;
-  const displayQuestions = filteredQuestions.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize
-  );
+  const displayQuestions = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredQuestions.slice(start, start + pageSize);
+  }, [filteredQuestions, currentPage, pageSize]);
 
-  // 🎯 Gọi GET /questions/{question_id} để lấy đầy đủ options (trắc nghiệm)
-  // và rubrics (tự luận) mới nhất trước khi mở modal Sửa, tránh trường hợp
-  // dữ liệu từ danh sách câu hỏi (get-list) chưa kèm đủ 2 quan hệ này.
+  // Reset về trang 1 khi thay đổi tìm kiếm hoặc bộ lọc
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedType]);
+
+  // Xử lý chỉnh sửa câu hỏi
   const handleEdit = async (question: Question) => {
     setEditLoadingId(question.question_id);
     try {
       const detail = await getQuestionDetailAction(question.question_id);
-      setEditingQuestion(detail || question); // fallback về dữ liệu cũ nếu API lỗi
+      setEditingQuestion(detail || question);
+      setOpenModal(true);
+    } catch (error) {
+      console.error("Lỗi khi tải chi tiết câu hỏi:", error);
+      setEditingQuestion(question);
       setOpenModal(true);
     } finally {
       setEditLoadingId(null);
     }
   };
 
-  const currentSubject: SubjectInfo = subjectData || {
-    subject_id: subjectId,
-    code: subjectId.substring(0, 8).toUpperCase(),
-    title: "Đang tải dữ liệu môn học...",
-    description: "Đang tải thông tin chi tiết môn học...",
-    instructor: "Giảng viên",
-    status_id: "SUBJECT_ACTIVE",
-    totalQuestions: questions.length,
-    totalModules: 0,
+  // Xử lý lưu câu hỏi
+  const handleSave = async (questionData: Question) => {
+    const res = await saveQuestionAction(questionData);
+    if (res.success) {
+      setOpenModal(false);
+      setEditingQuestion(undefined);
+      fetchData();
+    } else {
+      alert(`Lỗi khi lưu câu hỏi: ${res.error}`);
+    }
+  };
+
+  // Xử lý xóa câu hỏi
+  const handleDelete = async (questionId: string) => {
+    if (confirm("Bạn có chắc chắn muốn xóa câu hỏi này khỏi ngân hàng?")) {
+      const res = await deleteQuestionAction(questionId, subjectId);
+      if (res.success) {
+        fetchData();
+      } else {
+        alert(`Không thể xóa câu hỏi: ${res.error}`);
+      }
+    }
+  };
+
+  // Mở modal sinh tự động và tải danh sách bài học
+  const handleOpenGenerateModal = async () => {
+    setOpenGenerateModal(true);
+    const lessonData = await getLessonsBySubjectAction(subjectId);
+    setLessons(lessonData || []);
+    if (lessonData && lessonData.length > 0) {
+      setSelectedLessonId(lessonData[0].lesson_id);
+    }
+  };
+
+  // 2. Cập nhật hàm gọi API truyền maxPoints
+  const handleGenerateQuestions = async () => {
+    if (!selectedLessonId) {
+      alert("Vui lòng chọn bài học!");
+      return;
+    }
+    setIsGenerating(true);
+    try {
+      await generateFillInBlankQuestions(selectedLessonId, numQuestions, maxPoints);
+      alert(`Tạo thành công ${numQuestions} câu hỏi ngẫu nhiên từ bài học!`);
+      setOpenGenerateModal(false);
+      fetchData();
+    } catch (error: any) {
+      console.error("Lỗi khi sinh câu hỏi ngẫu nhiên:", error);
+      alert(error?.message || "Có lỗi xảy ra khi tạo câu hỏi tự động.");
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50/80 font-sans text-slate-800 antialiased selection:bg-emerald-500 selection:text-white">
-      {/* Navbar & Header */}
+    <div className="min-h-screen bg-slate-50/60 pb-16">
       <Navbar />
-      <SubjectHeader subject={currentSubject} />
 
-      {/* 🎯 TAB CHUYỂN ĐỔI NGÂN HÀNG CÂU HỎI <-> NGÂN HÀNG ĐỀ THI */}
-      <div className="bg-white border-b border-slate-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex gap-8">
-          <button className="py-3 px-1 border-b-2 border-emerald-600 font-bold text-emerald-600 text-sm flex items-center gap-2">
-            <HelpCircle size={18} />
-            Ngân hàng câu hỏi
-          </button>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-6">
+        {/* Header Thông tin Môn học */}
+        <SubjectHeader subject={subject} />
 
-          <Link
-            href={`/instructor-management/exam-manage/${subjectId}`}
-            className="py-3 px-1 border-b-2 border-transparent text-slate-500 hover:text-slate-900 font-medium text-sm flex items-center gap-2 transition duration-200"
-          >
-            <FileText size={18} />
-            Ngân hàng đề thi
-          </Link>
-        </div>
-      </div>
+        {/* Thống kê môn học */}
+        {subject && (
+          <SubjectInfoComponent
+            subject={subject}
+            totalQuestions={questions.length}
+          />
+        )}
 
-      <main className="mx-auto max-w-7xl px-4 sm:px-6 py-8 space-y-8">
-
-        {/* 1. THÔNG TIN MÔN HỌC & THỐNG KÊ */}
-        <div className="grid grid-cols-1 gap-6 items-stretch">
-          <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm hover:shadow-md transition-all duration-300">
-            <SubjectInfoComponent subject={currentSubject} />
-          </div>
-        </div>
-
-        {/* 2. BỘ LỌC TÌM KIẾM */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm space-y-4">
+        {/* Thanh công cụ Tìm kiếm, Bộ lọc & Nút bấm */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-sm">
           <QuestionFilter
-            keyword={keyword}
-            setKeyword={setKeyword}
-            selectedModule={selectedModule}
-            setSelectedModule={setSelectedModule}
+            searchTerm={searchTerm}
+            onSearchChange={setSearchTerm}
             selectedType={selectedType}
-            setSelectedType={setSelectedType}
-            selectedDifficulty={selectedDifficulty}
-            setSelectedDifficulty={setSelectedDifficulty}
-            selectedTopic={selectedTopic}
-            setSelectedTopic={setSelectedTopic}
-            modules={modules}
-            topics={topics}
+            onTypeChange={setSelectedType}
             onAddQuestion={() => {
               setEditingQuestion(undefined);
               setOpenModal(true);
             }}
+            onGenerateAuto={handleOpenGenerateModal}
           />
         </div>
 
-        {/* 3. DANH SÁCH CÂU HỎI */}
+        {/* Danh sách câu hỏi */}
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-slate-200/80 shadow-sm gap-3 text-slate-500">
-            <Loader2 size={36} className="animate-spin text-emerald-600" />
-            <p className="text-sm font-semibold text-slate-600">Đang đồng bộ dữ liệu câu hỏi...</p>
+          <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-slate-200/80 shadow-sm">
+            <Loader2 className="animate-spin text-emerald-600 mb-3" size={32} />
+            <p className="text-xs text-slate-500 font-medium">Đang tải danh sách câu hỏi...</p>
           </div>
         ) : (
           <section className="space-y-4">
-            <div className="flex items-center justify-between px-1">
-              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2.5">
-                <BookOpenCheck size={22} className="text-emerald-600" />
-                Danh sách câu hỏi
-                <span className="text-xs font-bold bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full border border-emerald-200/60">
-                  {filteredQuestions.length} câu
-                </span>
-              </h2>
-            </div>
-
-            {displayQuestions.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center shadow-sm space-y-4">
-                <div className="mx-auto w-16 h-16 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                  <SearchX size={32} />
+            {filteredQuestions.length === 0 ? (
+              <div className="bg-white rounded-2xl border border-slate-200/80 p-12 text-center text-slate-500 flex flex-col items-center justify-center gap-3 shadow-sm">
+                <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400">
+                  <SearchX size={24} />
                 </div>
-                <div className="space-y-1">
-                  <h3 className="text-base font-bold text-slate-800">Không tìm thấy câu hỏi nào</h3>
-                  <p className="text-xs text-slate-500">Thử thay đổi bộ lọc hoặc thêm câu hỏi mới vào môn học này.</p>
-                </div>
-                <button
-                  onClick={() => {
-                    setEditingQuestion(undefined);
-                    setOpenModal(true);
-                  }}
-                  className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-5 py-2.5 rounded-xl shadow-sm hover:shadow-md transition-all duration-200"
-                >
-                  <Plus size={16} /> Thêm câu hỏi ngay
-                </button>
+                <p className="text-xs font-medium text-slate-600">
+                  {searchTerm || selectedType
+                    ? "Không tìm thấy câu hỏi nào phù hợp với bộ lọc."
+                    : "Chưa có câu hỏi nào trong ngân hàng môn học này."}
+                </p>
               </div>
             ) : (
               <div className="space-y-4">
@@ -358,7 +272,7 @@ export default function QuestionBankDetailPage() {
           </section>
         )}
 
-        {/* 4. PHÂN TRANG */}
+        {/* Phân trang */}
         {!loading && totalPages > 1 && (
           <div className="flex justify-center pt-4">
             <Pagination
@@ -370,17 +284,110 @@ export default function QuestionBankDetailPage() {
         )}
       </main>
 
-      {/* MODAL THÊM / SỬA CÂU HỎI */}
+      {/* Modal Thêm / Chỉnh sửa câu hỏi */}
       <AddQuestionModal
         open={openModal}
+        subjectId={subjectId}
         onClose={() => {
           setOpenModal(false);
           setEditingQuestion(undefined);
         }}
         onSave={handleSave}
-        subjectId={subjectId}
         editQuestion={editingQuestion}
       />
+
+      {/* Modal Sinh câu hỏi ngẫu nhiên từ Bài học (Lesson) */}
+      {openGenerateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b pb-3">
+              <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                Sinh câu hỏi ngẫu nhiên từ bài học
+              </h3>
+              <button
+                onClick={() => setOpenGenerateModal(false)}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Chọn bài học
+              </label>
+              {lessons.length === 0 ? (
+                <p className="text-xs text-amber-600 bg-amber-50 p-2.5 rounded-xl border border-amber-200">
+                  Chưa có bài học nào thuộc môn học này!
+                </p>
+              ) : (
+                <select
+                  value={selectedLessonId}
+                  onChange={(e) => setSelectedLessonId(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 p-2.5 text-xs focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                >
+                  {lessons.map((l) => (
+                    <option key={l.lesson_id} value={l.lesson_id}>
+                      {l.title}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            {/* 3. Bố trí lại 2 trường Số lượng câu hỏi & Điểm mỗi câu thành 2 cột */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Số lượng câu
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={numQuestions}
+                  onChange={(e) => setNumQuestions(Number(e.target.value))}
+                  className="w-full rounded-xl border border-slate-200 p-2.5 text-xs focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Điểm câu hỏi
+                </label>
+                <input
+                  type="number"
+                  step="0.25"
+                  min={0}
+                  max={10}
+                  value={maxPoints}
+                  onChange={(e) => setMaxPoints(Number(e.target.value))}
+                  className="w-full rounded-xl border border-slate-200 p-2.5 text-xs focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3 border-t">
+              <button
+                type="button"
+                onClick={() => setOpenGenerateModal(false)}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={handleGenerateQuestions}
+                disabled={isGenerating || lessons.length === 0}
+                className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold bg-purple-600 hover:bg-purple-700 text-white rounded-xl transition disabled:opacity-50"
+              >
+                {isGenerating && <Loader2 size={14} className="animate-spin" />}
+                Tạo danh sách
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

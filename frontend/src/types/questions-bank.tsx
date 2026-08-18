@@ -4,7 +4,7 @@ export type SubjectStatus =
   | "SUBJECT_SUSPENDED";
 
 // 💥 Cập nhật thêm TRUE_FALSE tại đây
-export type QuestionTypeEnum = "MULTIPLE_CHOICE" | "ESSAY" | "TRUE_FALSE";
+export type QuestionTypeEnum = "MULTIPLE_CHOICE" | "ESSAY" | "TRUE_FALSE" | "FILL_IN_BLANK";
 
 export interface SubjectInfo {
   subject_id: string; // uuid (Khóa chính)

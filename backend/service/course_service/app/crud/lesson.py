@@ -275,4 +275,14 @@ class CRUDLesson(CRUDBase[Lesson, LessonCreate, LessonUpdate, UUID]):
             "content_body": result[0],
             "subject_id": result[1]
         }
+
+    def get_multi_by_subject(self, db: Session, subject_id: UUID):
+        statement = select(Lesson.lesson_id, Lesson.title).join(
+            Module, Module.module_id == Lesson.module_id
+        ).where(Module.subject_id == subject_id)
+
+        results = db.exec(statement).all()
+        
+        # Chuyển đổi danh sách Row (tuple) thành danh sách Dictionary
+        return [{"lesson_id": lesson_id, "title": title} for lesson_id, title in results]
 crud_lesson = CRUDLesson(Lesson)

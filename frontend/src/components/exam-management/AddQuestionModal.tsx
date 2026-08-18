@@ -54,11 +54,10 @@ export default function AddQuestionModal({
                 </div>
                 <button
                   onClick={() => onToggleSelect(q)}
-                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition ${
-                    isSelected
+                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition ${isSelected
                       ? "bg-rose-50 text-rose-600 hover:bg-rose-100"
                       : "bg-blue-50 text-[#0066FF] hover:bg-blue-100"
-                  }`}
+                    }`}
                 >
                   {isSelected ? "Bỏ chọn" : "+ Chọn"}
                 </button>

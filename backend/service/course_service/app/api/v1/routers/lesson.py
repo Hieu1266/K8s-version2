@@ -8,6 +8,8 @@ from app.models.lesson import Lesson
 from typing import List, Optional
 from app.crud.lesson import crud_lesson
 from app.crud.module import crud_module
+from app.crud.subject import crud_subject
+from app.crud.presentation import crud_presentation_slide
 from uuid import UUID
 from app.core.config import settings
 import asyncio
@@ -238,16 +240,21 @@ def get_body_content(
     lesson_id: UUID,
     current_user: dict = Depends(RoleChecker(["Instructor"]))
 ):
-    # Lấy trực tiếp dict dữ liệu (chứa cả content_body và subject_id)
-    lesson_data = crud_lesson.get_content_body(db, lesson_id)
-    
-    if lesson_data is None:
+    content = ''
+    lesson = crud_lesson.get_by_id(db, lesson_id)
+    if lesson is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Không tìm thấy bài học"
         )
+    if lesson.is_slide_presentation:
+        slides = crud_presentation_slide.get_by_slide_content_by_lesson(db, lesson_id)
+        for slide in slides:
+            content += "\n" + slide
+    else:
+        content = crud_lesson.get_content_body(db, lesson_id)
 
-    return lesson_data
+    return content
     
 
 @router.get("/is-existed/{lesson_id}")
@@ -256,3 +263,18 @@ def is_existed(
     lesson_id: UUID
 ):
     return crud_lesson.get_by_id(db, lesson_id) is not None
+
+@router.get("/lesson-list/{subject_id}", response_model=List[LessonShortResponse])
+def get_lesson_list_by_subject(
+    db: SessionDep,
+    subject_id: UUID,
+    current_user: dict = Depends(RoleChecker(["Instructor"]))
+):
+    subject = crud_subject.get_by_id(db, subject_id)
+    if subject is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Môn học không tồn tại"
+        )
+    lessons = crud_lesson.get_multi_by_subject(db, subject_id)
+    return lessons

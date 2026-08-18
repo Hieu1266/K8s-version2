@@ -193,6 +193,18 @@ class CRUDPresentationSlide(
             db.refresh(slide)
         return ordered_slides
 
+    def get_by_slide_content_by_lesson(
+        self, db: Session, lesson_id: UUID
+    ) -> list[str]:
+        """Lấy tất cả nội dung các slide thuộc về một lesson dựa trên lesson_id."""
+        statement = (
+            select(PresentationSlide.content_body)
+            .join(Presentation, PresentationSlide.presentation_id == Presentation.presentation_id)
+            .where(Presentation.lesson_id == lesson_id)
+            .order_by(PresentationSlide.slide_order)
+        )
+        return list(db.exec(statement).all())
+
 
 crud_presentation = CRUDPresentation(Presentation)
 crud_presentation_slide = CRUDPresentationSlide(PresentationSlide)

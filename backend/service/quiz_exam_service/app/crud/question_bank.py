@@ -10,7 +10,7 @@ from app.schemas.question_bank import QuestionCreate, QuestionUpdate
 
 class CRUDQuestionBank:
     def create(self, db: Session, obj_in: QuestionCreate) -> Question:
-        # 1. Ép kiểu question_type thành chuỗi in hoa an toàn (ví dụ: 'MULTIPLE_CHOICE', 'ESSAY')
+        # 1. Ép kiểu question_type thành chuỗi in hoa an toàn
         raw_type = obj_in.question_type
         q_type_str = str(raw_type.value if hasattr(raw_type, "value") else raw_type).upper()
 
@@ -24,6 +24,8 @@ class CRUDQuestionBank:
         )
         db.add(db_question)
         db.flush()  
+
+        # 3. Tạo Rubrics (dành cho ESSAY)
         rubrics_list = getattr(obj_in, "rubrics", []) or []
         if "ESSAY" in q_type_str or len(rubrics_list) > 0:
             for rub in rubrics_list:
@@ -44,8 +46,10 @@ class CRUDQuestionBank:
                 )
                 db.add(db_rubric)
 
+        # 4. Tạo QuestionOption (Cho CHOICE, TRUE_FALSE và FILL_IN_BLANK)
         options_list = getattr(obj_in, "options", []) or []
-        if ("CHOICE" in q_type_str or "TRUE_FALSE" in q_type_str) and len(options_list) > 0:
+        
+        if ("CHOICE" in q_type_str or "TRUE_FALSE" in q_type_str or "BLANK" in q_type_str) and len(options_list) > 0:
             for idx, opt in enumerate(options_list):
                 opt_dict = (
                     opt.model_dump()
@@ -58,17 +62,13 @@ class CRUDQuestionBank:
                     option_text=opt_dict.get("option_text", ""),
                     is_correct=bool(opt_dict.get("is_correct", False)),
                 )
-                # 🎯 option_id trong DB là UUID (primary key). Client chỉ nên gửi
-                # option_id khi đó là UUID thật của option đã tồn tại. Với option
-                # mới, client thường gửi nhãn hiển thị ("A","B"...) hoặc không gửi
-                # gì -> bỏ qua, để default_factory=uuid.uuid4 của model tự sinh ID,
-                # tránh lỗi UUID parsing / lỗi insert vào cột UUID.
+
                 raw_option_id = opt_dict.get("option_id")
                 if raw_option_id:
                     try:
                         option_kwargs["option_id"] = UUID(str(raw_option_id))
                     except (ValueError, AttributeError):
-                        pass  # nhãn hiển thị dạng chữ cái -> bỏ qua
+                        pass
 
                 db_option = QuestionOption(**option_kwargs)
                 db.add(db_option)

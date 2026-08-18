@@ -282,3 +282,34 @@ export async function deleteQuestionAction(
     return { success: false, error: error?.message || "Lỗi khi xóa câu hỏi" };
   }
 }
+
+export const generateFillInBlankQuestions = async (
+  lessonId: string,
+  numQuestions: number = 5,
+  maxPoints: number = 1.0,
+  token?: string
+) => {
+  try {
+    const headers = await getAuthHeaders(token);
+
+    const response = await fetch(`${EXAM_QUIZ_URL}/questions/generate-from-lesson/${lessonId}`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        num_questions: numQuestions,
+        max_points: maxPoints
+      })
+    });
+
+    if (!response.ok) {
+      const errText = await response.text().catch(() => "");
+      console.error(" [NEXT.JS SERVER] GENERATE FAILED:", errText);
+      throw new Error("Bài học đã hết câu hỏi để tạo hoặc số lượng câu hỏi yêu cầu quá nhiều");
+    }
+
+    return await response.json();
+  } catch (error: any) {
+    console.error(" [NEXT.JS SERVER] LỖI GENERATE EXCEPTION:", error);
+    throw error;
+  }
+};
