@@ -14,7 +14,6 @@ import { LessonShort } from "@/types/lessons";
 import {
   SearchX,
   Loader2,
-  Sparkles,
   X,
 } from "lucide-react";
 
@@ -58,7 +57,6 @@ export default function QuestionBankDetailPage() {
   const [lessons, setLessons] = useState<LessonShort[]>([]);
   const [selectedLessonId, setSelectedLessonId] = useState<string>("");
   const [numQuestions, setNumQuestions] = useState<number>(5);
-  // 1. Thêm State lưu số điểm tối đa cho mỗi câu
   const [maxPoints, setMaxPoints] = useState<number>(1.0);
   const [isGenerating, setIsGenerating] = useState(false);
 
@@ -73,8 +71,15 @@ export default function QuestionBankDetailPage() {
         getQuestionsBySubjectAction(subjectId),
       ]);
 
-      if (subjectRes) setSubject(subjectRes);
-      if (questionsRes) setQuestions(questionsRes);
+      const questionList = questionsRes || [];
+      setQuestions(questionList);
+
+      if (subjectRes) {
+        setSubject({
+          ...subjectRes,
+          totalQuestions: questionList.length,
+        });
+      }
     } catch (error) {
       console.error("Lỗi khi tải dữ liệu ngân hàng câu hỏi:", error);
     } finally {
@@ -97,11 +102,17 @@ export default function QuestionBankDetailPage() {
 
       // Lọc theo loại câu hỏi (hỗ trợ cả Enum lẫn tiếng Việt)
       const qType = String(q.question_type || "").toUpperCase();
-      const sType = String(selectedType || "").toUpperCase();
+      const sType = String(selectedType || "").toUpperCase().trim();
 
-      let matchesType = !selectedType;
+      const isAllType =
+        !selectedType ||
+        sType === "ALL" ||
+        sType === "TẤT CẢ" ||
+        sType === "TẤT CẢ LOẠI";
 
-      if (selectedType) {
+      let matchesType = isAllType;
+
+      if (!isAllType) {
         if (sType === "MULTIPLE_CHOICE") {
           matchesType = qType === "MULTIPLE_CHOICE" || qType === "TRẮC NGHIỆM";
         } else if (sType === "TRUE_FALSE") {
@@ -181,7 +192,6 @@ export default function QuestionBankDetailPage() {
     }
   };
 
-  // 2. Cập nhật hàm gọi API truyền maxPoints
   const handleGenerateQuestions = async () => {
     if (!selectedLessonId) {
       alert("Vui lòng chọn bài học!");
@@ -212,8 +222,10 @@ export default function QuestionBankDetailPage() {
         {/* Thống kê môn học */}
         {subject && (
           <SubjectInfoComponent
-            subject={subject}
-            totalQuestions={questions.length}
+            subject={{
+              ...subject,
+              totalQuestions: questions.length,
+            }}
           />
         )}
 
@@ -335,7 +347,6 @@ export default function QuestionBankDetailPage() {
               )}
             </div>
 
-            {/* 3. Bố trí lại 2 trường Số lượng câu hỏi & Điểm mỗi câu thành 2 cột */}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
