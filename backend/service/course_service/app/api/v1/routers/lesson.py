@@ -253,8 +253,11 @@ def get_body_content(
             content += "\n" + slide
     else:
         content = crud_lesson.get_content_body(db, lesson_id)
-
-    return content
+    subject_id = crud_lesson.get_subject_id_lesson(db, lesson_id)
+    return {
+        "content_body": content,
+        "subject_id": subject_id
+    }
     
 
 @router.get("/is-existed/{lesson_id}")

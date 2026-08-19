@@ -4,6 +4,7 @@ export enum QuestionType {
     MULTIPLE_CHOICE = "MULTIPLE_CHOICE",
     ESSAY = "ESSAY",
     TRUE_FALSE = "TRUE_FALSE",
+    FILL_IN_BLANK = "FILL_IN_BLANK",
 }
 
 export interface QuestionOption {
@@ -143,6 +144,7 @@ export interface SubmissionAnswerDetail {
     detail_id: string;
     question_id: string;
     question_text: string;
+    body_content?: string | null; // 🆕 Nội dung câu có chỗ trống (dùng cho FILL_IN_BLANK)
     question_type: string;
     max_score: number;
     score_earned: number | null;

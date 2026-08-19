@@ -55,7 +55,7 @@ export default function QuestionFilter({
           <button
             type="button"
             onClick={onGenerateAuto}
-            className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-purple-700 text-white font-semibold px-3.5 py-2 rounded-xl text-xs transition shadow-sm"
+            className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-3.5 py-2 rounded-xl text-xs transition shadow-sm"
           >
             Tạo câu điền khuyết tự động
           </button>

@@ -16,6 +16,8 @@ import {
 } from '@/types/quiz-submission';
 import { SubmissionStatus } from '@/types/statuses';
 
+// Với câu FILL_IN_BLANK, `essayText` lưu đáp án của (các) chỗ trống, nối với nhau
+// bằng BLANK_ANSWER_DELIMITER khi câu hỏi có nhiều hơn 1 chỗ trống.
 type AnswersMap = Record<string, { optionId?: string; essayText?: string }>;
 
 // `is_peer_review` chưa có trong type QuizSubmissionStatusResponse gốc (backend mới bổ sung) —
@@ -23,6 +25,27 @@ type AnswersMap = Record<string, { optionId?: string; essayText?: string }>;
 type StatusWithPeerReview = QuizSubmissionStatusResponse & { is_peer_review?: boolean | null };
 
 const MIN_MEMBERS_FOR_PEER_REVIEW = 3;
+
+// ---- Hỗ trợ câu hỏi điền khuyết (FILL_IN_BLANK) ----
+// Chỗ trống trong đề bài được đánh dấu bằng một dãy gạch dưới liên tiếp (vd: "_____").
+const BLANK_MARKER_REGEX = /_{3,}/g;
+// Dùng để nối nhiều đáp án (nếu câu có nhiều hơn 1 chỗ trống) thành 1 chuỗi lưu vào essay_answer_text.
+const BLANK_ANSWER_DELIMITER = '|||';
+
+/** Tách nội dung câu hỏi thành các đoạn text xen kẽ chỗ trống. Số chỗ trống = số đoạn - 1. */
+function splitByBlank(text: string): string[] {
+    return (text || '').split(BLANK_MARKER_REGEX);
+}
+
+/** Với FILL_IN_BLANK, câu có chỗ trống thường được lưu trong body_content (question_title chỉ là tiêu đề chung như "Điền từ còn thiếu vào chỗ trống"). Ưu tiên body_content nếu có nội dung, nếu không mới dùng question_title. */
+function getFillInBlankSourceText(question_title: string, body_content?: string | null): string {
+    const trimmedBody = (body_content || '').trim();
+    return trimmedBody ? trimmedBody : question_title;
+}
+
+function normalizeBlankAnswer(text?: string | null): string {
+    return (text || '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
 
 /** Khối nút bắt đầu/làm lại bài thi — hiển thị 2 lựa chọn khi đề thi hỗ trợ chấm chéo. */
 function StartQuizActions({
@@ -259,6 +282,26 @@ export function QuizSection({
         setSavingDetailId(null);
     };
 
+    // 3b. Nhập câu trả lời Điền khuyết (FILL_IN_BLANK) — cập nhật giá trị của 1 chỗ trống cụ thể
+    const handleBlankChange = (detailId: string, blankIndex: number, value: string) => {
+        setAnswers((prev) => {
+            const currentValues = (prev[detailId]?.essayText ?? '').split(BLANK_ANSWER_DELIMITER);
+            currentValues[blankIndex] = value;
+            return {
+                ...prev,
+                [detailId]: { ...prev[detailId], essayText: currentValues.join(BLANK_ANSWER_DELIMITER) },
+            };
+        });
+    };
+
+    // Lưu đáp án điền khuyết xuống server khi rời khỏi input (blur)
+    const handleBlankBlur = async (detailId: string) => {
+        const text = answers[detailId]?.essayText ?? '';
+        setSavingDetailId(detailId);
+        await updateSubmissionDetailAction(detailId, { essay_answer_text: text });
+        setSavingDetailId(null);
+    };
+
     // 4. Nộp bài
     const handleSubmit = async () => {
         if (!quizData) return;
@@ -336,7 +379,7 @@ export function QuizSection({
                     Điểm số của bạn: <strong className="text-[#161826]">{result.total_score}</strong>
                 </p>
                 {result.next_lesson_unlocked && (
-                    <p className="text-sm text-[#12B886] font-bold">🎉 Bài học tiếp theo đã được mở khóa!</p>
+                    <p className="text-sm text-[#12B886] font-bold">Bài học tiếp theo đã được mở khóa!</p>
                 )}
 
                 {/* NÚT LÀM LẠI BÀI THI KHI CHƯA ĐẠT (VỪA NỘP XONG) */}
@@ -407,7 +450,7 @@ export function QuizSection({
                                 )}
                             </div>
 
-                            {q.body_content && (
+                            {q.body_content && q.question_type !== QuestionType.FILL_IN_BLANK && (
                                 <div className="text-sm text-[#565A70]" dangerouslySetInnerHTML={{ __html: q.body_content }} />
                             )}
 
@@ -450,6 +493,54 @@ export function QuizSection({
                                     className="w-full text-sm p-3.5 bg-[#F7F8FB] border border-[#ECEAF0] rounded-xl text-[#565A70]"
                                 />
                             )}
+
+                            {q.question_type === QuestionType.FILL_IN_BLANK && (() => {
+                                const parts = splitByBlank(getFillInBlankSourceText(q.question_title, q.body_content));
+                                const blankCount = parts.length - 1;
+                                const studentValues = (q.essay_answer_text ?? '').split(BLANK_ANSWER_DELIMITER);
+                                // options[0].is_correct chỉ có giá trị khi bài đã được chấm (isGraded)
+                                const correctOption = q.options.find((o) => o.is_correct);
+                                const correctValues = correctOption
+                                    ? correctOption.option_text.split(BLANK_ANSWER_DELIMITER)
+                                    : [];
+
+                                return (
+                                    <div className="text-sm text-[#2B2D3D] leading-loose">
+                                        {parts.map((part, i) => {
+                                            const studentValue = studentValues[i] ?? '';
+                                            const isBlankCorrect =
+                                                isGraded &&
+                                                normalizeBlankAnswer(studentValue) === normalizeBlankAnswer(correctValues[i]);
+
+                                            let blankStyle = 'border-[#ECEAF0] bg-white text-[#2B2D3D]';
+                                            if (isGraded) {
+                                                blankStyle = isBlankCorrect
+                                                    ? 'border-[#12B886] bg-[#E6F8F3] text-[#0B8F63]'
+                                                    : 'border-[#E5484D] bg-[#FDE8E8] text-[#C4292E]';
+                                            }
+
+                                            return (
+                                                <span key={i}>
+                                                    {part}
+                                                    {i < blankCount && (
+                                                        <span
+                                                            className={`inline-block mx-1 px-2.5 py-1 rounded-md border text-sm font-semibold ${blankStyle}`}
+                                                        >
+                                                            {studentValue || 'Bạn chưa trả lời'}
+                                                        </span>
+                                                    )}
+                                                </span>
+                                            );
+                                        })}
+
+                                        {isGraded && correctOption && (
+                                            <p className="mt-2 text-xs font-semibold text-[#12B886]">
+                                                Đáp án đúng: {correctOption.option_text}
+                                            </p>
+                                        )}
+                                    </div>
+                                );
+                            })()}
 
                             {isGraded && q.teacher_feedback && (
                                 <div className="text-sm text-[#565A70] bg-[#F7F8FB] border border-[#ECEAF0] rounded-lg p-3.5">
@@ -527,7 +618,7 @@ export function QuizSection({
                             )}
                         </div>
 
-                        {q.body_content && (
+                        {q.body_content && q.question_type !== QuestionType.FILL_IN_BLANK && (
                             <div className="text-sm text-[#565A70]" dangerouslySetInnerHTML={{ __html: q.body_content }} />
                         )}
 
@@ -567,6 +658,32 @@ export function QuizSection({
                                 onBlur={(e) => handleEssayBlur(q.detail_id, e.target.value)}
                             />
                         )}
+
+                        {q.question_type === QuestionType.FILL_IN_BLANK && (() => {
+                            const parts = splitByBlank(getFillInBlankSourceText(q.question_title, q.body_content));
+                            const blankCount = parts.length - 1;
+                            const currentValues = (answers[q.detail_id]?.essayText ?? '').split(BLANK_ANSWER_DELIMITER);
+
+                            return (
+                                <div className="text-sm text-[#2B2D3D] leading-loose">
+                                    {parts.map((part, i) => (
+                                        <span key={i}>
+                                            {part}
+                                            {i < blankCount && (
+                                                <input
+                                                    type="text"
+                                                    value={currentValues[i] ?? ''}
+                                                    onChange={(e) => handleBlankChange(q.detail_id, i, e.target.value)}
+                                                    onBlur={() => handleBlankBlur(q.detail_id)}
+                                                    placeholder=""
+                                                    className="inline-block w-40 mx-1 px-2 py-1 text-sm bg-white border border-b-2 border-[#ECEAF0] border-b-[#5B5FEF] rounded-md focus:outline-none focus:border-[#5B5FEF]"
+                                                />
+                                            )}
+                                        </span>
+                                    ))}
+                                </div>
+                            );
+                        })()}
                     </div>
                 ))}
             </div>

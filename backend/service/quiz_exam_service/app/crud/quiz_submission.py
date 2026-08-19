@@ -24,6 +24,22 @@ from app.schemas.quiz_submission import (
 from app.core.security import settings
 
 
+def _normalize_fill_in_blank_answer(text: Optional[str]) -> str:
+    """Chuẩn hóa đáp án điền khuyết trước khi so sánh: bỏ khoảng trắng thừa đầu/cuối,
+    thu gọn nhiều khoảng trắng liên tiếp, không phân biệt hoa/thường."""
+    if not text:
+        return ""
+    return " ".join(text.strip().lower().split())
+
+
+def _is_fill_in_blank_correct(student_answer: Optional[str], correct_option: Optional[QuestionOption]) -> bool:
+    if not correct_option:
+        return False
+    student_norm = _normalize_fill_in_blank_answer(student_answer)
+    correct_norm = _normalize_fill_in_blank_answer(correct_option.option_text)
+    return bool(student_norm) and student_norm == correct_norm
+
+
 class CRUDQuizSubmission(CRUDBase[QuizSubmission, QuizSubmissionCreate, QuizSubmissionUpdate, UUID]):
 
     # Ghi đè hàm create để tự tính attempt_number
@@ -86,6 +102,20 @@ class CRUDQuizSubmission(CRUDBase[QuizSubmission, QuizSubmissionCreate, QuizSubm
                 correct_option = next((opt for opt in q.options if opt.is_correct), None)
                 
                 if correct_option and detail.selected_option_id == correct_option.option_id:
+                    detail.score_earned = max_p
+                    total_earned_score += max_p
+                else:
+                    detail.score_earned = 0.0
+
+                db.add(detail)
+
+            elif q.question_type == QuestionType.FILL_IN_BLANK:
+                # Câu điền khuyết: đáp án của thí sinh được lưu trong essay_answer_text,
+                # so sánh (không phân biệt hoa/thường, bỏ khoảng trắng thừa) với option_text
+                # của lựa chọn có is_correct = True.
+                correct_option = next((opt for opt in q.options if opt.is_correct), None)
+
+                if _is_fill_in_blank_correct(detail.essay_answer_text, correct_option):
                     detail.score_earned = max_p
                     total_earned_score += max_p
                 else:
@@ -224,6 +254,16 @@ class CRUDQuizSubmission(CRUDBase[QuizSubmission, QuizSubmissionCreate, QuizSubm
             correct_option = next((opt for opt in question.options if opt.is_correct), None)
             
             if correct_option and detail.selected_option_id == correct_option.option_id:
+                is_correct = True
+                detail.score_earned = question.max_points or 0.0
+            else:
+                is_correct = False
+                detail.score_earned = 0.0
+
+        elif question.question_type == QuestionType.FILL_IN_BLANK:
+            correct_option = next((opt for opt in question.options if opt.is_correct), None)
+
+            if _is_fill_in_blank_correct(detail.essay_answer_text, correct_option):
                 is_correct = True
                 detail.score_earned = question.max_points or 0.0
             else:
@@ -422,6 +462,10 @@ class CRUDQuizSubmission(CRUDBase[QuizSubmission, QuizSubmissionCreate, QuizSubm
                 getattr(question, "body_content", None) or 
                 "Câu hỏi"
             )
+            # 🆕 body_content lưu nội dung câu có chỗ trống (đối với FILL_IN_BLANK) hoặc
+            # phần mô tả/đề bài chi tiết cho các loại câu hỏi khác — cần trả riêng vì
+            # q_text ở trên ưu tiên lấy question_title (thường chỉ là nhãn chung).
+            q_body_content = getattr(question, "body_content", None)
 
             options = db.exec(
                 select(QuestionOption).where(QuestionOption.question_id == question.question_id)
@@ -440,6 +484,7 @@ class CRUDQuizSubmission(CRUDBase[QuizSubmission, QuizSubmissionCreate, QuizSubm
                 "detail_id": dt.detail_id,
                 "question_id": question.question_id,
                 "question_text": q_text,
+                "body_content": q_body_content,  # 🆕
                 "question_type": getattr(question, "question_type", "SINGLE_CHOICE"),
                 "max_score": float(q_max_score),
                 "score_earned": dt.score_earned,

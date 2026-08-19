@@ -19,7 +19,28 @@ import {
     getSubmissionDetailAction,
     updateSubmissionGradingAction,
 } from "@/actions/getQuizSubmission";
-import { QuizSubmissionDetail, QuestionGradingPayload } from "@/types/quiz-submission";
+import { QuizSubmissionDetail, QuestionGradingPayload, QuestionType } from "@/types/quiz-submission";
+
+// ---- Hỗ trợ hiển thị câu hỏi điền khuyết (FILL_IN_BLANK) ----
+// Chỗ trống trong đề bài được đánh dấu bằng một dãy gạch dưới liên tiếp (vd: "_____").
+const BLANK_MARKER_REGEX = /_{3,}/g;
+// Dùng để tách nhiều đáp án (nếu câu có nhiều hơn 1 chỗ trống) đã được nối khi lưu essay_answer_text.
+const BLANK_ANSWER_DELIMITER = "|||";
+
+/** Tách nội dung câu hỏi thành các đoạn text xen kẽ chỗ trống. Số chỗ trống = số đoạn - 1. */
+function splitByBlank(text: string): string[] {
+    return (text || "").split(BLANK_MARKER_REGEX);
+}
+
+/** Câu điền khuyết thường lưu nội dung có chỗ trống ở body_content (question_text chỉ là nhãn chung). */
+function getFillInBlankSourceText(questionText: string, bodyContent?: string | null): string {
+    const trimmedBody = (bodyContent || "").trim();
+    return trimmedBody ? trimmedBody : questionText;
+}
+
+function normalizeBlankAnswer(text?: string | null): string {
+    return (text || "").trim().toLowerCase().replace(/\s+/g, " ");
+}
 
 export default function SubmissionDetailPage({
     params,
@@ -238,7 +259,7 @@ export default function SubmissionDetailPage({
                                     </div>
 
                                     {/* Trắc nghiệm */}
-                                    {ans.options && ans.options.length > 0 && (
+                                    {ans.question_type !== QuestionType.FILL_IN_BLANK && ans.options && ans.options.length > 0 && (
                                         <div className="space-y-2 mt-4 pl-2">
                                             {ans.options.map((opt) => {
                                                 const selected = ans.selected_option_id === opt.option_id;
@@ -273,8 +294,56 @@ export default function SubmissionDetailPage({
                                         </div>
                                     )}
 
+                                    {/* Điền khuyết */}
+                                    {ans.question_type === QuestionType.FILL_IN_BLANK && (() => {
+                                        const parts = splitByBlank(getFillInBlankSourceText(ans.question_text, ans.body_content));
+                                        const blankCount = parts.length - 1;
+                                        const studentValues = (ans.essay_answer_text ?? "").split(BLANK_ANSWER_DELIMITER);
+                                        const correctOption = ans.options.find((o) => o.is_correct);
+                                        const correctValues = correctOption
+                                            ? correctOption.option_text.split(BLANK_ANSWER_DELIMITER)
+                                            : [];
+
+                                        return (
+                                            <div className="mt-4 pl-2">
+                                                <div className="text-sm text-slate-700 leading-loose">
+                                                    {parts.map((part, i) => {
+                                                        const studentValue = studentValues[i] ?? "";
+                                                        const isBlankCorrect =
+                                                            normalizeBlankAnswer(studentValue) === normalizeBlankAnswer(correctValues[i]);
+
+                                                        let blankStyle = "border-slate-200 bg-slate-50/50 text-slate-700";
+                                                        if (studentValue) {
+                                                            blankStyle = isBlankCorrect
+                                                                ? "border-emerald-300 bg-emerald-50 text-emerald-800 font-medium"
+                                                                : "border-red-300 bg-red-50 text-red-800 font-medium";
+                                                        }
+
+                                                        return (
+                                                            <span key={i}>
+                                                                {part}
+                                                                {i < blankCount && (
+                                                                    <span
+                                                                        className={`inline-block mx-1 px-2.5 py-1 rounded-lg border text-xs ${blankStyle}`}
+                                                                    >
+                                                                        {studentValue || "Chưa trả lời"}
+                                                                    </span>
+                                                                )}
+                                                            </span>
+                                                        );
+                                                    })}
+                                                </div>
+                                                {correctOption && (
+                                                    <p className="mt-2 flex items-center gap-1 text-[11px] font-bold text-emerald-600">
+                                                        <CheckCircle2 size={13} /> Đáp án đúng: {correctOption.option_text}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        );
+                                    })()}
+
                                     {/* Tự luận văn bản */}
-                                    {ans.essay_answer_text && (
+                                    {ans.essay_answer_text && ans.question_type !== QuestionType.FILL_IN_BLANK && (
                                         <div className="mt-3 p-3 bg-slate-50 border border-slate-200 rounded-xl">
                                             <span className="text-[11px] font-bold text-slate-400 block mb-1">Bài làm tự luận:</span>
                                             <div

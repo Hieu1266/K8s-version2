@@ -61,6 +61,7 @@ class SubmissionAnswerDetail(BaseModel):
     detail_id: UUID
     question_id: UUID
     question_text: str
+    body_content: Optional[str] = None  # 🆕 Nội dung câu có chỗ trống (dùng cho FILL_IN_BLANK)
     question_type: QuestionType
     max_score: float
     score_earned: Optional[float] = None

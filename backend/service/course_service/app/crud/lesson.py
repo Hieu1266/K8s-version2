@@ -258,23 +258,16 @@ class CRUDLesson(CRUDBase[Lesson, LessonCreate, LessonUpdate, UUID]):
         statement = select(Lesson.lesson_id).where(Lesson.module_id.in_(module_ids))
         return db.exec(statement).all()
     
-    def get_content_body(self, db: Session, lesson_id: UUID) -> Optional[Dict[str, Any]]:
-        # Thêm .join(Module) để truy vấn được subject_id
+    def get_content_body(self, db: Session, lesson_id: UUID) -> str:
         statement = (
-            select(Lesson.content_body, Module.subject_id)
-            .join(Module)
+            select(Lesson.content_body)
             .where(Lesson.lesson_id == lesson_id)
         )
         
         result = db.exec(statement).first()
         if not result:
             return None
-
-        # result trả về tuple: (content_body, subject_id)
-        return {
-            "content_body": result[0],
-            "subject_id": result[1]
-        }
+        return result
 
     def get_multi_by_subject(self, db: Session, subject_id: UUID):
         statement = select(Lesson.lesson_id, Lesson.title).join(
@@ -285,4 +278,11 @@ class CRUDLesson(CRUDBase[Lesson, LessonCreate, LessonUpdate, UUID]):
         
         # Chuyển đổi danh sách Row (tuple) thành danh sách Dictionary
         return [{"lesson_id": lesson_id, "title": title} for lesson_id, title in results]
+
+    def get_subject_id_lesson(self, db: Session, lesson_id: UUID) -> UUID:
+        statement = select(Module.subject_id).join(
+            Lesson, Module.module_id == Lesson.module_id
+        ).where(Lesson.lesson_id == lesson_id)
+
+        return db.exec(statement).first()
 crud_lesson = CRUDLesson(Lesson)

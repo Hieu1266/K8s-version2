@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
+import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import SubjectHeader from "@/components/question-bank/SubjectHeader";
 import SubjectInfoComponent from "@/components/SubjectInfo";
@@ -15,6 +16,8 @@ import {
   SearchX,
   Loader2,
   X,
+  HelpCircle,
+  FileText,
 } from "lucide-react";
 
 import {
@@ -219,6 +222,28 @@ export default function QuestionBankDetailPage() {
         {/* Header Thông tin Môn học */}
         <SubjectHeader subject={subject} />
 
+        {/* 🟢 THANH ĐIỀU HƯỚNG TABS (Chuyển giữa Ngân hàng câu hỏi và Quản lý bài thi) */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 px-6 pt-4 shadow-sm">
+          <div className="flex items-center gap-6 border-b border-slate-200 pb-px overflow-x-auto">
+            <button
+              className="pb-3 text-sm font-semibold transition border-b-2 border-emerald-600 text-emerald-600 flex items-center gap-2 whitespace-nowrap"
+            >
+              <HelpCircle size={18} />
+              Ngân hàng câu hỏi ({questions.length})
+            </button>
+
+            <span className="h-4 w-px bg-slate-200 -mt-3 hidden sm:inline-block" />
+
+            <Link
+              href={`/instructor-management/exam-manage/${subjectId}`}
+              className="pb-3 text-sm font-medium transition border-b-2 border-transparent text-slate-500 hover:text-slate-900 flex items-center gap-2 whitespace-nowrap"
+            >
+              <FileText size={18} />
+              Quản lý Bài thi & Kho câu hỏi
+            </Link>
+          </div>
+        </div>
+
         {/* Thống kê môn học */}
         {subject && (
           <SubjectInfoComponent
@@ -390,7 +415,7 @@ export default function QuestionBankDetailPage() {
                 type="button"
                 onClick={handleGenerateQuestions}
                 disabled={isGenerating || lessons.length === 0}
-                className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold bg-purple-600 hover:bg-purple-700 text-white rounded-xl transition disabled:opacity-50"
+                className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl transition disabled:opacity-50"
               >
                 {isGenerating && <Loader2 size={14} className="animate-spin" />}
                 Tạo danh sách

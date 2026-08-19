@@ -9,7 +9,18 @@ import CreateQuizDrawer from "@/components/exam-management/CreateQuizDrawer";
 import EditQuizModal from "@/components/exam-management/EditQuizModal";
 import { Quiz, QuizCreatePayload, QuizUpdatePayload } from "@/types/exam-management";
 import { getQuizzesAction, createQuizAction, deleteQuizAction, updateQuizAction } from "@/actions/getQuizzes";
-import { HelpCircle, FileText, Users, Link2 } from "lucide-react";
+import {
+  HelpCircle,
+  FileText,
+  Users,
+  Link2,
+  ArrowLeft,
+  Plus,
+  Search,
+  Loader2,
+  SearchX,
+  Layers,
+} from "lucide-react";
 
 export default function SubjectDetailPage({
   params,
@@ -117,37 +128,43 @@ export default function SubjectDetailPage({
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800">
+    <div className="min-h-screen bg-slate-50/60 pb-16">
       <Navbar />
 
-      <section className="bg-white border-b border-slate-200 py-8 px-6">
-        <div className="max-w-7xl mx-auto">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-6">
+        {/* Header Thông tin Môn học & Thao tác */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm space-y-4">
           <button
             onClick={() => router.push("/instructor-management/exam-manage")}
-            className="text-sm font-medium text-slate-500 hover:text-slate-900 transition mb-4"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 transition"
           >
+            <ArrowLeft size={16} />
             Quay lại danh sách môn học
           </button>
 
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
-              <span className="text-xs font-mono bg-slate-100 px-2 py-1 rounded text-slate-500">
+              <span className="inline-block text-[11px] font-mono font-medium bg-slate-100 px-2.5 py-1 rounded-lg text-slate-600">
                 Môn học: {subjectId}
               </span>
-              <h1 className="text-2xl font-semibold mt-2 text-slate-900">
-                Quản lý Bài thi & Ngân hàng câu hỏi
+              <h1 className="text-xl sm:text-2xl font-bold mt-2 text-slate-900 tracking-tight">
+                Quản lý Bài thi & Kho câu hỏi
               </h1>
             </div>
 
             <button
               onClick={() => setIsCreateDrawerOpen(true)}
-              className="px-4 py-2 bg-blue-600 text-white font-medium text-sm rounded-lg hover:bg-blue-700 transition"
+              className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white font-semibold text-xs rounded-xl hover:bg-blue-700 shadow-sm transition"
             >
+              <Plus size={16} />
               Tạo bài thi mới
             </button>
           </div>
+        </div>
 
-          <div className="flex items-center gap-6 mt-8 border-b border-slate-200 pb-px overflow-x-auto">
+        {/* Thanh Điều Hướng Tabs (Đồng bộ với QuestionBankDetailPage) */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 px-6 pt-4 shadow-sm">
+          <div className="flex items-center gap-6 border-b border-slate-200 pb-px overflow-x-auto">
             <Link
               href={`/instructor-management/questions-bank/${subjectId}`}
               className="pb-3 text-sm font-medium transition border-b-2 border-transparent text-slate-500 hover:text-slate-900 flex items-center gap-2 whitespace-nowrap"
@@ -160,9 +177,9 @@ export default function SubjectDetailPage({
 
             <button
               onClick={() => setActiveTab("QUIZZES")}
-              className={`pb-3 text-sm font-medium transition border-b-2 flex items-center gap-2 whitespace-nowrap ${activeTab === "QUIZZES"
+              className={`pb-3 text-sm transition border-b-2 flex items-center gap-2 whitespace-nowrap ${activeTab === "QUIZZES"
                   ? "border-blue-600 text-blue-600 font-semibold"
-                  : "border-transparent text-slate-500 hover:text-slate-800"
+                  : "border-transparent text-slate-500 hover:text-slate-800 font-medium"
                 }`}
             >
               <FileText size={18} />
@@ -171,78 +188,91 @@ export default function SubjectDetailPage({
 
             <button
               onClick={() => setActiveTab("POOLS")}
-              className={`pb-3 text-sm font-medium transition border-b-2 whitespace-nowrap ${activeTab === "POOLS"
+              className={`pb-3 text-sm transition border-b-2 flex items-center gap-2 whitespace-nowrap ${activeTab === "POOLS"
                   ? "border-blue-600 text-blue-600 font-semibold"
-                  : "border-transparent text-slate-500 hover:text-slate-800"
+                  : "border-transparent text-slate-500 hover:text-slate-800 font-medium"
                 }`}
             >
+              <Layers size={18} />
               Kho câu hỏi (Pools)
             </button>
           </div>
         </div>
-      </section>
 
-      <section className="max-w-7xl mx-auto px-6 py-8">
+        {/* Nội dung chính theo Tab */}
         {activeTab === "QUIZZES" ? (
-          <div className="space-y-6">
-            <div className="bg-white p-2 rounded-xl shadow-sm border border-slate-200 flex">
+          <div className="space-y-4">
+            {/* Thanh Tìm kiếm */}
+            <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-sm flex items-center gap-2">
+              <Search size={18} className="text-slate-400 ml-2" />
               <input
                 type="text"
                 placeholder="Tìm kiếm bài thi theo tên hoặc mã..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full px-4 py-2 text-sm bg-transparent outline-none"
+                className="w-full text-xs sm:text-sm bg-transparent outline-none placeholder:text-slate-400"
               />
             </div>
 
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            {/* Bảng Danh sách Bài thi */}
+            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-slate-50 text-slate-500 text-xs font-medium border-b border-slate-200">
+                <table className="w-full text-left text-xs sm:text-sm">
+                  <thead className="bg-slate-50/80 text-slate-500 text-xs font-semibold uppercase tracking-wider border-b border-slate-200/80">
                     <tr>
-                      <th className="p-4 font-medium">Tên bài kiểm tra</th>
-                      <th className="p-4 font-medium">Cấu hình</th>
-                      <th className="p-4 font-medium">Thời lượng</th>
-                      <th className="p-4 font-medium">Trạng thái</th>
-                      <th className="p-4 font-medium text-right">Thao tác</th>
+                      <th className="p-4">Tên bài kiểm tra</th>
+                      <th className="p-4">Cấu hình</th>
+                      <th className="p-4">Thời lượng</th>
+                      <th className="p-4">Trạng thái</th>
+                      <th className="p-4 text-right">Thao tác</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {isLoadingQuizzes ? (
                       <tr>
-                        <td colSpan={5} className="p-8 text-center text-slate-500">Đang tải dữ liệu...</td>
+                        <td colSpan={5} className="p-12 text-center text-slate-500">
+                          <div className="flex flex-col items-center justify-center gap-2">
+                            <Loader2 size={28} className="animate-spin text-blue-600" />
+                            <span className="text-xs font-medium">Đang tải danh sách bài thi...</span>
+                          </div>
+                        </td>
                       </tr>
                     ) : filteredQuizzes.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="p-8 text-center text-slate-500">Không tìm thấy bài thi nào.</td>
+                        <td colSpan={5} className="p-12 text-center text-slate-500">
+                          <div className="flex flex-col items-center justify-center gap-2">
+                            <SearchX size={32} className="text-slate-400" />
+                            <span className="text-xs font-medium text-slate-600">
+                              {searchTerm ? "Không tìm thấy bài thi nào phù hợp." : "Chưa có bài thi nào trong môn học này."}
+                            </span>
+                          </div>
+                        </td>
                       </tr>
                     ) : (
                       filteredQuizzes.map((qz) => (
-                        <tr key={qz.quiz_id} className="hover:bg-slate-50/50 transition">
+                        <tr key={qz.quiz_id} className="hover:bg-slate-50/60 transition duration-150">
                           <td className="p-4">
-                            <p className="font-medium text-slate-900">{qz.title}</p>
-
-                            {/* 🟢 HIỂN THỊ CÁC BADGE ĐÁNH DẤU */}
+                            <p className="font-semibold text-slate-900 text-sm">{qz.title}</p>
                             <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                               <span className="text-[11px] text-slate-500 font-mono">Mã: {qz.quiz_id}</span>
 
                               {qz.is_peer_review && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-purple-50 text-purple-700 border border-purple-200">
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-purple-50 text-purple-700 border border-purple-200">
                                   <Users size={12} />
                                   Chấm chéo
                                 </span>
                               )}
 
                               {qz.target_lesson_id && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200" title={`Mã bài học: ${qz.target_lesson_id}`}>
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200" title={`Mã bài học: ${qz.target_lesson_id}`}>
                                   <Link2 size={12} />
                                   Đã gắn bài học
                                 </span>
                               )}
                             </div>
                           </td>
-                          <td className="p-4">
-                            <span className="text-slate-600">
+                          <td className="p-4 text-slate-600">
+                            <span className="font-medium">
                               {qz.quiz_type === "FIXED_QUESTION" ? "Đề cố định" : "Đề ngẫu nhiên"}
                             </span>
                           </td>
@@ -250,29 +280,29 @@ export default function SubjectDetailPage({
                             {qz.duration_minutes} phút
                           </td>
                           <td className="p-4">
-                            <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${qz.is_active ? "bg-green-50 text-green-700" : "bg-slate-100 text-slate-600"}`}>
+                            <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${qz.is_active ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-slate-100 text-slate-600 border border-slate-200"}`}>
                               {qz.is_active ? "Hoạt động" : "Đã ẩn"}
                             </span>
                           </td>
                           <td className="p-4 text-right">
-                            <div className="flex items-center justify-end gap-3 text-sm">
+                            <div className="flex items-center justify-end gap-1.5 text-xs font-semibold">
                               <Link
                                 href={`/instructor-management/exam-manage/${subjectId}/quiz/${qz.quiz_id}`}
-                                className="text-blue-600 hover:text-blue-800 font-medium"
+                                className="px-2.5 py-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition"
                               >
                                 Cấu hình
                               </Link>
                               <span className="text-slate-300">|</span>
                               <button
                                 onClick={() => setEditingQuiz(qz)}
-                                className="text-slate-600 hover:text-slate-900 font-medium"
+                                className="px-2.5 py-1.5 text-slate-600 hover:bg-slate-100 hover:text-slate-900 rounded-lg transition"
                               >
                                 Sửa
                               </button>
                               <span className="text-slate-300">|</span>
                               <button
                                 onClick={() => handleDeleteQuiz(qz.quiz_id, qz.title)}
-                                className="text-red-600 hover:text-red-800 font-medium"
+                                className="px-2.5 py-1.5 text-red-600 hover:bg-red-50 rounded-lg transition"
                               >
                                 Xóa
                               </button>
@@ -287,10 +317,13 @@ export default function SubjectDetailPage({
             </div>
           </div>
         ) : (
-          <QuestionPoolManager subjectId={subjectId} />
+          <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm">
+            <QuestionPoolManager subjectId={subjectId} />
+          </div>
         )}
-      </section>
+      </main>
 
+      {/* Drawers & Modals */}
       <CreateQuizDrawer
         subjectId={subjectId}
         isOpen={isCreateDrawerOpen}
