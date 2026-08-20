@@ -404,10 +404,6 @@ export default function SubjectPage() {
           <div className="bg-white p-6 sm:p-8 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
               <div className="flex items-center gap-3">
-                <span className="text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-blue-50 text-blue-600 border border-blue-100">
-                  Mã môn: {subjectId}
-                </span>
-
                 {/* Badge Trạng thái Môn học hiện tại */}
                 {loadingSubject ? (
                   <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-500 border border-slate-200 animate-pulse">

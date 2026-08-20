@@ -7,8 +7,17 @@ import Navbar from "@/components/Navbar";
 import QuestionPoolManager from "@/components/exam-management/QuestionPoolManager";
 import CreateQuizDrawer from "@/components/exam-management/CreateQuizDrawer";
 import EditQuizModal from "@/components/exam-management/EditQuizModal";
-import { Quiz, QuizCreatePayload, QuizUpdatePayload } from "@/types/exam-management";
-import { getQuizzesAction, createQuizAction, deleteQuizAction, updateQuizAction } from "@/actions/getQuizzes";
+import {
+  Quiz,
+  QuizCreatePayload,
+  QuizUpdatePayload,
+} from "@/types/exam-management";
+import {
+  getQuizzesAction,
+  createQuizAction,
+  deleteQuizAction,
+  updateQuizAction,
+} from "@/actions/getQuizzes";
 import {
   HelpCircle,
   FileText,
@@ -40,17 +49,20 @@ export default function SubjectDetailPage({
   const [isLoadingQuizzes, setIsLoadingQuizzes] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
 
-  const fetchQuizzes = useCallback(async (searchQuery: string = "") => {
-    setIsLoadingQuizzes(true);
-    try {
-      const data = await getQuizzesAction(subjectId, searchQuery);
-      setQuizzes(data);
-    } catch (error) {
-      console.error("Lỗi khi tải danh sách bài thi:", error);
-    } finally {
-      setIsLoadingQuizzes(false);
-    }
-  }, [subjectId]);
+  const fetchQuizzes = useCallback(
+    async (searchQuery: string = "") => {
+      setIsLoadingQuizzes(true);
+      try {
+        const data = await getQuizzesAction(subjectId, searchQuery);
+        setQuizzes(data);
+      } catch (error) {
+        console.error("Lỗi khi tải danh sách bài thi:", error);
+      } finally {
+        setIsLoadingQuizzes(false);
+      }
+    },
+    [subjectId],
+  );
 
   useEffect(() => {
     fetchQuizzes();
@@ -58,7 +70,10 @@ export default function SubjectDetailPage({
 
   const handleDeleteQuiz = async (quizId: string, title: string) => {
     if (confirm(`Bạn có chắc chắn muốn xóa bài thi "${title}" không?`)) {
-      const result = await deleteQuizAction(quizId, `/instructor-management/exam-manage/${subjectId}`);
+      const result = await deleteQuizAction(
+        quizId,
+        `/instructor-management/exam-manage/${subjectId}`,
+      );
       if (result.success) {
         setQuizzes((prev) => prev.filter((q) => q.quiz_id !== quizId));
       } else {
@@ -81,7 +96,10 @@ export default function SubjectDetailPage({
       is_peer_review: newQuizData.is_peer_review,
     };
 
-    const result = await createQuizAction(payload, `/instructor-management/exam-manage/${subjectId}`);
+    const result = await createQuizAction(
+      payload,
+      `/instructor-management/exam-manage/${subjectId}`,
+    );
     if (result.success) {
       alert("Tạo bài kiểm tra mới thành công!");
       setIsCreateDrawerOpen(false);
@@ -108,7 +126,7 @@ export default function SubjectDetailPage({
     const result = await updateQuizAction(
       editingQuiz.quiz_id,
       payload,
-      `/instructor-management/exam-manage/${subjectId}`
+      `/instructor-management/exam-manage/${subjectId}`,
     );
 
     if (!result.success) {
@@ -117,14 +135,20 @@ export default function SubjectDetailPage({
     }
 
     setQuizzes((prev) =>
-      prev.map((q) => (q.quiz_id === editingQuiz.quiz_id ? { ...q, ...(result.data || updatedData) } : q))
+      prev.map((q) =>
+        q.quiz_id === editingQuiz.quiz_id
+          ? { ...q, ...(result.data || updatedData) }
+          : q,
+      ),
     );
     setEditingQuiz(null);
     alert("Cập nhật bài thi thành công!");
   };
 
   const filteredQuizzes = quizzes.filter(
-    (q) => q.title.toLowerCase().includes(searchTerm.toLowerCase()) || q.quiz_id.toLowerCase().includes(searchTerm.toLowerCase())
+    (q) =>
+      q.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      q.quiz_id.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   return (
@@ -144,10 +168,7 @@ export default function SubjectDetailPage({
 
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
-              <span className="inline-block text-[11px] font-mono font-medium bg-slate-100 px-2.5 py-1 rounded-lg text-slate-600">
-                Môn học: {subjectId}
-              </span>
-              <h1 className="text-xl sm:text-2xl font-bold mt-2 text-slate-900 tracking-tight">
+              <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
                 Quản lý Bài thi & Kho câu hỏi
               </h1>
             </div>
@@ -177,10 +198,11 @@ export default function SubjectDetailPage({
 
             <button
               onClick={() => setActiveTab("QUIZZES")}
-              className={`pb-3 text-sm transition border-b-2 flex items-center gap-2 whitespace-nowrap ${activeTab === "QUIZZES"
+              className={`pb-3 text-sm transition border-b-2 flex items-center gap-2 whitespace-nowrap ${
+                activeTab === "QUIZZES"
                   ? "border-blue-600 text-blue-600 font-semibold"
                   : "border-transparent text-slate-500 hover:text-slate-800 font-medium"
-                }`}
+              }`}
             >
               <FileText size={18} />
               Danh sách Bài thi ({quizzes.length})
@@ -188,10 +210,11 @@ export default function SubjectDetailPage({
 
             <button
               onClick={() => setActiveTab("POOLS")}
-              className={`pb-3 text-sm transition border-b-2 flex items-center gap-2 whitespace-nowrap ${activeTab === "POOLS"
+              className={`pb-3 text-sm transition border-b-2 flex items-center gap-2 whitespace-nowrap ${
+                activeTab === "POOLS"
                   ? "border-blue-600 text-blue-600 font-semibold"
                   : "border-transparent text-slate-500 hover:text-slate-800 font-medium"
-                }`}
+              }`}
             >
               <Layers size={18} />
               Kho câu hỏi (Pools)
@@ -230,32 +253,48 @@ export default function SubjectDetailPage({
                   <tbody className="divide-y divide-slate-100">
                     {isLoadingQuizzes ? (
                       <tr>
-                        <td colSpan={5} className="p-12 text-center text-slate-500">
+                        <td
+                          colSpan={5}
+                          className="p-12 text-center text-slate-500"
+                        >
                           <div className="flex flex-col items-center justify-center gap-2">
-                            <Loader2 size={28} className="animate-spin text-blue-600" />
-                            <span className="text-xs font-medium">Đang tải danh sách bài thi...</span>
+                            <Loader2
+                              size={28}
+                              className="animate-spin text-blue-600"
+                            />
+                            <span className="text-xs font-medium">
+                              Đang tải danh sách bài thi...
+                            </span>
                           </div>
                         </td>
                       </tr>
                     ) : filteredQuizzes.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="p-12 text-center text-slate-500">
+                        <td
+                          colSpan={5}
+                          className="p-12 text-center text-slate-500"
+                        >
                           <div className="flex flex-col items-center justify-center gap-2">
                             <SearchX size={32} className="text-slate-400" />
                             <span className="text-xs font-medium text-slate-600">
-                              {searchTerm ? "Không tìm thấy bài thi nào phù hợp." : "Chưa có bài thi nào trong môn học này."}
+                              {searchTerm
+                                ? "Không tìm thấy bài thi nào phù hợp."
+                                : "Chưa có bài thi nào trong môn học này."}
                             </span>
                           </div>
                         </td>
                       </tr>
                     ) : (
                       filteredQuizzes.map((qz) => (
-                        <tr key={qz.quiz_id} className="hover:bg-slate-50/60 transition duration-150">
+                        <tr
+                          key={qz.quiz_id}
+                          className="hover:bg-slate-50/60 transition duration-150"
+                        >
                           <td className="p-4">
-                            <p className="font-semibold text-slate-900 text-sm">{qz.title}</p>
+                            <p className="font-semibold text-slate-900 text-sm">
+                              {qz.title}
+                            </p>
                             <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                              <span className="text-[11px] text-slate-500 font-mono">Mã: {qz.quiz_id}</span>
-
                               {qz.is_peer_review && (
                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-purple-50 text-purple-700 border border-purple-200">
                                   <Users size={12} />
@@ -264,7 +303,7 @@ export default function SubjectDetailPage({
                               )}
 
                               {qz.target_lesson_id && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200" title={`Mã bài học: ${qz.target_lesson_id}`}>
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
                                   <Link2 size={12} />
                                   Đã gắn bài học
                                 </span>
@@ -273,14 +312,18 @@ export default function SubjectDetailPage({
                           </td>
                           <td className="p-4 text-slate-600">
                             <span className="font-medium">
-                              {qz.quiz_type === "FIXED_QUESTION" ? "Đề cố định" : "Đề ngẫu nhiên"}
+                              {qz.quiz_type === "FIXED_QUESTION"
+                                ? "Đề cố định"
+                                : "Đề ngẫu nhiên"}
                             </span>
                           </td>
                           <td className="p-4 text-slate-600">
                             {qz.duration_minutes} phút
                           </td>
                           <td className="p-4">
-                            <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${qz.is_active ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-slate-100 text-slate-600 border border-slate-200"}`}>
+                            <span
+                              className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${qz.is_active ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-slate-100 text-slate-600 border border-slate-200"}`}
+                            >
                               {qz.is_active ? "Hoạt động" : "Đã ẩn"}
                             </span>
                           </td>
@@ -301,7 +344,9 @@ export default function SubjectDetailPage({
                               </button>
                               <span className="text-slate-300">|</span>
                               <button
-                                onClick={() => handleDeleteQuiz(qz.quiz_id, qz.title)}
+                                onClick={() =>
+                                  handleDeleteQuiz(qz.quiz_id, qz.title)
+                                }
                                 className="px-2.5 py-1.5 text-red-600 hover:bg-red-50 rounded-lg transition"
                               >
                                 Xóa

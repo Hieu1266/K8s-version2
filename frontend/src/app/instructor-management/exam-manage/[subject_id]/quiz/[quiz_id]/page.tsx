@@ -3,11 +3,7 @@
 import { use, useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
-import {
-  QuizDetail,
-  Question,
-  QuestionPool,
-} from "@/types/exam-management";
+import { QuizDetail, Question, QuestionPool } from "@/types/exam-management";
 import { getQuestionsBySubjectAction } from "@/actions/getQuestions";
 import { getPoolsBySubjectAction } from "@/actions/getQuestionPools";
 import {
@@ -39,14 +35,20 @@ export default function QuizConfigPage({
   // Dùng cho FIXED_QUESTION
   const [bankQuestions, setBankQuestions] = useState<Question[]>([]);
   const [selectedToAdd, setSelectedToAdd] = useState<string[]>([]);
-  const [videoTriggerSeconds, setVideoTriggerSeconds] = useState<number | "">("");
-  const [triggerDrafts, setTriggerDrafts] = useState<Record<string, number | "">>({});
+  const [videoTriggerSeconds, setVideoTriggerSeconds] = useState<number | "">(
+    "",
+  );
+  const [triggerDrafts, setTriggerDrafts] = useState<
+    Record<string, number | "">
+  >({});
 
   // Dùng cho RANDOM_QUESTION
   const [subjectPools, setSubjectPools] = useState<QuestionPool[]>([]);
   const [addPoolId, setAddPoolId] = useState("");
   const [addPoolQuantity, setAddPoolQuantity] = useState(1);
-  const [ruleQuantityDrafts, setRuleQuantityDrafts] = useState<Record<string, number>>({});
+  const [ruleQuantityDrafts, setRuleQuantityDrafts] = useState<
+    Record<string, number>
+  >({});
 
   const [busy, setBusy] = useState(false);
 
@@ -95,19 +97,32 @@ export default function QuizConfigPage({
   }, [quiz?.fixed_questions]);
 
   // ============ FIXED_QUESTION handlers (Optimistic UI) ============
-  const assignedQuestionIds = new Set((quiz?.fixed_questions || []).map((q) => q.question_id));
-  const availableQuestions = bankQuestions.filter((q) => !assignedQuestionIds.has(q.question_id));
+  const assignedQuestionIds = new Set(
+    (quiz?.fixed_questions || []).map((q) => q.question_id),
+  );
+  const availableQuestions = bankQuestions.filter(
+    (q) => !assignedQuestionIds.has(q.question_id),
+  );
 
   const handleToggleAdd = (qId: string) => {
-    setSelectedToAdd((prev) => (prev.includes(qId) ? prev.filter((id) => id !== qId) : [...prev, qId]));
+    setSelectedToAdd((prev) =>
+      prev.includes(qId) ? prev.filter((id) => id !== qId) : [...prev, qId],
+    );
   };
 
   const handleAddSelectedQuestions = async () => {
     if (selectedToAdd.length === 0 || !quiz) return;
     setBusy(true);
 
-    const triggerValue = quiz.placement_type === "IN_VIDEO" && videoTriggerSeconds !== "" ? Number(videoTriggerSeconds) : null;
-    const result = await addFixedQuestionsAction(quizId, selectedToAdd, triggerValue);
+    const triggerValue =
+      quiz.placement_type === "IN_VIDEO" && videoTriggerSeconds !== ""
+        ? Number(videoTriggerSeconds)
+        : null;
+    const result = await addFixedQuestionsAction(
+      quizId,
+      selectedToAdd,
+      triggerValue,
+    );
     setBusy(false);
 
     if (!result.success) {
@@ -116,7 +131,9 @@ export default function QuizConfigPage({
     }
 
     // Tối ưu UI: Cập nhật state local ngay mà không gọi fetchData()
-    const addedQuestions = bankQuestions.filter((q) => selectedToAdd.includes(q.question_id));
+    const addedQuestions = bankQuestions.filter((q) =>
+      selectedToAdd.includes(q.question_id),
+    );
     const newFixedQuestions = [
       ...quiz.fixed_questions,
       ...addedQuestions.map((q, idx) => ({
@@ -139,7 +156,9 @@ export default function QuizConfigPage({
     const previousQuestions = quiz.fixed_questions;
     setQuiz({
       ...quiz,
-      fixed_questions: quiz.fixed_questions.filter((q) => q.question_id !== questionId),
+      fixed_questions: quiz.fixed_questions.filter(
+        (q) => q.question_id !== questionId,
+      ),
     });
 
     setBusy(true);
@@ -164,12 +183,17 @@ export default function QuizConfigPage({
   const handleDrop = async (targetIndex: number) => {
     if (draggedIndex === null || draggedIndex === targetIndex || !quiz) return;
 
-    const list = [...quiz.fixed_questions].sort((a, b) => a.order_index - b.order_index);
+    const list = [...quiz.fixed_questions].sort(
+      (a, b) => a.order_index - b.order_index,
+    );
     const [draggedItem] = list.splice(draggedIndex, 1);
     list.splice(targetIndex, 0, draggedItem);
 
     // Cập nhật lại order_index mới
-    const reorderedList = list.map((q, idx) => ({ ...q, order_index: idx + 1 }));
+    const reorderedList = list.map((q, idx) => ({
+      ...q,
+      order_index: idx + 1,
+    }));
 
     // Optimistic Update local state
     setQuiz({ ...quiz, fixed_questions: reorderedList });
@@ -192,7 +216,11 @@ export default function QuizConfigPage({
       return;
     }
     setBusy(true);
-    const result = await updateFixedQuestionTriggerAction(quizId, questionId, Number(value));
+    const result = await updateFixedQuestionTriggerAction(
+      quizId,
+      questionId,
+      Number(value),
+    );
     setBusy(false);
 
     if (!result.success) {
@@ -205,21 +233,29 @@ export default function QuizConfigPage({
       setQuiz({
         ...quiz,
         fixed_questions: quiz.fixed_questions.map((q) =>
-          q.question_id === questionId ? { ...q, video_trigger_seconds: Number(value) } : q
+          q.question_id === questionId
+            ? { ...q, video_trigger_seconds: Number(value) }
+            : q,
         ),
       });
     }
   };
 
   // ============ RANDOM_QUESTION handlers ============
-  const assignedPoolIds = new Set((quiz?.pool_rules || []).map((r) => r.pool_id));
-  const availablePools = subjectPools.filter((p) => !assignedPoolIds.has(p.pool_id));
+  const assignedPoolIds = new Set(
+    (quiz?.pool_rules || []).map((r) => r.pool_id),
+  );
+  const availablePools = subjectPools.filter(
+    (p) => !assignedPoolIds.has(p.pool_id),
+  );
 
   const handleAddPoolRule = async () => {
     if (!addPoolId) return;
     const pool = subjectPools.find((p) => p.pool_id === addPoolId);
     if (pool && addPoolQuantity > pool.total_questions) {
-      alert(`Pool "${pool.title}" chỉ có ${pool.total_questions} câu hỏi, không đủ để bốc ${addPoolQuantity} câu.`);
+      alert(
+        `Pool "${pool.title}" chỉ có ${pool.total_questions} câu hỏi, không đủ để bốc ${addPoolQuantity} câu.`,
+      );
       return;
     }
     setBusy(true);
@@ -235,11 +271,16 @@ export default function QuizConfigPage({
     await fetchData();
   };
 
-  const handleUpdateRuleQuantity = async (ruleId: string, poolTotal: number) => {
+  const handleUpdateRuleQuantity = async (
+    ruleId: string,
+    poolTotal: number,
+  ) => {
     const newQuantity = ruleQuantityDrafts[ruleId];
     if (!newQuantity || newQuantity < 1) return;
     if (newQuantity > poolTotal) {
-      alert(`Pool này chỉ có ${poolTotal} câu hỏi, không đủ để bốc ${newQuantity} câu.`);
+      alert(
+        `Pool này chỉ có ${poolTotal} câu hỏi, không đủ để bốc ${newQuantity} câu.`,
+      );
       return;
     }
     setBusy(true);
@@ -254,7 +295,9 @@ export default function QuizConfigPage({
     if (quiz) {
       setQuiz({
         ...quiz,
-        pool_rules: quiz.pool_rules.map((r) => (r.rule_id === ruleId ? { ...r, quantity: newQuantity } : r)),
+        pool_rules: quiz.pool_rules.map((r) =>
+          r.rule_id === ruleId ? { ...r, quantity: newQuantity } : r,
+        ),
       });
     }
   };
@@ -263,7 +306,10 @@ export default function QuizConfigPage({
     if (!confirm("Xóa luật cấu hình pool này khỏi đề thi?") || !quiz) return;
 
     const previousRules = quiz.pool_rules;
-    setQuiz({ ...quiz, pool_rules: quiz.pool_rules.filter((r) => r.rule_id !== ruleId) });
+    setQuiz({
+      ...quiz,
+      pool_rules: quiz.pool_rules.filter((r) => r.rule_id !== ruleId),
+    });
 
     setBusy(true);
     const result = await deletePoolRuleAction(quizId, ruleId);
@@ -287,9 +333,13 @@ export default function QuizConfigPage({
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center">
         <div className="bg-white p-6 rounded-2xl border border-slate-200 text-center max-w-md">
-          <p className="text-base text-rose-600">{errorMessage || "Không tìm thấy đề thi."}</p>
+          <p className="text-base text-rose-600">
+            {errorMessage || "Không tìm thấy đề thi."}
+          </p>
           <button
-            onClick={() => router.push(`/instructor-management/exam-manage/${subjectId}`)}
+            onClick={() =>
+              router.push(`/instructor-management/exam-manage/${subjectId}`)
+            }
             className="mt-4 text-sm font-bold text-blue-600 hover:underline"
           >
             Quay lại danh sách đề thi
@@ -299,7 +349,9 @@ export default function QuizConfigPage({
     );
   }
 
-  const sortedFixedQuestions = [...quiz.fixed_questions].sort((a, b) => a.order_index - b.order_index);
+  const sortedFixedQuestions = [...quiz.fixed_questions].sort(
+    (a, b) => a.order_index - b.order_index,
+  );
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-800">
@@ -308,20 +360,24 @@ export default function QuizConfigPage({
       <section className="bg-slate-900 text-white py-6 px-6">
         <div className="max-w-7xl mx-auto">
           <button
-            onClick={() => router.push(`/instructor-management/exam-manage/${subjectId}`)}
+            onClick={() =>
+              router.push(`/instructor-management/exam-manage/${subjectId}`)
+            }
             className="text-sm text-slate-400 hover:text-white transition mb-3 font-bold"
           >
             ← Quay lại Danh sách Đề thi
           </button>
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-xs font-mono bg-blue-500/20 text-blue-300 px-2.5 py-1 rounded font-bold">
-              Quiz ID: {quizId}
-            </span>
             <span
-              className={`text-xs px-2.5 py-1 rounded font-bold ${quiz.quiz_type === "FIXED_QUESTION" ? "bg-blue-600" : "bg-purple-600"
-                }`}
+              className={`text-xs px-2.5 py-1 rounded font-bold ${
+                quiz.quiz_type === "FIXED_QUESTION"
+                  ? "bg-blue-600"
+                  : "bg-purple-600"
+              }`}
             >
-              {quiz.quiz_type === "FIXED_QUESTION" ? "Đề Cố Định" : "Đề Ngẫu Nhiên"}
+              {quiz.quiz_type === "FIXED_QUESTION"
+                ? "Đề Cố Định"
+                : "Đề Ngẫu Nhiên"}
             </span>
           </div>
           <h1 className="text-3xl font-bold">{quiz.title}</h1>
@@ -339,20 +395,26 @@ export default function QuizConfigPage({
                     Danh sách Câu hỏi trong Đề ({sortedFixedQuestions.length})
                   </h2>
                   <p className="text-xs text-slate-400 mt-0.5">
-                    💡 Giữ biểu tượng <span className="font-bold">⋮⋮</span> để kéo và thả câu hỏi để thay đổi thứ tự.
+                    💡 Giữ biểu tượng <span className="font-bold">⋮⋮</span> để
+                    kéo và thả câu hỏi để thay đổi thứ tự.
                   </p>
                 </div>
                 <p className="text-sm text-slate-500">
                   Tổng điểm:{" "}
                   <span className="font-bold text-[#0066FF]">
-                    {sortedFixedQuestions.reduce((sum, q) => sum + (q.question.max_points || 0), 0).toFixed(1)} pts
+                    {sortedFixedQuestions
+                      .reduce((sum, q) => sum + (q.question.max_points || 0), 0)
+                      .toFixed(1)}{" "}
+                    pts
                   </span>
                 </p>
               </div>
 
               <div className="divide-y divide-slate-100">
                 {sortedFixedQuestions.length === 0 ? (
-                  <p className="p-6 text-center text-base text-slate-400">Chưa có câu hỏi nào trong đề thi.</p>
+                  <p className="p-6 text-center text-base text-slate-400">
+                    Chưa có câu hỏi nào trong đề thi.
+                  </p>
                 ) : (
                   sortedFixedQuestions.map((q, idx) => (
                     <div
@@ -361,8 +423,11 @@ export default function QuizConfigPage({
                       onDragStart={() => handleDragStart(idx)}
                       onDragOver={handleDragOver}
                       onDrop={() => handleDrop(idx)}
-                      className={`p-5 flex items-start justify-between gap-4 transition cursor-default ${draggedIndex === idx ? "opacity-30 bg-blue-50 border-2 border-dashed border-blue-400" : "hover:bg-slate-50/80"
-                        }`}
+                      className={`p-5 flex items-start justify-between gap-4 transition cursor-default ${
+                        draggedIndex === idx
+                          ? "opacity-30 bg-blue-50 border-2 border-dashed border-blue-400"
+                          : "hover:bg-slate-50/80"
+                      }`}
                     >
                       <div className="flex items-start gap-3 flex-1 min-w-0">
                         {/* Tay nắm Kéo thả */}
@@ -381,18 +446,23 @@ export default function QuizConfigPage({
                           {/* 🟢 FIXED: Hiển thị định dạng HTML cho tiêu đề & nội dung câu hỏi */}
                           <div
                             className="text-base font-bold text-slate-900 prose prose-slate max-w-none"
-                            dangerouslySetInnerHTML={{ __html: q.question.question_title }}
+                            dangerouslySetInnerHTML={{
+                              __html: q.question.question_title,
+                            }}
                           />
 
                           {q.question.body_content && (
                             <div
                               className="text-sm text-slate-600 mt-1 leading-relaxed prose prose-slate max-w-none"
-                              dangerouslySetInnerHTML={{ __html: q.question.body_content }}
+                              dangerouslySetInnerHTML={{
+                                __html: q.question.body_content,
+                              }}
                             />
                           )}
 
                           <span className="text-xs text-slate-400 mt-2 block font-medium">
-                            {q.question.question_type} · {q.question.max_points} điểm
+                            {q.question.question_type} · {q.question.max_points}{" "}
+                            điểm
                           </span>
 
                           {quiz.placement_type === "IN_VIDEO" && (
@@ -407,7 +477,10 @@ export default function QuizConfigPage({
                                 onChange={(e) =>
                                   setTriggerDrafts((prev) => ({
                                     ...prev,
-                                    [q.question_id]: e.target.value === "" ? "" : Number(e.target.value),
+                                    [q.question_id]:
+                                      e.target.value === ""
+                                        ? ""
+                                        : Number(e.target.value),
                                   }))
                                 }
                                 className="w-20 px-2 py-1 border border-slate-300 rounded-lg text-xs outline-none bg-white"
@@ -441,7 +514,9 @@ export default function QuizConfigPage({
 
             {/* Chọn thêm câu hỏi từ Ngân hàng câu hỏi */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
-              <h2 className="text-lg font-bold">Thêm câu hỏi từ Ngân hàng câu hỏi</h2>
+              <h2 className="text-lg font-bold">
+                Thêm câu hỏi từ Ngân hàng câu hỏi
+              </h2>
 
               {quiz.placement_type === "IN_VIDEO" && (
                 <div className="max-w-xs">
@@ -452,7 +527,11 @@ export default function QuizConfigPage({
                     type="number"
                     min={0}
                     value={videoTriggerSeconds}
-                    onChange={(e) => setVideoTriggerSeconds(e.target.value === "" ? "" : Number(e.target.value))}
+                    onChange={(e) =>
+                      setVideoTriggerSeconds(
+                        e.target.value === "" ? "" : Number(e.target.value),
+                      )
+                    }
                     className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm outline-none"
                     placeholder="Vd: 120"
                   />
@@ -471,16 +550,26 @@ export default function QuizConfigPage({
                       <div
                         key={q.question_id}
                         onClick={() => handleToggleAdd(q.question_id)}
-                        className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition ${checked ? "bg-blue-50/60 border-[#0066FF]" : "bg-white border-slate-200 hover:bg-slate-50"
-                          }`}
+                        className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition ${
+                          checked
+                            ? "bg-blue-50/60 border-[#0066FF]"
+                            : "bg-white border-slate-200 hover:bg-slate-50"
+                        }`}
                       >
-                        <input type="checkbox" checked={checked} onChange={() => { }} className="mt-1.5 h-4 w-4" />
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => {}}
+                          className="mt-1.5 h-4 w-4"
+                        />
                         <div className="flex-1 min-w-0">
                           <div className="flex justify-between gap-3">
                             {/* 🟢 FIXED: Hiển thị định dạng HTML ở ngân hàng câu hỏi */}
                             <div
                               className="text-base font-bold text-slate-800 prose prose-slate max-w-none"
-                              dangerouslySetInnerHTML={{ __html: q.question_title }}
+                              dangerouslySetInnerHTML={{
+                                __html: q.question_title,
+                              }}
                             />
                             <span className="text-xs font-semibold px-2 py-0.5 bg-slate-100 text-slate-600 rounded shrink-0 h-fit">
                               {q.question_type}
@@ -489,7 +578,9 @@ export default function QuizConfigPage({
                           {q.body_content && (
                             <div
                               className="text-sm text-slate-600 mt-1 leading-relaxed prose prose-slate max-w-none"
-                              dangerouslySetInnerHTML={{ __html: q.body_content }}
+                              dangerouslySetInnerHTML={{
+                                __html: q.body_content,
+                              }}
                             />
                           )}
                           <span className="text-xs text-emerald-600 font-semibold mt-1 block">
@@ -503,7 +594,9 @@ export default function QuizConfigPage({
               </div>
 
               <div className="flex justify-between items-center pt-3 border-t border-slate-100">
-                <span className="text-sm font-semibold text-slate-600">Đã chọn: {selectedToAdd.length}</span>
+                <span className="text-sm font-semibold text-slate-600">
+                  Đã chọn: {selectedToAdd.length}
+                </span>
                 <button
                   onClick={handleAddSelectedQuestions}
                   disabled={busy || selectedToAdd.length === 0}
@@ -519,19 +612,29 @@ export default function QuizConfigPage({
             {/* Danh sách luật pool đã gán */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm">
               <div className="p-5 border-b border-slate-100">
-                <h2 className="text-lg font-bold">Quy tắc sinh đề Ngẫu nhiên ({quiz.pool_rules.length})</h2>
+                <h2 className="text-lg font-bold">
+                  Quy tắc sinh đề Ngẫu nhiên ({quiz.pool_rules.length})
+                </h2>
                 <p className="text-sm text-slate-500 mt-1">
-                  Tổng câu hỏi sẽ bốc: {quiz.pool_rules.reduce((sum, r) => sum + r.quantity, 0)} câu
+                  Tổng câu hỏi sẽ bốc:{" "}
+                  {quiz.pool_rules.reduce((sum, r) => sum + r.quantity, 0)} câu
                 </p>
               </div>
               <div className="divide-y divide-slate-100">
                 {quiz.pool_rules.length === 0 ? (
-                  <p className="p-6 text-center text-base text-slate-400">Chưa có pool nào được gán cho đề thi này.</p>
+                  <p className="p-6 text-center text-base text-slate-400">
+                    Chưa có pool nào được gán cho đề thi này.
+                  </p>
                 ) : (
                   quiz.pool_rules.map((rule) => (
-                    <div key={rule.rule_id} className="p-5 flex items-center justify-between gap-4">
+                    <div
+                      key={rule.rule_id}
+                      className="p-5 flex items-center justify-between gap-4"
+                    >
                       <div>
-                        <h4 className="text-base font-bold">{rule.pool_title}</h4>
+                        <h4 className="text-base font-bold">
+                          {rule.pool_title}
+                        </h4>
                         <span className="text-sm text-slate-400">
                           Pool có {rule.pool_total_questions} câu hỏi
                         </span>
@@ -541,15 +644,25 @@ export default function QuizConfigPage({
                           type="number"
                           min={1}
                           max={rule.pool_total_questions}
-                          value={ruleQuantityDrafts[rule.rule_id] ?? rule.quantity}
+                          value={
+                            ruleQuantityDrafts[rule.rule_id] ?? rule.quantity
+                          }
                           onChange={(e) =>
-                            setRuleQuantityDrafts((prev) => ({ ...prev, [rule.rule_id]: Number(e.target.value) }))
+                            setRuleQuantityDrafts((prev) => ({
+                              ...prev,
+                              [rule.rule_id]: Number(e.target.value),
+                            }))
                           }
                           className="w-24 px-2.5 py-2 border border-slate-300 rounded-lg text-base outline-none"
                         />
                         <button
                           disabled={busy}
-                          onClick={() => handleUpdateRuleQuantity(rule.rule_id, rule.pool_total_questions)}
+                          onClick={() =>
+                            handleUpdateRuleQuantity(
+                              rule.rule_id,
+                              rule.pool_total_questions,
+                            )
+                          }
                           className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-sm font-bold rounded-lg transition"
                         >
                           Lưu
@@ -570,16 +683,21 @@ export default function QuizConfigPage({
 
             {/* Gán thêm 1 pool mới */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
-              <h2 className="text-lg font-bold">Gán thêm Kho câu hỏi (Pool) vào đề thi</h2>
+              <h2 className="text-lg font-bold">
+                Gán thêm Kho câu hỏi (Pool) vào đề thi
+              </h2>
 
               {availablePools.length === 0 ? (
                 <p className="text-base text-slate-400">
-                  Không còn pool nào khác của môn học để gán thêm (hoặc chưa có pool nào — tạo ở tab "Kho câu hỏi").
+                  Không còn pool nào khác của môn học để gán thêm (hoặc chưa có
+                  pool nào — tạo ở tab "Kho câu hỏi").
                 </p>
               ) : (
                 <div className="flex flex-wrap items-end gap-3">
                   <div className="flex-1 min-w-[240px]">
-                    <label className="block text-sm font-semibold text-slate-700 mb-1">Chọn Pool</label>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1">
+                      Chọn Pool
+                    </label>
                     <select
                       value={addPoolId}
                       onChange={(e) => setAddPoolId(e.target.value)}
@@ -594,12 +712,16 @@ export default function QuizConfigPage({
                     </select>
                   </div>
                   <div className="w-36">
-                    <label className="block text-sm font-semibold text-slate-700 mb-1">Số lượng bốc</label>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1">
+                      Số lượng bốc
+                    </label>
                     <input
                       type="number"
                       min={1}
                       value={addPoolQuantity}
-                      onChange={(e) => setAddPoolQuantity(Number(e.target.value) || 1)}
+                      onChange={(e) =>
+                        setAddPoolQuantity(Number(e.target.value) || 1)
+                      }
                       className="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-base outline-none"
                     />
                   </div>

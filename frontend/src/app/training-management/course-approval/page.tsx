@@ -1,18 +1,9 @@
 "use client";
 
-import React, {
-  Suspense,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import React, { Suspense, useEffect, useMemo, useState } from "react";
 
 import Link from "next/link";
-import {
-  usePathname,
-  useRouter,
-  useSearchParams,
-} from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Navbar from "@/components/Navbar";
 
 import {
@@ -33,26 +24,18 @@ import {
   UsersRound,
 } from "lucide-react";
 
-import {
-  getCourseApprovalData,
-} from "@/actions/getSyllabusApproval";
+import { getCourseApprovalData } from "@/actions/getSyllabusApproval";
 
-import {
-  getAllTesters,
-} from "@/actions/getTester";
+import { getAllTesters } from "@/actions/getTester";
 
-import {
-  enrollTesterToCourse,
-} from "@/actions/getenrollTester";
+import { enrollTesterToCourse } from "@/actions/getenrollTester";
 
 import {
   getTestersCourseStatusBulk,
   TesterCourseStatus,
 } from "@/actions/getTesterProgress";
 
-import {
-  approveCourseAction,
-} from "@/actions/getCourse";
+import { approveCourseAction } from "@/actions/getCourse";
 
 /* ============================================================
    TYPES
@@ -121,17 +104,23 @@ function CourseApprovalContent() {
 
   const [assigningId, setAssigningId] = useState<string | null>(null);
   const [assignedMap, setAssignedMap] = useState<Record<string, boolean>>({});
-  const [assignMessage, setAssignMessage] = useState<AssignMessage | null>(null);
+  const [assignMessage, setAssignMessage] = useState<AssignMessage | null>(
+    null,
+  );
 
   /* ---------------- TIẾN ĐỘ HỌC CỦA TESTER ---------------- */
 
-  const [progressMap, setProgressMap] = useState<Record<string, TesterCourseStatus>>({});
+  const [progressMap, setProgressMap] = useState<
+    Record<string, TesterCourseStatus>
+  >({});
   const [progressLoading, setProgressLoading] = useState(false);
 
   /* ---------------- DUYỆT KHÓA HỌC ---------------- */
 
   const [approvingId, setApprovingId] = useState<string | null>(null);
-  const [approveMessage, setApproveMessage] = useState<ApproveMessage | null>(null);
+  const [approveMessage, setApproveMessage] = useState<ApproveMessage | null>(
+    null,
+  );
 
   /* ============================================================
      LOAD DATA
@@ -165,13 +154,13 @@ function CourseApprovalContent() {
           const courseExistsInUrl =
             courseIdFromUrl &&
             courseList.some(
-              (course: any) => course.course_id === courseIdFromUrl
+              (course: any) => course.course_id === courseIdFromUrl,
             );
 
           setSelectedCourseId(
             courseExistsInUrl
               ? (courseIdFromUrl as string)
-              : courseList[0].course_id
+              : courseList[0].course_id,
           );
         }
 
@@ -244,7 +233,7 @@ function CourseApprovalContent() {
   const hasApprovedTester = useMemo(() => {
     return testers.some(
       (tester) =>
-        progressMap[tester.user_id]?.testing_course_status === "APPROVED"
+        progressMap[tester.user_id]?.testing_course_status === "APPROVED",
     );
   }, [testers, progressMap]);
 
@@ -288,7 +277,7 @@ function CourseApprovalContent() {
       const ids = testers.map((t) => t.user_id);
       const result = await getTestersCourseStatusBulk(
         ids,
-        selectedCourseId as string
+        selectedCourseId as string,
       );
 
       if (mounted) {
@@ -379,11 +368,11 @@ function CourseApprovalContent() {
           prev.map((course) =>
             course.course_id === courseId
               ? {
-                ...course,
-                status_id: "COURSE_REGISTRATION",
-              }
-              : course
-          )
+                  ...course,
+                  status_id: "COURSE_REGISTRATION",
+                }
+              : course,
+          ),
         );
       } else {
         setApproveMessage({
@@ -457,7 +446,7 @@ function CourseApprovalContent() {
                 <p className="mt-2 text-3xl font-bold text-slate-900">
                   {courses.reduce(
                     (total, course) => total + course.subjects.length,
-                    0
+                    0,
                   )}
                 </p>
               </div>
@@ -533,27 +522,27 @@ function CourseApprovalContent() {
                       type="button"
                       key={course.course_id}
                       onClick={() => handleSelectCourse(course.course_id)}
-                      className={`group w-full rounded-xl border p-4 text-left transition-all ${selected
+                      className={`group w-full rounded-xl border p-4 text-left transition-all ${
+                        selected
                           ? "border-blue-500 bg-blue-50/70 shadow-sm ring-4 ring-blue-50"
                           : "border-slate-200 bg-white hover:border-blue-200 hover:bg-slate-50"
-                        }`}
+                      }`}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <p
-                            className={`line-clamp-2 text-sm font-bold leading-5 ${selected ? "text-blue-700" : "text-slate-900"
-                              }`}
+                            className={`line-clamp-2 text-sm font-bold leading-5 ${
+                              selected ? "text-blue-700" : "text-slate-900"
+                            }`}
                           >
                             {course.title}
-                          </p>
-                          <p className="mt-1 truncate font-mono text-[10px] text-slate-400">
-                            {course.course_id}
                           </p>
                         </div>
                         <ChevronRight
                           size={18}
-                          className={`mt-0.5 shrink-0 ${selected ? "text-blue-600" : "text-slate-300"
-                            }`}
+                          className={`mt-0.5 shrink-0 ${
+                            selected ? "text-blue-600" : "text-slate-300"
+                          }`}
                         />
                       </div>
 
@@ -594,10 +583,6 @@ function CourseApprovalContent() {
                     <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="rounded-lg bg-blue-50 px-2.5 py-1 font-mono text-[11px] font-bold text-blue-600">
-                            {selectedCourse.course_id.slice(0, 8)}
-                          </span>
-
                           <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
                             <CheckCircle2 size={12} />
                             Khóa học
@@ -605,10 +590,11 @@ function CourseApprovalContent() {
 
                           {selectedCourse.status_id && (
                             <span
-                              className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-semibold ${selectedCourse.status_id === "COURSE_DRAFT"
+                              className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-semibold ${
+                                selectedCourse.status_id === "COURSE_DRAFT"
                                   ? "bg-amber-50 text-amber-700"
                                   : "bg-blue-50 text-blue-700"
-                                }`}
+                              }`}
                             >
                               {selectedCourse.status_id === "COURSE_DRAFT"
                                 ? "Đang tạo khóa học"
@@ -654,17 +640,19 @@ function CourseApprovalContent() {
                             {!hasApprovedTester &&
                               approvingId !== selectedCourse.course_id && (
                                 <p className="mt-2 text-xs font-medium text-amber-600">
-                                  Cần ít nhất một tester đánh giá &quot;Đạt&quot;
-                                  trước khi có thể duyệt khóa học.
+                                  Cần ít nhất một tester đánh giá
+                                  &quot;Đạt&quot; trước khi có thể duyệt khóa
+                                  học.
                                 </p>
                               )}
 
                             {approveMessage && (
                               <p
-                                className={`mt-2 text-xs font-medium ${approveMessage.type === "success"
+                                className={`mt-2 text-xs font-medium ${
+                                  approveMessage.type === "success"
                                     ? "text-emerald-600"
                                     : "text-red-500"
-                                  }`}
+                                }`}
                               >
                                 {approveMessage.text}
                               </p>
@@ -751,9 +739,6 @@ function CourseApprovalContent() {
                               <h4 className="text-sm font-bold text-slate-900">
                                 {subject.title}
                               </h4>
-                              <span className="w-fit rounded-md bg-white px-2 py-1 font-mono text-[10px] text-slate-400">
-                                {subject.subject_id.slice(0, 8)}
-                              </span>
                             </div>
 
                             {subject.description && (
@@ -779,7 +764,8 @@ function CourseApprovalContent() {
                         </h3>
                       </div>
                       <p className="mt-1 text-xs text-slate-500">
-                        Gán tester và theo dõi kết quả kiểm thử do tester tự chấm
+                        Gán tester và theo dõi kết quả kiểm thử do tester tự
+                        chấm
                       </p>
                     </div>
 
@@ -790,7 +776,10 @@ function CourseApprovalContent() {
 
                   {testers.length === 0 ? (
                     <div className="rounded-xl border border-dashed border-slate-200 py-10 text-center">
-                      <UsersRound size={30} className="mx-auto text-slate-300" />
+                      <UsersRound
+                        size={30}
+                        className="mx-auto text-slate-300"
+                      />
                       <p className="mt-3 text-sm font-medium text-slate-600">
                         Chưa có tester
                       </p>
@@ -809,8 +798,7 @@ function CourseApprovalContent() {
                         const status: TesterCourseStatus | undefined =
                           progressMap[tester.user_id];
 
-                        const isEnrolled =
-                          justAssigned || !!status?.enrolled;
+                        const isEnrolled = justAssigned || !!status?.enrolled;
 
                         return (
                           <div
@@ -848,10 +836,11 @@ function CourseApprovalContent() {
                                 onClick={() =>
                                   handleAssignTester(tester.user_id)
                                 }
-                                className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${isEnrolled
+                                className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                                  isEnrolled
                                     ? "cursor-default bg-emerald-50 text-emerald-700"
                                     : "bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
-                                  }`}
+                                }`}
                               >
                                 {isAssigning ? (
                                   <Loader2 size={13} className="animate-spin" />
@@ -871,10 +860,11 @@ function CourseApprovalContent() {
 
                             {message && (
                               <p
-                                className={`mt-2 text-[11px] font-medium ${message.type === "success"
+                                className={`mt-2 text-[11px] font-medium ${
+                                  message.type === "success"
                                     ? "text-emerald-600"
                                     : "text-red-500"
-                                  }`}
+                                }`}
                               >
                                 {message.text}
                               </p>
@@ -901,18 +891,22 @@ function CourseApprovalContent() {
                                   <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700">
                                     <Trophy size={12} />
                                     Đã hoàn thành (
-                                    {Math.round(status.current_overall_progress)}
+                                    {Math.round(
+                                      status.current_overall_progress,
+                                    )}
                                     %)
                                   </span>
 
-                                  {status.testing_course_status === "APPROVED" ? (
+                                  {status.testing_course_status ===
+                                  "APPROVED" ? (
                                     <div className="flex items-center justify-between gap-2">
                                       <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2 py-1 text-[11px] font-bold text-emerald-700">
                                         <CheckCircle2 size={12} />
                                         Tester đánh giá: Đạt
                                       </span>
                                     </div>
-                                  ) : status.testing_course_status === "REJECTED" ? (
+                                  ) : status.testing_course_status ===
+                                    "REJECTED" ? (
                                     <div className="flex items-center justify-between gap-2">
                                       <span className="inline-flex items-center gap-1 rounded-lg bg-red-50 px-2 py-1 text-[11px] font-bold text-red-600">
                                         <AlertCircle size={12} />
@@ -935,7 +929,7 @@ function CourseApprovalContent() {
                                     </span>
                                     <span className="font-bold text-blue-600">
                                       {Math.round(
-                                        status?.current_overall_progress ?? 0
+                                        status?.current_overall_progress ?? 0,
                                       )}
                                       %
                                     </span>
@@ -948,8 +942,9 @@ function CourseApprovalContent() {
                                           100,
                                           Math.max(
                                             0,
-                                            status?.current_overall_progress ?? 0
-                                          )
+                                            status?.current_overall_progress ??
+                                              0,
+                                          ),
                                         )}%`,
                                       }}
                                     />

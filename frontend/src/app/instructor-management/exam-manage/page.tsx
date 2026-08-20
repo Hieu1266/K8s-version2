@@ -119,7 +119,10 @@ export default function InstructorSubjectsPage() {
         {/* Bộ lọc và Tìm kiếm */}
         <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between gap-4">
           <div className="relative flex-1">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <Search
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+              size={18}
+            />
             <input
               type="text"
               placeholder="Tìm theo tên môn, mô tả..."
@@ -142,10 +145,11 @@ export default function InstructorSubjectsPage() {
               <button
                 key={status.value}
                 onClick={() => setSelectedStatus(status.value)}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition ${selectedStatus === status.value
-                  ? "bg-[#0066FF] text-white shadow-sm"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                  }`}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition ${
+                  selectedStatus === status.value
+                    ? "bg-[#0066FF] text-white shadow-sm"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
               >
                 {status.label}
               </button>
@@ -157,7 +161,9 @@ export default function InstructorSubjectsPage() {
         {loading && (
           <div className="flex flex-col items-center justify-center py-20 gap-3 text-slate-500 bg-white rounded-2xl border border-slate-200/80 shadow-sm">
             <Loader2 size={32} className="animate-spin text-[#0066FF]" />
-            <p className="text-sm font-semibold">Đang tải danh sách môn học...</p>
+            <p className="text-sm font-semibold">
+              Đang tải danh sách môn học...
+            </p>
           </div>
         )}
 
@@ -202,7 +208,9 @@ export default function InstructorSubjectsPage() {
                       <span
                         className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold border whitespace-nowrap w-fit ${statusConfig.className}`}
                       >
-                        <span className={`w-1.5 h-1.5 rounded-full ${statusConfig.dotColor}`} />
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full ${statusConfig.dotColor}`}
+                        />
                         {statusConfig.label}
                       </span>
                     </div>
@@ -223,13 +231,7 @@ export default function InstructorSubjectsPage() {
                     </div>
                   </div>
 
-                  <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
-                    <span
-                      className="text-[10px] font-mono text-slate-400 truncate max-w-[120px]"
-                      title={subject.subject_id}
-                    >
-                      {subject.subject_id}
-                    </span>
+                  <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end items-center">
                     <Link
                       href={`/instructor-management/exam-manage/${subject.subject_id}`}
                       className="inline-flex items-center gap-1 text-xs font-bold text-[#0066FF] hover:text-blue-700 group-hover:translate-x-1 transition-transform"

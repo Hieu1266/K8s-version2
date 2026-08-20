@@ -429,14 +429,7 @@ export default function CourseTagAssignmentPage() {
                   className="bg-white border border-slate-200 hover:border-blue-300 rounded-3xl p-6 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between space-y-5 group relative"
                 >
                   <div className="space-y-3">
-                    <div className="flex justify-between items-center gap-3">
-                      <span
-                        title={course.course_id}
-                        className="max-w-[170px] truncate text-[10px] font-extrabold uppercase bg-slate-100 text-slate-500 px-2.5 py-1 rounded-lg border border-slate-200"
-                      >
-                        {course.course_id}
-                      </span>
-
+                    <div className="flex justify-end items-center">
                       <span className="text-xs text-slate-400 font-semibold shrink-0">
                         {course.tags.length} Tag
                       </span>

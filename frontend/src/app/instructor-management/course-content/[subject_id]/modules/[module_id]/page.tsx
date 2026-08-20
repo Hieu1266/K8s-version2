@@ -446,11 +446,6 @@ export default function ModuleDetailPage() {
 
           <div className="bg-white p-6 sm:p-8 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
-              <div className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                <span>Subject: {subjectId}</span>
-                <span>•</span>
-                <span className="text-blue-600">Module ID: {moduleId}</span>
-              </div>
               <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 mt-1">
                 Chi Tiết Module & Nội Dung Bài Học
               </h1>

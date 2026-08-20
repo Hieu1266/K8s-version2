@@ -15,41 +15,11 @@ import {
   Trash2,
   X,
   Check,
-  Hash,
   Layers,
   AlertCircle,
 } from "lucide-react";
 
 export default function TagManagementPage() {
-  // const [tags, setTags] = useState<TagItem[]>([
-  //   {
-  //     tag_id: "TAG001",
-  //     tag_name: "Lập trình Web",
-  //     description:
-  //       "Các khóa học bao gồm Frontend, Backend và Fullstack Development.",
-  //   },
-  //   {
-  //     tag_id: "TAG002",
-  //     tag_name: "Python",
-  //     description: "Các môn học liên quan đến ngôn ngữ lập trình Python.",
-  //   },
-  //   {
-  //     tag_id: "TAG003",
-  //     tag_name: "AI & Data Science",
-  //     description: "Trí tuệ nhân tạo, Học máy và Phân tích dữ liệu.",
-  //   },
-  //   {
-  //     tag_id: "TAG004",
-  //     tag_name: "Cơ bản",
-  //     description: "Kiến thức nền tảng dành cho người mới bắt đầu.",
-  //   },
-  //   {
-  //     tag_id: "TAG005",
-  //     tag_name: "Nâng cao",
-  //     description:
-  //       "Kiến thức chuyên sâu dành cho lập trình viên đã có kinh nghiệm.",
-  //   },
-  // ]);
   const [tags, setTags] = useState<TagItem[]>([]);
   const [keyword, setKeyword] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -238,12 +208,12 @@ export default function TagManagementPage() {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="border-b border-slate-100 text-slate-400 text-[11px] font-black uppercase tracking-wider">
-                    <th className="pb-4 px-4">Mã Tag</th>
                     <th className="pb-4 px-4">Tên Tag</th>
                     <th className="pb-4 px-4">Mô tả</th>
                     <th className="pb-4 px-4 text-right">Thao tác</th>
                   </tr>
                 </thead>
+
                 <tbody className="divide-y divide-slate-100">
                   {filteredTags.map((tag) => (
                     <tr
@@ -251,15 +221,12 @@ export default function TagManagementPage() {
                       className="hover:bg-slate-50/80 transition-colors group"
                     >
                       <td className="py-4 px-4">
-                        <span className="font-mono text-xs text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200 inline-flex items-center gap-1 font-bold">
-                          <Hash size={12} /> {tag.tag_id}
-                        </span>
-                      </td>
-                      <td className="py-4 px-4">
                         <span className="bg-blue-50 text-[#0066FF] border border-blue-100 px-3 py-1 rounded-xl text-xs font-extrabold inline-flex items-center gap-1.5 shadow-sm">
-                          <TagIcon size={12} /> {tag.tag_name}
+                          <TagIcon size={12} />
+                          {tag.tag_name}
                         </span>
                       </td>
+
                       <td className="py-4 px-4">
                         <p className="text-xs text-slate-600 font-medium line-clamp-1 max-w-md">
                           {tag.description || (
@@ -269,6 +236,7 @@ export default function TagManagementPage() {
                           )}
                         </p>
                       </td>
+
                       <td className="py-4 px-4 text-right">
                         <div className="flex items-center justify-end gap-2">
                           <button
@@ -278,6 +246,7 @@ export default function TagManagementPage() {
                           >
                             <Edit3 size={16} />
                           </button>
+
                           <button
                             onClick={() => handleOpenDelete(tag)}
                             className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"

@@ -65,7 +65,8 @@ const getFileNameFromUrl = (url: string | null): string => {
   return rawFileName;
 };
 
-const MEDIA_BASE_URL = process.env.NEXT_PUBLIC_MEDIA_URL || "http://127.0.0.1:8081";
+const MEDIA_BASE_URL =
+  process.env.NEXT_PUBLIC_MEDIA_URL || "http://127.0.0.1:8081";
 
 const getFullAssetUrl = (url: string | null): string => {
   if (!url) return "";
@@ -301,7 +302,6 @@ export default function LumerCurriculumManagement() {
 
           <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
             <div className="max-w-3xl">
-
               <h1 className="text-3xl font-black uppercase tracking-tight drop-shadow-md md:text-4xl">
                 QUẢN LÝ CHƯƠNG TRÌNH ĐÀO TẠO
               </h1>
@@ -420,17 +420,18 @@ export default function LumerCurriculumManagement() {
                     <div className="flex items-start justify-between w-full">
                       <div>
                         <span
-                          className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${STATUS_MAP_TO_FRONTEND[c.status_id] ===
-                              "Đang hoạt động"
+                          className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                            STATUS_MAP_TO_FRONTEND[c.status_id] ===
+                            "Đang hoạt động"
                               ? "bg-green-50 text-green-600"
                               : STATUS_MAP_TO_FRONTEND[c.status_id] ===
-                                "Bản nháp"
+                                  "Bản nháp"
                                 ? "bg-amber-50 text-amber-600"
                                 : STATUS_MAP_TO_FRONTEND[c.status_id] ===
-                                  "Thẩm định"
+                                    "Thẩm định"
                                   ? "bg-blue-50 text-blue-600"
                                   : "bg-gray-100 text-gray-600"
-                            }`}
+                          }`}
                         >
                           {STATUS_MAP_TO_FRONTEND[c.status_id] || "Bản nháp"}
                         </span>
@@ -587,11 +588,6 @@ export default function LumerCurriculumManagement() {
                       ? "Cập nhật chương trình"
                       : "Thiết kế chương trình mới"}
                   </h3>
-                  <p className="text-[11px] text-slate-400 font-medium mt-0.5">
-                    {isEditMode
-                      ? `Mã số cấu trúc: ${selectedCurriculum?.curriculum_id}`
-                      : "Nhập thông tin chuẩn hóa liên kết hệ thống"}
-                  </p>
                 </div>
               </div>
 
