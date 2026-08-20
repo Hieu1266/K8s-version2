@@ -152,6 +152,7 @@ export default function CourseLearningPage() {
   // =========================================================
 
   const [completing, setCompleting] = useState(false);
+  const [slideFocusMode, setSlideFocusMode] = useState(false);
 
   const slideCompletionInFlightRef = useRef(false);
 
@@ -280,10 +281,29 @@ export default function CourseLearningPage() {
   // =========================================================
 
   useEffect(() => {
+    if (!slideFocusMode) {
+      return;
+    }
+
+    const handleFocusModeKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setSlideFocusMode(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleFocusModeKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleFocusModeKeyDown);
+    };
+  }, [slideFocusMode]);
+
+  useEffect(() => {
     setVideoCurrentTime(0);
     setSeekTarget(null);
 
     setHasViewedAllSlides(false);
+    setSlideFocusMode(false);
 
     setQuickNoteOpen(false);
     setQuickNoteContent("");
@@ -1437,49 +1457,65 @@ export default function CourseLearningPage() {
         fontFamily: "'Inter', ui-sans-serif, system-ui, sans-serif",
       }}
     >
-      <Navbar />
+      {!slideFocusMode && (
+        <>
+          <Navbar />
 
-      <CourseHeaderBar
-        courseTitle={course.title}
-        progressPercent={progressPercent}
-        onLeaveCourse={() => router.push("/dashboard-student")}
-      />
+          <CourseHeaderBar
+            courseTitle={course.title}
+            progressPercent={progressPercent}
+            onLeaveCourse={() => router.push("/dashboard-student")}
+          />
+        </>
+      )}
 
       <div className="flex flex-1 min-h-0 overflow-hidden">
-        <CourseSidebar
-          course={course}
-          expandedSubjects={expandedSubjects}
-          expandedModules={expandedModules}
-          onToggleSubject={toggleSubject}
-          onToggleModule={toggleModule}
-          isAllExpanded={isAllExpanded}
-          onToggleAll={toggleAll}
-          completedCount={completedCount}
-          totalLessons={flatLessons.length}
-          currentLessonId={currentLesson?.lesson_id}
-          onSelectLesson={selectLesson}
-          collapsed={sidebarCollapsed}
-          onToggleCollapse={toggleSidebarCollapsed}
-        />
+        {!slideFocusMode && (
+          <CourseSidebar
+            course={course}
+            expandedSubjects={expandedSubjects}
+            expandedModules={expandedModules}
+            onToggleSubject={toggleSubject}
+            onToggleModule={toggleModule}
+            isAllExpanded={isAllExpanded}
+            onToggleAll={toggleAll}
+            completedCount={completedCount}
+            totalLessons={flatLessons.length}
+            currentLessonId={currentLesson?.lesson_id}
+            onSelectLesson={selectLesson}
+            collapsed={sidebarCollapsed}
+            onToggleCollapse={toggleSidebarCollapsed}
+          />
+        )}
 
         {/* Khung hiển thị nội dung bài học */}
         <div
           ref={lessonContentScrollRef}
-          className="flex-1 min-h-0 overflow-y-auto bg-[#F7F8FB] flex flex-col"
+          className={`flex min-h-0 flex-1 flex-col bg-[#F7F8FB] ${
+            slideFocusMode ? "overflow-hidden" : "overflow-y-auto"
+          }`}
         >
-          <div className="px-10 pt-8 space-y-6 flex-1 max-w-7xl">
-            <LessonTitleHeader
-              subjectTitle={currentSubject?.title}
-              subjectAccentColor={
-                currentSubject
-                  ? getSubjectAccent(course, currentSubject.subject_id)
-                  : "#5B5FEF"
-              }
-              isOptional={currentLesson?.is_optional}
-              lessonTitle={currentLesson?.title}
-            />
+          <div
+            className={
+              slideFocusMode
+                ? "flex min-h-0 max-w-none flex-1 flex-col"
+                : "max-w-7xl flex-1 space-y-6 px-10 pt-8"
+            }
+          >
+            {!slideFocusMode && (
+              <LessonTitleHeader
+                subjectTitle={currentSubject?.title}
+                subjectAccentColor={
+                  currentSubject
+                    ? getSubjectAccent(course, currentSubject.subject_id)
+                    : "#5B5FEF"
+                }
+                isOptional={currentLesson?.is_optional}
+                lessonTitle={currentLesson?.title}
+              />
+            )}
 
-            {!currentLesson?.is_quiz && (
+            {!slideFocusMode && !currentLesson?.is_quiz && (
               <LessonTabsNav
                 tabs={lessonTabs}
                 activeTab={activeTab}
@@ -1494,9 +1530,19 @@ export default function CourseLearningPage() {
             {activeTab === "lecture" &&
               !currentLesson?.is_quiz &&
               currentLesson && (
-                <div key="lecture" className="anim-fade-up space-y-6 pb-12">
+                <div
+                  key="lecture"
+                  className={
+                    slideFocusMode
+                      ? "flex min-h-0 flex-1 flex-col"
+                      : "anim-fade-up space-y-6 pb-12"
+                  }
+                >
                   <LectureTabContent
+                    courseId={id}
                     currentLesson={currentLesson}
+                    isFocusMode={slideFocusMode}
+                    onFocusModeChange={setSlideFocusMode}
                     hasVideo={hasVideo}
                     videoProgress={videoProgress}
                     videoProgressLoading={videoProgressLoading}

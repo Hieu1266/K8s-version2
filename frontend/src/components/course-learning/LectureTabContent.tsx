@@ -9,7 +9,10 @@ import PresentationViewer from "@/components/PresentationViewer";
 import AnnotatedContent from "@/components/AnnotatedContent";
 
 type LectureTabContentProps = {
+  courseId: string;
   currentLesson?: LessonWithStatus;
+  isFocusMode: boolean;
+  onFocusModeChange: (isFocused: boolean) => void;
   hasVideo: boolean;
   videoProgress: VideoProgress | null;
   videoProgressLoading: boolean;
@@ -39,7 +42,10 @@ type LectureTabContentProps = {
 
 /** Nội dung tab "Bài giảng": video (hoặc nội dung bài đọc) + ghi chú nhanh + nút hoàn thành */
 export default function LectureTabContent({
+  courseId,
   currentLesson,
+  isFocusMode,
+  onFocusModeChange,
   hasVideo,
   videoProgress,
   videoProgressLoading,
@@ -122,8 +128,11 @@ export default function LectureTabContent({
       {currentLesson.is_slide_presentation ? (
         <PresentationViewer
           key={currentLesson.lesson_id}
+          courseId={courseId}
           lessonId={currentLesson.lesson_id}
           lessonTitle={currentLesson.title}
+          isFocusMode={isFocusMode}
+          onFocusModeChange={onFocusModeChange}
           onSlideProgressChange={onSlideProgressChange}
         />
       ) : hasContentBody ? (
@@ -149,6 +158,7 @@ export default function LectureTabContent({
 
       {/* NÚT HOÀN THÀNH BÀI ĐỌC: Chỉ hiển thị khi KHÔNG có video VÀ had_quiz == false */}
       {!hasVideo &&
+        !isFocusMode &&
         !currentLesson.had_quiz &&
         (!currentLesson.is_slide_presentation ||
           hasViewedAllSlides ||
@@ -161,7 +171,8 @@ export default function LectureTabContent({
           />
         )}
 
-      {currentLesson.is_slide_presentation &&
+      {!isFocusMode &&
+        currentLesson.is_slide_presentation &&
         !hasViewedAllSlides &&
         currentLesson.status !== LessonStatus.COMPLETED && (
           <p className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-center text-sm font-medium text-blue-700">
