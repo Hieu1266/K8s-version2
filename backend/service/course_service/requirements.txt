@@ -6,3 +6,7 @@ PyJWT==2.13.0
 bcrypt==5.0.0
 SQLAlchemy==2.0.46
 sqlmodel==0.0.31
+httpx
+psycopg2-binary 
+uvicorn
+
