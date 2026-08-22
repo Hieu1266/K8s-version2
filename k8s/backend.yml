@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
       - name: user-service
-        image: __DOCKER_USERNAME__/user-service:latest
+        image: thanhieub2305573/user-service:latest
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8000
@@ -29,8 +29,12 @@ spec:
         - name: DB_NAME
           value: "user_db"
         envFrom:
+        - configMapRef:
+            name: backend-config
         - secretRef:
             name: backend-secrets
+        - secretRef:
+            name: app-db-secrets
         resources:
           requests:
             memory: "128Mi"
@@ -75,7 +79,7 @@ spec:
     spec:
       containers:
       - name: course-service
-        image: __DOCKER_USERNAME__/course-service:latest
+        image: thanhieub2305573/course-service:latest
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8001
@@ -85,8 +89,12 @@ spec:
         - name: DB_NAME
           value: "course_db"
         envFrom:
+        - configMapRef:
+            name: backend-config
         - secretRef:
             name: backend-secrets
+        - secretRef:
+            name: app-db-secrets
         resources:
           requests:
             memory: "128Mi"
@@ -130,7 +138,7 @@ spec:
     spec:
       containers:
       - name: quiz-exam-service
-        image: __DOCKER_USERNAME__/quiz-exam-service:latest
+        image: thanhieub2305573/quiz-exam-service:latest
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8002
@@ -140,8 +148,12 @@ spec:
         - name: DB_NAME
           value: "quiz_exam_db"
         envFrom:
+        - configMapRef:
+            name: backend-config
         - secretRef:
             name: backend-secrets
+        - secretRef:
+            name: app-db-secrets
         resources:
           requests:
             memory: "128Mi"
@@ -185,7 +197,7 @@ spec:
     spec:
       containers:
       - name: learning-progress-service
-        image: __DOCKER_USERNAME__/learning-progress-service:latest
+        image: thanhieub2305573/learning-progress-service:latest
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8003
@@ -195,8 +207,12 @@ spec:
         - name: DB_NAME
           value: "learning_progress_db"
         envFrom:
+        - configMapRef:
+            name: backend-config
         - secretRef:
             name: backend-secrets
+        - secretRef:
+            name: app-db-secrets
         resources:
           requests:
             memory: "128Mi"
@@ -239,7 +255,7 @@ spec:
     spec:
       containers:
       - name: config-service
-        image: __DOCKER_USERNAME__/config-service:latest
+        image: thanhieub2305573/config-service:latest
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8004

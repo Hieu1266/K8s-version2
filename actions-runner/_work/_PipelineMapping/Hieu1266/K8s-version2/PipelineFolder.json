@@ -1,0 +1,12 @@
+﻿{
+  "repositoryName": "Hieu1266/K8s-version2",
+  "pipelineDirectory": "K8s-version2",
+  "workspaceDirectory": "K8s-version2\\K8s-version2",
+  "repositories": {
+    "Hieu1266/K8s-version2": {
+      "repositoryPath": "K8s-version2\\K8s-version2",
+      "lastRunOn": "08/22/2026 12:05:44 +07:00"
+    }
+  },
+  "lastRunOn": "08/22/2026 12:05:44 +07:00"
+}

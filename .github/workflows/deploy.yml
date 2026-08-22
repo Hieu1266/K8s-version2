@@ -118,3 +118,24 @@ jobs:
           kubectl rollout restart deployment/user-service
           kubectl rollout restart deployment/config-service
           kubectl rollout restart deployment/frontend
+
+      - name: Expose NodePort ra LAN (netsh portproxy)
+        shell: powershell
+        run: |
+          $lanIp = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object {
+            $_.InterfaceAlias -notmatch 'Loopback|vEthernet|WSL' -and $_.IPAddress -notlike '169.254.*'
+          } | Select-Object -First 1 -ExpandProperty IPAddress)
+
+          Write-Host "LAN IP hien tai: $lanIp"
+
+          $ports = 30080,30800,30801,30802,30803
+          foreach ($port in $ports) {
+            netsh interface portproxy delete v4tov4 listenport=$port listenaddress=$lanIp | Out-Null
+            netsh interface portproxy add v4tov4 listenaddress=$lanIp listenport=$port connectaddress=127.0.0.1 connectport=$port
+          }
+
+          netsh interface portproxy show v4tov4
+
+          if (-not (Get-NetFirewallRule -DisplayName "LUMER K8s Ports" -ErrorAction SilentlyContinue)) {
+            New-NetFirewallRule -DisplayName "LUMER K8s Ports" -Direction Inbound -LocalPort $ports -Protocol TCP -Action Allow
+          }
