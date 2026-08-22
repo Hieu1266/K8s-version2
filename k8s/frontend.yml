@@ -21,7 +21,7 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: your-registry/frontend:latest
+        image: thanhieub2305573/frontend:latest
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 3000

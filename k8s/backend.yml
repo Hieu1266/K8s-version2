@@ -19,15 +19,31 @@ spec:
     spec:
       containers:
       - name: user-service
-        image: your-registry/user-service:latest
+        image: thanhieub2305573/user-service:latest
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8000
         env:
         - name: PORT
           value: "8000"
-        - name: DB_NAME
-          value: "user_db"
+        - name: CLIENT_ID
+          value: "373059704505-idbcgjtvf3pl94krkoeh67f4ars8fmte.apps.googleusercontent.com"
+        - name: CLIENT_SECRET_KEY
+          value: "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"
+        - name: USERS_DB_URL
+          value: "postgresql://postgres:abc123@postgres:5432/user_db"
+        - name: FRONTEND_HOST
+          value: "http://localhost:30080"
+        - name: STORAGE_API_URL
+          value: "http://storage-service:8000"
+        - name: BACKEND_USER_URL
+          value: "http://user-service:8000"
+        - name: BACKEND_COURSE_URL
+          value: "http://course-service:8001"
+        - name: BACKEND_QUIZ_EXAM_URL
+          value: "http://quiz-exam-service:8002"
+        - name: BACKEND_LEARNING_PROGRESS_URL
+          value: "http://learning-progress-service:8003"
         envFrom:
         - secretRef:
             name: backend-secrets
@@ -73,15 +89,27 @@ spec:
     spec:
       containers:
       - name: course-service
-        image: your-registry/course-service:latest
+        image: thanhieub2305573/course-service:latest
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8001
         env:
         - name: PORT
           value: "8001"
-        - name: DB_NAME
-          value: "course_db"
+        - name: COURSES_DB_URL
+          value: "postgresql://postgres:abc123@postgres:5432/course_db"
+        - name: FRONTEND_HOST
+          value: "http://localhost:30080"
+        - name: STORAGE_API_URL
+          value: "http://storage-service:8000"
+        - name: BACKEND_USER_URL
+          value: "http://user-service:8000"
+        - name: BACKEND_COURSE_URL
+          value: "http://course-service:8001"
+        - name: BACKEND_QUIZ_EXAM_URL
+          value: "http://quiz-exam-service:8002"
+        - name: BACKEND_LEARNING_PROGRESS_URL
+          value: "http://learning-progress-service:8003"
         envFrom:
         - secretRef:
             name: backend-secrets
@@ -127,15 +155,27 @@ spec:
     spec:
       containers:
       - name: quiz-exam-service
-        image: your-registry/quiz-exam-service:latest
+        image: thanhieub2305573/quiz-exam-service:latest
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8002
         env:
         - name: PORT
           value: "8002"
-        - name: DB_NAME
-          value: "quiz_exam_db"
+        - name: QUIZS_DB_URL
+          value: "postgresql://postgres:abc123@postgres:5432/quiz_exam_db"
+        - name: FRONTEND_HOST
+          value: "http://localhost:30080"
+        - name: STORAGE_API_URL
+          value: "http://storage-service:8000"
+        - name: BACKEND_USER_URL
+          value: "http://user-service:8000"
+        - name: BACKEND_COURSE_URL
+          value: "http://course-service:8001"
+        - name: BACKEND_QUIZ_EXAM_URL
+          value: "http://quiz-exam-service:8002"
+        - name: BACKEND_LEARNING_PROGRESS_URL
+          value: "http://learning-progress-service:8003"
         envFrom:
         - secretRef:
             name: backend-secrets
@@ -181,15 +221,27 @@ spec:
     spec:
       containers:
       - name: learning-progress-service
-        image: your-registry/learning-progress-service:latest
+        image: thanhieub2305573/learning-progress-service:latest
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8003
         env:
         - name: PORT
           value: "8003"
-        - name: DB_NAME
-          value: "learning_progress_db"
+        - name: LEARNING_PROGRESS_DB_URL
+          value: "postgresql://postgres:abc123@postgres:5432/learning_progress_db"
+        - name: FRONTEND_HOST
+          value: "http://localhost:30080"
+        - name: STORAGE_API_URL
+          value: "http://storage-service:8000"
+        - name: BACKEND_USER_URL
+          value: "http://user-service:8000"
+        - name: BACKEND_COURSE_URL
+          value: "http://course-service:8001"
+        - name: BACKEND_QUIZ_EXAM_URL
+          value: "http://quiz-exam-service:8002"
+        - name: BACKEND_LEARNING_PROGRESS_URL
+          value: "http://learning-progress-service:8003"
         envFrom:
         - secretRef:
             name: backend-secrets
