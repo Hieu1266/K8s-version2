@@ -30,6 +30,14 @@ class Settings(BaseSettings):
     BACKEND_LEARNING_PROGRESS_URL: str
     COURSES_DB_URL: str
 
+
+    MINIO_ENDPOINT: str = "http://minio:9000"
+    MINIO_ACCESS_KEY: str = "minioadmin"
+    MINIO_SECRET_KEY: str = "minioadmin123"
+    MINIO_BUCKET: str = "lumer-media"   
+    STORAGE_PUBLIC_URL: str = "http://localhost:30900"
+
+
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_DAYS: int = 1
