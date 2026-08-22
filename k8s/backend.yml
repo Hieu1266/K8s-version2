@@ -110,6 +110,16 @@ spec:
           value: "http://quiz-exam-service:8002"
         - name: BACKEND_LEARNING_PROGRESS_URL
           value: "http://learning-progress-service:8003"
+        - name: MINIO_ENDPOINT
+          value: "http://minio:9000"
+        - name: MINIO_ACCESS_KEY
+          value: "minioadmin"
+        - name: MINIO_SECRET_KEY
+          value: "minioadmin123"
+        - name: MINIO_BUCKET
+          value: "lumer-media"
+        - name: STORAGE_PUBLIC_URL
+          value: "http://localhost:30900"
         envFrom:
         - secretRef:
             name: backend-secrets

@@ -7,7 +7,7 @@ class CRUDSyllabusMedia:
     def upload_file(self, file: UploadFile) -> str:
         try:
             files = {"file": (file.filename, file.file, file.content_type)}
-            data = {"folder": "syllabus"}
+            data = {"folder": "curriculum"}
             resp = httpx.post(f"{STORAGE_API_URL}/upload", files=files, data=data, timeout=30)
             resp.raise_for_status()
             result = resp.json()
