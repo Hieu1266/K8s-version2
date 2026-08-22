@@ -122,3 +122,16 @@
 [2026-08-22 04:42:05Z INFO RunnerServer] EstablishVssConnection
 [2026-08-22 04:42:05Z INFO RunnerServer] Establish connection with 60 seconds timeout.
 [2026-08-22 04:42:05Z INFO GitHubActionsService] Starting operation Location.GetConnectionData
+[2026-08-22 04:42:06Z INFO GitHubActionsService] Finished operation Location.GetConnectionData
+[2026-08-22 04:42:06Z INFO GitHubActionsService] Finished operation Location.GetConnectionData
+[2026-08-22 04:42:06Z INFO GitHubActionsService] Finished operation Location.GetConnectionData
+[2026-08-22 04:42:06Z INFO BrokerMessageListener] VssConnection created
+[2026-08-22 04:42:06Z INFO Terminal] WRITE LINE: 
+[2026-08-22 04:42:06Z INFO Terminal] WRITE LINE: 
+[2026-08-22 04:42:06Z INFO RSAEncryptedFileKeyManager] Loading RSA key parameters from file D:\CodeSourcce\Remote-Learning-LUMER\actions-runner\.credentials_rsaparams
+[2026-08-22 04:42:06Z INFO RSAEncryptedFileKeyManager] Loading RSA key parameters from file D:\CodeSourcce\Remote-Learning-LUMER\actions-runner\.credentials_rsaparams
+[2026-08-22 04:42:07Z INFO GitHubActionsService] AAD Correlation ID for this token request: Unknown
+[2026-08-22 04:42:08Z INFO BrokerMessageListener] Session created.
+[2026-08-22 04:42:08Z INFO Terminal] WRITE LINE: Current runner version: '2.336.0'
+[2026-08-22 04:42:08Z INFO Terminal] WRITE LINE: 2026-08-22 04:42:08Z: Listening for Jobs
+[2026-08-22 04:42:08Z INFO JobDispatcher] Set runner/worker IPC timeout to 30 seconds.
